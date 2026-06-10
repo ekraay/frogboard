@@ -41,9 +41,10 @@ Designed to be reused for any future event, including scout activities.
 - **Performant — rendering speed first, under 100 ms.** The bar is *perceived*
   speed: every interaction should feel instant. Targets at p95:
   - **Interaction render < 100 ms** — claim/release, status move, view switch,
-    filter, and waiting-toggle repaint in under 100 ms. Achieved with
-    **optimistic UI** (update the screen immediately, reconcile with the server
-    after) so renders never wait on the network.
+    filter, and waiting-toggle repaint in under 100 ms. The target end state is
+    **optimistic UI** (update the screen immediately, reconcile after). Phase 1
+    ships honest **pending-state + refresh** (disabled control while the action
+    runs, then re-render); true `useOptimistic` is a tracked enhancement.
   - **Smooth lists** — board/Kanban/table stay at 60 fps while scrolling;
     long rosters are virtualized so render cost doesn't grow with task count.
   - **Fast first paint** — the initial board is server-rendered and
@@ -91,8 +92,13 @@ reports, and revert DRY.
 - `requestedGroup` (optional) — affiliate asked to staff it (Scouts, YAO, BWA,
   Taiko, Soko Gakuen, Board). Distinct axis from `category`.
 - `neededCount` — how many people are wanted
-- `date` (optional)
-- `startTime`, `endTime` (optional) — for `kind: shift`. Both blank = "All day".
+- `date` (optional) — the calendar day; drives day-grouping. Set for any
+  scheduled task; blank only for undated frogs.
+- `startAt`, `endAt` (optional, timestamps) — exact start/end when known; a date
+  set with no times = "All day". Stored as timestamps (not strings) for correct
+  sorting and reporting; display formatting lives in the domain/UI layer, in a
+  fixed event timezone (America/Los_Angeles for BCSF; per-event timezone is a
+  later enhancement).
 - `dueBy` (optional) — for `kind: frog`, a "done by" deadline.
 - `pointOfContact` (optional) — name + optional phone/email of who can explain
   the job.
@@ -114,12 +120,17 @@ reports, and revert DRY.
   who actually signed up.
 - `minor` (optional yes/no) — whether the volunteer is under 18; one optional
   checkbox at claim time, surfaced for youth-protection counts and the table.
+- `claimToken` (random, set at claim) — a capability token stored device-side
+  (localStorage) so only the claimer's device shows a "remove me" control and can
+  release the signup. Phase-1 anti-graffiti, not a security boundary; the audit
+  log + admin revert is the real backstop. Admin override comes in Phase 2.
 - `userId` (nullable) — set when a logged-in user claims (links to Auth.js
   `User`); null for anonymous signups. Powers the "my shifts" view and reminders.
 - `createdAt`
 
 ### AuditLog (append-only)
-- `id`, `taskId`
+- `id`, `eventId`, `taskId` — `eventId` denormalized so admin/report screens can
+  query an event's history without joining through Task.
 - `action` — `"claim"` | `"release"` | `"edit"` | `"move"` (status change) |
   `"flag"` (waiting toggle)
 - `details` — enough to render "who did what when" and to revert
@@ -144,8 +155,13 @@ reports, and revert DRY.
 - Tap an open card → type name (email, phone, group all optional) → claimed;
   your name appears on the card.
 - Seeing who's already on a card is how **pairing** happens — join your buddy.
-- **Release:** tap your own name → "remove me." Anyone *can* edit/remove (it's
-  the open whiteboard), but every change is logged and revertible.
+- **Release:** the "remove me" control appears only on the device that made the
+  claim (via the `claimToken`), so people don't undo each other's signups. Every
+  change is still logged and admin-revertible (Phase 2).
+- **Abuse protection** (public, no-login board): input length limits and light
+  validation on name/email/phone/group, a hidden honeypot field to catch bots,
+  and rate limiting (placeholder until a KV store is added). Collect no personal
+  info beyond what a claim needs.
 
 ### Kanban / progress view
 - A second view of the same tasks, grouped into four columns: **To Do →

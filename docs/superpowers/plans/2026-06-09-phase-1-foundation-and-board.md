@@ -2,13 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship the MVP volunteer frog board — anyone with the link can see an event's shifts/frogs grouped by day and claim or release a slot, with every change written to an append-only audit log.
+**Goal:** Ship the MVP volunteer frog board — anyone with the link can see an event's shifts/frogs grouped by day and claim or release **their own** slot, with every change written to an append-only audit log. No final-slot overfill, no removing other people's claims.
 
-**Architecture:** Next.js (App Router) full-stack app. Pure domain functions in `lib/domain/` hold all logic (grouping, slot math, claim/release validation, audit-entry construction) and are unit-tested without a database. A thin repository layer (`lib/repository/`) wraps Prisma in transactions and is covered by integration tests against a test Postgres database. Server Actions call the repository; React Server Components render the board; one client component handles claim/release with optimistic UI.
+**Architecture:** Next.js (App Router) full-stack app. Pure domain functions in `lib/domain/` hold all logic (grouping, slot math, claim/release validation, audit construction) and are unit-tested without a database. A thin repository layer (`lib/repository/`) wraps Prisma in transactions — using `SELECT … FOR UPDATE` row locks to make claiming the last slot safe under concurrency — and is integration-tested. Server Actions call the repository; React Server Components render the board; client components own the claim/release interaction. A `claimToken` capability gives each claimer device-local ownership of their signup.
 
-**Tech Stack:** Next.js 15 (App Router, TypeScript), Tailwind CSS, Prisma ORM, Neon Postgres, Vitest + @testing-library/react.
+**Tech Stack:** Next.js 15 (App Router, TypeScript), Tailwind CSS, Prisma ORM, Neon Postgres (prod) / Postgres service container (CI), Vitest + @testing-library/react, Playwright (E2E stretch), GitHub Actions (CI), Vercel (CD).
 
-This is Phase 1 of 5. See the spec at `docs/superpowers/specs/2026-06-09-volunteer-frog-board-design.md`. Phases 2–5 (admin/import, Kanban/table, accounts, reports) are separate plans. The Prisma schema in this plan includes fields used by later phases (`status`, `waiting`, `userId`, etc.) so no migration is needed to add them later.
+This is Phase 1 of 5. See the spec at `docs/superpowers/specs/2026-06-09-volunteer-frog-board-design.md`. The Prisma schema here includes fields used by later phases (`status`, `waiting`, `userId`, etc.) so no migration is needed to add them later.
 
 ---
 
@@ -16,52 +16,88 @@ This is Phase 1 of 5. See the spec at `docs/superpowers/specs/2026-06-09-volunte
 
 These shape *how* every task below is built, not just what it builds.
 
-- **Kent Beck — TDD & simple design.** Red → green → refactor on every task (this
-  plan is structured that way). Make it work, then right, then fast. Four rules of
-  simple design, in order: passes the tests, reveals intent, no duplication,
-  fewest elements. When a change is awkward, first make the change *easy*, then
-  make the easy change.
+- **Kent Beck — TDD & simple design.** Red → green → refactor on every task. Make
+  it work, then right, then fast. Four rules of simple design, in order: passes
+  the tests, reveals intent, no duplication, fewest elements.
 - **Ward Cunningham — simplest thing & honest debt.** Build the simplest thing
-  that could possibly work. When you knowingly take a shortcut, write it down (a
-  one-line `## Known debt` note in the PR/commit) and pay it back deliberately —
-  debt is a tool only if it's visible.
+  that could possibly work; when you take a knowing shortcut, write it down (a
+  `Known debt:` line in the commit body) and pay it back deliberately.
 - **Bob Martin — clean architecture & boundaries.** Hold the dependency rule:
   `lib/domain/` knows nothing about Prisma, Next, or React; frameworks depend on
-  the domain, never the reverse. The repository layer is the only seam that
-  touches the database. (Already the structure here — keep it that way.)
-- **Elizabeth Hendrickson — exploratory testing.** Automated tests prove what you
-  thought to check; they don't find surprises. After each phase, run a timeboxed
-  charter — e.g. "explore claiming the last slot from two phones at once; weird
-  names, double-taps, back-button" — and turn anything found into a new test.
+  the domain, never the reverse. The repository layer is the only DB seam.
+- **Elizabeth Hendrickson — exploratory testing.** After each phase, run a
+  timeboxed charter (e.g. "claim the last slot from two phones at once; weird
+  names, double-taps, back-button") and turn anything found into a test.
 - **Henrik Kniberg — self-organization, visual management, definition of done.**
-  The product embodies these; so does the process. Honor each task's DoD
-  checkboxes; visualize work; prefer pull over push.
-- **Don Reinertsen — flow & small batches.** Thin vertical slices (Phase 1 is a
-  shippable slice). One task = one commit = small batch. Limit work-in-progress.
-  Sequence by cost of delay — the no-login board ships first because its delay
-  cost is highest (scouts can't sign up without it).
-- **John Cutler — outcomes over output.** Success = scouts actually sign up and
-  gaps close, not features shipped. Each phase must earn the next; resist the
-  feature factory. Keep the work and its rationale visible.
-- **Esther Derby — retrospect & improve the system.** After each phase, a short
-  retro: what helped, what to change, one adjustment to the next plan. Improve the
-  system, not the people.
+  Honor each task's DoD; visualize work; prefer pull over push.
+- **Don Reinertsen — flow & small batches.** Thin vertical slices; one task = one
+  commit; limit WIP; sequence by cost of delay (the no-login board first).
+- **John Cutler — outcomes over output.** Success = scouts sign up and gaps
+  close, not features shipped. Each phase must earn the next.
+- **Esther Derby — retrospect & improve the system.** A short retro after each
+  phase; one adjustment to the next plan. Improve the system, not the people.
+- **Jez Humble — continuous delivery.** Keep `main` always releasable behind a
+  deployment pipeline (Task 2). Trunk-based development with small, frequent
+  commits; every commit runs the full test suite in CI before deploy. Build once,
+  promote the same artifact; database migrations run automatically in the
+  pipeline (`prisma migrate deploy`), never by hand against prod. If a step
+  hurts, automate it and do it more often. Incomplete later-phase features hide
+  behind flags rather than living on a long-lived branch.
+
+---
+
+## User Experience & Mental Models
+
+UI tasks (Task 11 here; the organizer view in Phase 2) must be built with the
+**`frontend-design` skill** — not just to look good, but to match how each user
+already thinks. Invoke it when implementing components and hold to these models.
+
+**Volunteer mental model — "grab a task like taking a flyer off a board."**
+- A card is a *physical object you pick up*. Claiming is one confident action
+  ("Grab a frog" → name → done), never a multi-screen form. The frog/lily-pad
+  metaphor reinforces "pick it up and it's yours."
+- Make state instantly legible *before* reading: open vs. full readable by color
+  and weight at a glance; "2 of 5 filled" as a glanceable ratio, not fine print.
+- Show who's already on a task — that's the social cue that drives pairing
+  ("join your buddy"), straight from Kniberg.
+- Respect the device: thumb-sized targets, single column, no zoom, no horizontal
+  scroll. The remove "×" appears only on *your* signups, so the board never feels
+  like something you could break by tapping.
+- Feedback is immediate: a pending "Adding…" state, then the name appears. Errors
+  speak plainly ("This task is already full") next to the action, not in a toast
+  that vanishes.
+
+**Organizer mental model — "I think in spreadsheet rows" (Phase 2, captured now).**
+- Their source of truth is a Google Sheet of shifts. The add-tasks experience
+  should feel like *editing a sheet*: a row-based grid where you add many rows
+  fast, Tab between cells, fill-down repeating values, and **paste a block
+  straight from Google Sheets** — not a fussy one-record-at-a-time modal.
+- Sensible defaults (carry the last date/category forward), inline validation,
+  and a live preview of how a row becomes a card — so the organizer sees the
+  volunteer's view as they build it.
+- This is built in Phase 2 (admin/import) with the `frontend-design` skill; it is
+  listed here so Phase 1's data model and components don't foreclose it. They
+  don't — `Task` already carries the fields a sheet row maps onto.
 
 ## File Structure
 
 ```
+.github/workflows/ci.yml     # CD pipeline: test on every push, gate main
 prisma/
-  schema.prisma              # data model: Event, Task, Signup, AuditLog + enums
+  schema.prisma              # data model: Event, Task, Signup, AuditLog + enums + indexes
   seed.ts                    # loads one real event for local dev
 lib/
   db.ts                      # singleton Prisma client
   domain/
     types.ts                 # plain TS types used by domain + UI (no Prisma imports)
-    board.ts                 # groupTasksByDay, getSlotInfo, formatWhen
-    claim.ts                 # validateClaim, validateRelease
+    time.ts                  # EVENT_TZ, formatTime, formatWhen (timezone-aware)
+    board.ts                 # groupTasksByDay, getSlotInfo
+    claim.ts                 # validateClaim (limits + honeypot), validateRelease (token)
     audit.ts                 # claimAuditDetails, releaseAuditDetails
+  security/
+    tokens.ts                # newClaimToken()
   repository/
-    signups.ts               # createSignupWithAudit, deleteSignupWithAudit (transactions)
+    signups.ts               # createSignupWithAudit (FOR UPDATE), deleteSignupWithAudit
     events.ts                # getActiveEventBoard
 app/
   actions/signups.ts         # claimSlot, releaseSignup server actions
@@ -71,24 +107,29 @@ app/
 components/
   Board.tsx                  # server component: day groups -> TaskCard list
   TaskCard.tsx               # server component: one shift/frog card
-  ClaimForm.tsx              # client component: claim a slot (optimistic)
-  Claimant.tsx               # client component: a claimed name + remove button
+  ClaimForm.tsx              # client: claim a slot (honeypot, stores claimToken)
+  Claimant.tsx               # client: a claimed name + device-owned remove button
+lib/client/
+  ownership.ts               # localStorage helpers: rememberClaim/getClaimToken/forgetClaim
 test/
   setup.ts                   # RTL/jsdom setup
-  db.ts                      # test-db helpers: resetDb()
+  db.ts                      # test-db helpers: resetDb() with safety guard
+e2e/
+  board.spec.ts              # Playwright E2E (stretch, Task 13)
+playwright.config.ts         # Playwright config (stretch)
 ```
 
 **Responsibility boundaries:**
-- `lib/domain/*` — pure, deterministic, no I/O. The heart; heavily unit-tested.
-- `lib/repository/*` — the only place Prisma is touched for writes; transactional; integration-tested.
+- `lib/domain/*` — pure, deterministic, no I/O. Heavily unit-tested.
+- `lib/repository/*` — the only place Prisma is touched for writes; transactional and concurrency-safe; integration-tested.
 - `app/actions/*` — glue: validate via domain, persist via repository, `revalidatePath`.
-- `components/*` — rendering only; the single client component owns optimistic state.
+- `components/*` + `lib/client/*` — rendering and device-local ownership only.
 
 ---
 
 ## Prerequisites (one-time, before Task 1)
 
-You need a Neon account (free) with two databases: one for dev, one for tests. From the Neon console create a project, then two databases (e.g. `frogboard` and `frogboard_test`); copy each connection string. You'll paste them into `.env` and `.env.test` in Task 2. No other accounts are needed for Phase 1.
+You need: a GitHub repo (created in Task 2), a Neon account (free) with two databases — `frogboard` (dev) and `frogboard_test` (local tests) — and a Vercel account. CI uses its own throwaway Postgres container, so no Neon secret is needed for tests in CI. Copy the two Neon connection strings; you'll paste them into `.env` and `.env.test` in Task 3.
 
 ---
 
@@ -100,25 +141,19 @@ You need a Neon account (free) with two databases: one for dev, one for tests. F
 
 - [ ] **Step 1: Scaffold with create-next-app**
 
-Run from `/Users/ekraay/claude/volunteer`:
-
-```bash
-npx create-next-app@latest . --typescript --tailwind --app --eslint --no-src-dir --import-alias "@/*" --use-npm --yes
-```
-
-Expected: project files created in the current directory. If it refuses because the directory isn't empty, move the existing `docs/` aside, scaffold, then move it back:
+Run from `/Users/ekraay/claude/volunteer`. The directory already contains `docs/`, so move it aside first:
 
 ```bash
 mv docs ../_docs_tmp && npx create-next-app@latest . --typescript --tailwind --app --eslint --no-src-dir --import-alias "@/*" --use-npm --yes && mv ../_docs_tmp docs
 ```
+
+Expected: Next.js project files created; `docs/` restored.
 
 - [ ] **Step 2: Install test tooling**
 
 ```bash
 npm install -D vitest @vitejs/plugin-react @testing-library/react @testing-library/jest-dom @testing-library/user-event jsdom
 ```
-
-Expected: packages added to `devDependencies`.
 
 - [ ] **Step 3: Add Vitest config**
 
@@ -136,6 +171,7 @@ export default defineConfig({
     setupFiles: ["./test/setup.ts"],
     globals: true,
     include: ["**/*.test.ts", "**/*.test.tsx"],
+    exclude: ["e2e/**", "node_modules/**", ".next/**"],
   },
   resolve: {
     alias: { "@": path.resolve(__dirname, ".") },
@@ -151,9 +187,9 @@ Create `test/setup.ts`:
 import "@testing-library/jest-dom/vitest";
 ```
 
-- [ ] **Step 5: Add test scripts to package.json**
+- [ ] **Step 5: Add scripts to package.json**
 
-In `package.json`, add to the `"scripts"` object:
+In `"scripts"`:
 
 ```json
 "test": "vitest run",
@@ -172,15 +208,15 @@ test("test runner works", () => {
 });
 ```
 
-- [ ] **Step 7: Run the smoke test to verify it passes**
+- [ ] **Step 7: Run the smoke test**
 
 Run: `npm test`
 Expected: PASS — 1 passed.
 
-- [ ] **Step 8: Verify the dev server boots**
+- [ ] **Step 8: Verify the build**
 
 Run: `npm run build`
-Expected: build completes with no type errors.
+Expected: build completes, no type errors.
 
 - [ ] **Step 9: Commit**
 
@@ -191,11 +227,86 @@ git commit -m "chore: scaffold Next.js app with Vitest"
 
 ---
 
-## Task 2: Data model with Prisma and Neon
+## Task 2: Continuous delivery pipeline (set this up early)
+
+Per Jez Humble: build the pipeline before piling on features, so every commit is validated and `main` stays releasable. CI runs unit + integration tests against a disposable Postgres container.
+
+**Files:**
+- Create: `.github/workflows/ci.yml`
+
+- [ ] **Step 1: Push the repo to GitHub**
+
+```bash
+gh repo create frogboard --private --source=. --remote=origin --push
+```
+
+Expected: repo created and the current `main` pushed.
+
+- [ ] **Step 2: Write the CI workflow**
+
+Create `.github/workflows/ci.yml`:
+
+```yaml
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: frogboard_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/frogboard_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx prisma migrate deploy
+      - run: npm run lint
+      - run: npx vitest run
+      - run: npm run build
+```
+
+- [ ] **Step 3: Commit and push**
+
+```bash
+git add .github/workflows/ci.yml
+git commit -m "ci: add deployment pipeline (test + build on every push)"
+git push
+```
+
+- [ ] **Step 4: Verify the pipeline runs**
+
+Run: `gh run watch` (or check the Actions tab).
+Expected: the workflow runs. The `migrate deploy` and `vitest` steps may be no-ops until Task 3 adds the schema/tests — that's fine; the lint and build steps should pass. CI must stay green from here on.
+
+> **Note:** Vercel CD is connected in Task 12 (after there's something worth deploying). From then on, pushing to `main` auto-deploys, and migrations run in the Vercel build command — no manual prod migrations.
+
+---
+
+## Task 3: Data model with Prisma and Neon
 
 **Files:**
 - Create: `prisma/schema.prisma`, `lib/db.ts`, `.env`, `.env.test`, `.env.example`
-- Modify: `package.json` (add prisma scripts), `.gitignore` (ensure `.env*` ignored — already present)
 
 - [ ] **Step 1: Install Prisma**
 
@@ -204,7 +315,7 @@ npm install -D prisma
 npm install @prisma/client
 ```
 
-- [ ] **Step 2: Write the schema**
+- [ ] **Step 2: Write the schema (with indexes)**
 
 Create `prisma/schema.prisma`:
 
@@ -244,6 +355,7 @@ model Event {
   startDate DateTime
   endDate   DateTime
   tasks     Task[]
+  auditLogs AuditLog[]
   createdAt DateTime @default(now())
 }
 
@@ -256,9 +368,9 @@ model Task {
   category         String?
   requestedGroup   String?
   neededCount      Int         @default(1)
-  date             DateTime?
-  startTime        String?     // display string e.g. "10:00 AM"; null = all-day
-  endTime          String?
+  date             DateTime?   // calendar day; drives grouping; set for scheduled tasks
+  startAt          DateTime?   // exact start when known; null + date set = all-day
+  endAt            DateTime?
   dueBy            DateTime?   // frog deadline
   pointOfContact   String?
   location         String?
@@ -269,45 +381,49 @@ model Task {
   auditLogs        AuditLog[]
   createdAt        DateTime    @default(now())
 
-  @@index([eventId])
+  @@index([eventId, date])
 }
 
 model Signup {
-  id        String   @id @default(cuid())
-  taskId    String
-  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  name      String
-  email     String?
-  phone     String?
-  group     String?
-  minor     Boolean?
-  userId    String?  // reserved for Phase 4 optional accounts
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  name       String
+  email      String?
+  phone      String?
+  group      String?
+  minor      Boolean?
+  claimToken String   // capability token for device-local ownership of this signup
+  userId     String?  // reserved for Phase 4 optional accounts
+  createdAt  DateTime @default(now())
 
-  @@index([taskId])
+  @@index([taskId, createdAt])
 }
 
 model AuditLog {
   id        String      @id @default(cuid())
+  eventId   String
+  event     Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
   taskId    String
   task      Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
   action    AuditAction
   details   Json
   createdAt DateTime    @default(now())
 
-  @@index([taskId])
+  @@index([eventId, createdAt])
+  @@index([taskId, createdAt])
 }
 ```
 
-- [ ] **Step 2b: Create env files**
+- [ ] **Step 3: Create env files**
 
-Create `.env` (paste your Neon dev connection string):
+Create `.env` (Neon dev string):
 
 ```
 DATABASE_URL="postgresql://USER:PASS@HOST/frogboard?sslmode=require"
 ```
 
-Create `.env.test` (paste your Neon test connection string):
+Create `.env.test` (Neon test string — note the database name contains `test`, which the reset guard in Task 7 requires):
 
 ```
 DATABASE_URL="postgresql://USER:PASS@HOST/frogboard_test?sslmode=require"
@@ -319,33 +435,34 @@ Create `.env.example` (committed, no secrets):
 DATABASE_URL="postgresql://USER:PASS@HOST/DBNAME?sslmode=require"
 ```
 
-- [ ] **Step 3: Add Prisma scripts to package.json**
+- [ ] **Step 4: Add Prisma scripts**
 
 In `"scripts"`:
 
 ```json
 "db:migrate": "prisma migrate dev",
-"db:push:test": "dotenv -e .env.test -- prisma migrate deploy",
-"db:seed": "prisma db seed"
+"db:migrate:test": "dotenv -e .env.test -- prisma migrate deploy",
+"db:seed": "prisma db seed",
+"test:db": "dotenv -e .env.test -- vitest run"
 ```
 
-Install dotenv-cli for the test script:
+Install dotenv-cli:
 
 ```bash
 npm install -D dotenv-cli
 ```
 
-- [ ] **Step 4: Run the first migration**
+- [ ] **Step 5: Run the first migration (dev)**
 
 Run: `npx prisma migrate dev --name init`
-Expected: creates `prisma/migrations/`, applies to the dev database, generates the client. Output ends with "Your database is now in sync with your schema."
+Expected: creates `prisma/migrations/`, applies to the dev DB, generates the client.
 
-- [ ] **Step 5: Apply schema to the test database**
+- [ ] **Step 6: Apply migrations to the local test database**
 
-Run: `npm run db:push:test`
+Run: `npm run db:migrate:test`
 Expected: "All migrations have been successfully applied."
 
-- [ ] **Step 6: Create the Prisma client singleton**
+- [ ] **Step 7: Create the Prisma client singleton**
 
 Create `lib/db.ts`:
 
@@ -354,13 +471,12 @@ import { PrismaClient } from "@prisma/client";
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
-export const prisma =
-  globalForPrisma.prisma ?? new PrismaClient();
+export const prisma = globalForPrisma.prisma ?? new PrismaClient();
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 ```
 
-- [ ] **Step 7: Write a connection smoke test**
+- [ ] **Step 8: Connection smoke test**
 
 Create `test/db-connection.test.ts`:
 
@@ -374,25 +490,28 @@ test("can reach the database", async () => {
 });
 ```
 
-- [ ] **Step 8: Run the connection test**
+- [ ] **Step 9: Run the connection test**
 
-Run: `npx dotenv -e .env.test -- npx vitest run test/db-connection.test.ts`
+Run: `npm run test:db -- test/db-connection.test.ts`
 Expected: PASS.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 10: Commit and push (CI must go green)**
 
 ```bash
 git add -A
-git commit -m "feat: add Prisma schema and Neon connection"
+git commit -m "feat: Prisma schema with indexes, audit eventId, and Neon connection"
+git push
 ```
+
+Expected: `gh run watch` shows CI green.
 
 ---
 
-## Task 3: Domain types and board grouping
+## Task 4: Domain types and timezone-aware formatting
 
 **Files:**
-- Create: `lib/domain/types.ts`, `lib/domain/board.ts`
-- Test: `lib/domain/board.test.ts`
+- Create: `lib/domain/types.ts`, `lib/domain/time.ts`
+- Test: `lib/domain/time.test.ts`
 
 - [ ] **Step 1: Define domain types**
 
@@ -417,8 +536,8 @@ export interface BoardTask {
   requestedGroup: string | null;
   neededCount: number;
   date: Date | null;
-  startTime: string | null;
-  endTime: string | null;
+  startAt: Date | null;
+  endAt: Date | null;
   dueBy: Date | null;
   pointOfContact: string | null;
   location: string | null;
@@ -435,42 +554,156 @@ export interface SlotInfo {
 }
 
 export interface DayGroup {
-  /** ISO date string (YYYY-MM-DD) or the literal "all-day" for undated tasks */
+  /** ISO date (YYYY-MM-DD) in the event timezone, or "all-day" for undated tasks */
   key: string;
-  /** Human label, e.g. "Saturday, Jul 25" or "No set date" */
   label: string;
   tasks: BoardTask[];
 }
 ```
 
-- [ ] **Step 2: Write failing tests for getSlotInfo**
+- [ ] **Step 2: Write failing tests for time formatting**
+
+Create `lib/domain/time.test.ts`:
+
+```typescript
+import { describe, expect, test } from "vitest";
+import { formatTime, formatWhen } from "@/lib/domain/time";
+import type { BoardTask } from "@/lib/domain/types";
+
+function task(overrides: Partial<BoardTask>): BoardTask {
+  return {
+    id: "t1", kind: "shift", title: "Games", category: null,
+    requestedGroup: null, neededCount: 3, date: new Date("2026-07-25T00:00:00Z"),
+    startAt: null, endAt: null, dueBy: null, pointOfContact: null,
+    location: null, definitionOfDone: null, status: "todo", waiting: false,
+    signups: [], ...overrides,
+  };
+}
+
+describe("formatTime (America/Los_Angeles)", () => {
+  test("17:00 UTC renders as 10:00 AM PDT", () => {
+    expect(formatTime(new Date("2026-07-25T17:00:00Z"))).toBe("10:00 AM");
+  });
+  test("20:00 UTC renders as 1:00 PM PDT", () => {
+    expect(formatTime(new Date("2026-07-25T20:00:00Z"))).toBe("1:00 PM");
+  });
+});
+
+describe("formatWhen", () => {
+  test("shift with start and end", () => {
+    expect(
+      formatWhen(task({
+        startAt: new Date("2026-07-25T17:00:00Z"),
+        endAt: new Date("2026-07-25T20:00:00Z"),
+      })),
+    ).toBe("10:00 AM–1:00 PM");
+  });
+  test("shift with a date but no times is all day", () => {
+    expect(formatWhen(task({ startAt: null, endAt: null }))).toBe("All day");
+  });
+  test("frog with a deadline", () => {
+    expect(
+      formatWhen(task({ kind: "frog", date: null, dueBy: new Date("2026-07-25T17:00:00Z") })),
+    ).toBe("By Jul 25");
+  });
+  test("frog with no deadline is anytime", () => {
+    expect(
+      formatWhen(task({ kind: "frog", date: null, dueBy: null })),
+    ).toBe("Anytime");
+  });
+});
+```
+
+- [ ] **Step 3: Run to verify failure**
+
+Run: `npx vitest run lib/domain/time.test.ts`
+Expected: FAIL — module not found.
+
+- [ ] **Step 4: Implement timezone-aware formatting**
+
+Create `lib/domain/time.ts`:
+
+```typescript
+import type { BoardTask } from "@/lib/domain/types";
+
+/** Fixed event timezone for Phase 1 (BCSF). Per-event timezone is a later enhancement. */
+export const EVENT_TZ = "America/Los_Angeles";
+
+const MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+export function formatTime(d: Date): string {
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: EVENT_TZ,
+  }).format(d);
+}
+
+function monthDay(d: Date): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: EVENT_TZ,
+  }).formatToParts(d);
+  const month = parts.find((p) => p.type === "month")?.value ?? "";
+  const day = parts.find((p) => p.type === "day")?.value ?? "";
+  return `${month} ${day}`;
+}
+
+export function formatWhen(task: BoardTask): string {
+  if (task.kind === "frog") {
+    return task.dueBy ? `By ${monthDay(task.dueBy)}` : "Anytime";
+  }
+  if (task.startAt && task.endAt) {
+    return `${formatTime(task.startAt)}–${formatTime(task.endAt)}`;
+  }
+  if (task.startAt) return `From ${formatTime(task.startAt)}`;
+  return "All day";
+}
+
+export { MONTHS };
+```
+
+- [ ] **Step 5: Run to verify pass**
+
+Run: `npx vitest run lib/domain/time.test.ts`
+Expected: PASS.
+
+- [ ] **Step 6: Commit and push**
+
+```bash
+git add lib/domain/types.ts lib/domain/time.ts lib/domain/time.test.ts
+git commit -m "feat: domain types and timezone-aware time formatting"
+git push
+```
+
+---
+
+## Task 5: Board grouping and slot info
+
+**Files:**
+- Create: `lib/domain/board.ts`
+- Test: `lib/domain/board.test.ts`
+
+- [ ] **Step 1: Write failing tests**
 
 Create `lib/domain/board.test.ts`:
 
 ```typescript
 import { describe, expect, test } from "vitest";
-import { getSlotInfo, groupTasksByDay, formatWhen } from "@/lib/domain/board";
+import { getSlotInfo, groupTasksByDay } from "@/lib/domain/board";
 import type { BoardTask } from "@/lib/domain/types";
 
 function task(overrides: Partial<BoardTask>): BoardTask {
   return {
-    id: "t1",
-    kind: "shift",
-    title: "Games",
-    category: null,
-    requestedGroup: null,
-    neededCount: 3,
-    date: new Date("2026-07-25T00:00:00Z"),
-    startTime: "10:00 AM",
-    endTime: "1:00 PM",
-    dueBy: null,
-    pointOfContact: null,
-    location: null,
-    definitionOfDone: null,
-    status: "todo",
-    waiting: false,
-    signups: [],
-    ...overrides,
+    id: "t1", kind: "shift", title: "Games", category: null,
+    requestedGroup: null, neededCount: 3, date: new Date("2026-07-25T00:00:00Z"),
+    startAt: null, endAt: null, dueBy: null, pointOfContact: null,
+    location: null, definitionOfDone: null, status: "todo", waiting: false,
+    signups: [], ...overrides,
   };
 }
 
@@ -485,7 +718,6 @@ describe("getSlotInfo", () => {
     });
     expect(getSlotInfo(t)).toEqual({ filled: 2, needed: 3, isFull: false });
   });
-
   test("isFull when filled reaches needed", () => {
     const t = task({
       neededCount: 1,
@@ -494,19 +726,39 @@ describe("getSlotInfo", () => {
     expect(getSlotInfo(t)).toEqual({ filled: 1, needed: 1, isFull: true });
   });
 });
+
+describe("groupTasksByDay", () => {
+  test("groups by date, sorts days ascending, all-day group last", () => {
+    const result = groupTasksByDay([
+      task({ id: "b", date: new Date("2026-07-26T00:00:00Z") }),
+      task({ id: "a", date: new Date("2026-07-25T00:00:00Z") }),
+      task({ id: "c", date: null }),
+    ]);
+    expect(result.map((g) => g.key)).toEqual(["2026-07-25", "2026-07-26", "all-day"]);
+  });
+  test("sorts tasks within a day by startAt, timed before all-day", () => {
+    const [group] = groupTasksByDay([
+      task({ id: "allday", startAt: null }),
+      task({ id: "late", startAt: new Date("2026-07-25T21:00:00Z") }),
+      task({ id: "early", startAt: new Date("2026-07-25T17:00:00Z") }),
+    ]);
+    expect(group.tasks.map((t) => t.id)).toEqual(["early", "late", "allday"]);
+  });
+});
 ```
 
-- [ ] **Step 3: Run the test to verify it fails**
+- [ ] **Step 2: Run to verify failure**
 
 Run: `npx vitest run lib/domain/board.test.ts`
-Expected: FAIL — cannot find module `board` / exports not defined.
+Expected: FAIL — module not found.
 
-- [ ] **Step 4: Implement getSlotInfo, formatWhen, groupTasksByDay**
+- [ ] **Step 3: Implement board grouping**
 
 Create `lib/domain/board.ts`:
 
 ```typescript
 import type { BoardTask, DayGroup, SlotInfo } from "@/lib/domain/types";
+import { EVENT_TZ } from "@/lib/domain/time";
 
 export function getSlotInfo(task: BoardTask): SlotInfo {
   const filled = task.signups.length;
@@ -514,45 +766,33 @@ export function getSlotInfo(task: BoardTask): SlotInfo {
   return { filled, needed, isFull: filled >= needed };
 }
 
-const WEEKDAYS = [
-  "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
-];
-const MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
-
-function isoDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+/** ISO date (YYYY-MM-DD) of a Date in the event timezone. */
+function tzIsoDate(d: Date): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric", month: "2-digit", day: "2-digit", timeZone: EVENT_TZ,
+  }).formatToParts(d);
+  const y = parts.find((p) => p.type === "year")!.value;
+  const m = parts.find((p) => p.type === "month")!.value;
+  const day = parts.find((p) => p.type === "day")!.value;
+  return `${y}-${m}-${day}`;
 }
 
 function dayLabel(d: Date): string {
-  return `${WEEKDAYS[d.getUTCDay()]}, ${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long", month: "short", day: "numeric", timeZone: EVENT_TZ,
+  }).format(d);
 }
 
-/** A frog with no time and no date shows "Anytime"; a shift with no times shows "All day". */
-export function formatWhen(task: BoardTask): string {
-  if (task.kind === "frog") {
-    if (task.dueBy) {
-      const d = task.dueBy;
-      return `By ${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
-    }
-    return "Anytime";
-  }
-  if (task.startTime && task.endTime) return `${task.startTime}–${task.endTime}`;
-  if (task.startTime) return `From ${task.startTime}`;
-  return "All day";
+/** Sort key: timed tasks by startAt ascending, all-day (no startAt) last. */
+function startKey(t: BoardTask): number {
+  return t.startAt ? t.startAt.getTime() : Number.MAX_SAFE_INTEGER;
 }
 
-/**
- * Group tasks by calendar day, sorted ascending. Undated tasks go in a
- * trailing "all-day" group. Within a day, tasks sort by startTime then title.
- */
 export function groupTasksByDay(tasks: BoardTask[]): DayGroup[] {
   const groups = new Map<string, DayGroup>();
 
   for (const t of tasks) {
-    const key = t.date ? isoDate(t.date) : "all-day";
+    const key = t.date ? tzIsoDate(t.date) : "all-day";
     if (!groups.has(key)) {
       groups.set(key, {
         key,
@@ -565,9 +805,9 @@ export function groupTasksByDay(tasks: BoardTask[]): DayGroup[] {
 
   for (const g of groups.values()) {
     g.tasks.sort((a, b) => {
-      const at = a.startTime ?? "";
-      const bt = b.startTime ?? "";
-      if (at !== bt) return at < bt ? -1 : 1;
+      const ka = startKey(a);
+      const kb = startKey(b);
+      if (ka !== kb) return ka - kb;
       return a.title.localeCompare(b.title);
     });
   }
@@ -580,69 +820,22 @@ export function groupTasksByDay(tasks: BoardTask[]): DayGroup[] {
 }
 ```
 
-- [ ] **Step 5: Add tests for groupTasksByDay and formatWhen**
-
-Append to `lib/domain/board.test.ts`:
-
-```typescript
-describe("formatWhen", () => {
-  test("shift with both times", () => {
-    expect(formatWhen(task({ startTime: "10:00 AM", endTime: "1:00 PM" })))
-      .toBe("10:00 AM–1:00 PM");
-  });
-
-  test("shift with no times is all day", () => {
-    expect(formatWhen(task({ startTime: null, endTime: null }))).toBe("All day");
-  });
-
-  test("frog with a deadline", () => {
-    expect(
-      formatWhen(task({ kind: "frog", startTime: null, endTime: null, date: null, dueBy: new Date("2026-07-25T00:00:00Z") })),
-    ).toBe("By Jul 25");
-  });
-
-  test("frog with no deadline is anytime", () => {
-    expect(
-      formatWhen(task({ kind: "frog", startTime: null, endTime: null, date: null, dueBy: null })),
-    ).toBe("Anytime");
-  });
-});
-
-describe("groupTasksByDay", () => {
-  test("groups by date, sorts days ascending, all-day last", () => {
-    const result = groupTasksByDay([
-      task({ id: "b", date: new Date("2026-07-26T00:00:00Z"), startTime: "9:00 AM" }),
-      task({ id: "a", date: new Date("2026-07-25T00:00:00Z"), startTime: "10:00 AM" }),
-      task({ id: "c", date: null, startTime: null }),
-    ]);
-    expect(result.map((g) => g.key)).toEqual(["2026-07-25", "2026-07-26", "all-day"]);
-  });
-
-  test("sorts tasks within a day by start time", () => {
-    const [group] = groupTasksByDay([
-      task({ id: "late", startTime: "2:00 PM" }),
-      task({ id: "early", startTime: "9:00 AM" }),
-    ]);
-    expect(group.tasks.map((t) => t.id)).toEqual(["early", "late"]);
-  });
-});
-```
-
-- [ ] **Step 6: Run all board tests to verify they pass**
+- [ ] **Step 4: Run to verify pass**
 
 Run: `npx vitest run lib/domain/board.test.ts`
-Expected: PASS — all tests green.
+Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 5: Commit and push**
 
 ```bash
-git add lib/domain/types.ts lib/domain/board.ts lib/domain/board.test.ts
+git add lib/domain/board.ts lib/domain/board.test.ts
 git commit -m "feat: board grouping and slot-info domain logic"
+git push
 ```
 
 ---
 
-## Task 4: Claim and release validation
+## Task 6: Claim/release validation (limits, honeypot, token)
 
 **Files:**
 - Create: `lib/domain/claim.ts`
@@ -654,22 +847,15 @@ Create `lib/domain/claim.test.ts`:
 
 ```typescript
 import { describe, expect, test } from "vitest";
-import { validateClaim, validateRelease } from "@/lib/domain/claim";
-import type { BoardTask } from "@/lib/domain/types";
+import { validateClaim, validateRelease, LIMITS } from "@/lib/domain/claim";
+import type { SlotInfo } from "@/lib/domain/types";
 
-function task(overrides: Partial<BoardTask>): BoardTask {
-  return {
-    id: "t1", kind: "shift", title: "Games", category: null,
-    requestedGroup: null, neededCount: 2, date: null, startTime: null,
-    endTime: null, dueBy: null, pointOfContact: null, location: null,
-    definitionOfDone: null, status: "todo", waiting: false, signups: [],
-    ...overrides,
-  };
-}
+const open: SlotInfo = { filled: 0, needed: 2, isFull: false };
+const full: SlotInfo = { filled: 1, needed: 1, isFull: true };
 
 describe("validateClaim", () => {
   test("accepts a trimmed name and normalizes optional fields", () => {
-    const result = validateClaim(task({}), { name: "  Kenji  ", group: "Scouts" });
+    const result = validateClaim({ name: "  Kenji  ", group: "Scouts" }, open);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value).toEqual({
@@ -677,23 +863,34 @@ describe("validateClaim", () => {
       });
     }
   });
-
   test("rejects an empty name", () => {
-    const result = validateClaim(task({}), { name: "   " });
-    expect(result).toEqual({ ok: false, error: "Please enter a name." });
-  });
-
-  test("rejects when the task is already full", () => {
-    const full = task({
-      neededCount: 1,
-      signups: [{ id: "s1", name: "Ann", group: null, minor: null }],
+    expect(validateClaim({ name: "   " }, open)).toEqual({
+      ok: false, error: "Please enter a name.",
     });
-    const result = validateClaim(full, { name: "Kenji" });
-    expect(result).toEqual({ ok: false, error: "This task is already full." });
   });
-
+  test("rejects when the task is already full", () => {
+    expect(validateClaim({ name: "Kenji" }, full)).toEqual({
+      ok: false, error: "This task is already full.",
+    });
+  });
+  test("rejects when the honeypot is filled (bot)", () => {
+    expect(validateClaim({ name: "Kenji", honeypot: "anything" }, open)).toEqual({
+      ok: false, error: "Could not submit. Please try again.",
+    });
+  });
+  test("rejects a name over the max length", () => {
+    const longName = "x".repeat(LIMITS.name + 1);
+    expect(validateClaim({ name: longName }, open)).toEqual({
+      ok: false, error: "Name is too long.",
+    });
+  });
+  test("rejects a malformed email", () => {
+    expect(validateClaim({ name: "Kenji", email: "not-an-email" }, open)).toEqual({
+      ok: false, error: "That email doesn't look right.",
+    });
+  });
   test("coerces empty optional strings to null", () => {
-    const result = validateClaim(task({}), { name: "Kenji", email: "", phone: "" });
+    const result = validateClaim({ name: "Kenji", email: "", phone: "" }, open);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.email).toBeNull();
@@ -703,16 +900,17 @@ describe("validateClaim", () => {
 });
 
 describe("validateRelease", () => {
-  test("accepts releasing an existing signup", () => {
-    const t = task({ signups: [{ id: "s1", name: "Ann", group: null, minor: null }] });
-    expect(validateRelease(t, "s1")).toEqual({ ok: true });
+  test("accepts when the token matches", () => {
+    expect(validateRelease({ claimToken: "abc" }, "abc")).toEqual({ ok: true });
   });
-
-  test("rejects releasing a signup that is not on the task", () => {
-    const t = task({ signups: [] });
-    expect(validateRelease(t, "nope")).toEqual({
-      ok: false,
-      error: "That signup is no longer here.",
+  test("rejects when the token is missing", () => {
+    expect(validateRelease({ claimToken: "abc" }, null)).toEqual({
+      ok: false, error: "You can only remove your own signup.",
+    });
+  });
+  test("rejects when the token does not match", () => {
+    expect(validateRelease({ claimToken: "abc" }, "xyz")).toEqual({
+      ok: false, error: "You can only remove your own signup.",
     });
   });
 });
@@ -728,8 +926,11 @@ Expected: FAIL — module not found.
 Create `lib/domain/claim.ts`:
 
 ```typescript
-import { getSlotInfo } from "@/lib/domain/board";
-import type { BoardTask } from "@/lib/domain/types";
+import type { SlotInfo } from "@/lib/domain/types";
+
+export const LIMITS = { name: 80, group: 40, email: 120, phone: 40 } as const;
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export interface ClaimInput {
   name: string;
@@ -737,6 +938,8 @@ export interface ClaimInput {
   phone?: string;
   group?: string;
   minor?: boolean;
+  /** Hidden form field; bots fill it, humans never see it. */
+  honeypot?: string;
 }
 
 export interface ClaimValue {
@@ -747,10 +950,7 @@ export interface ClaimValue {
   minor: boolean | null;
 }
 
-export type Result<T> =
-  | { ok: true; value: T }
-  | { ok: false; error: string };
-
+export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 export type VoidResult = { ok: true } | { ok: false; error: string };
 
 function nullIfBlank(v: string | undefined): string | null {
@@ -758,27 +958,40 @@ function nullIfBlank(v: string | undefined): string | null {
   return trimmed === "" ? null : trimmed;
 }
 
-export function validateClaim(task: BoardTask, input: ClaimInput): Result<ClaimValue> {
+export function validateClaim(input: ClaimInput, slot: SlotInfo): Result<ClaimValue> {
+  // Honeypot: a filled hidden field means a bot. Fail generically.
+  if ((input.honeypot ?? "").trim() !== "") {
+    return { ok: false, error: "Could not submit. Please try again." };
+  }
+
   const name = (input.name ?? "").trim();
   if (name === "") return { ok: false, error: "Please enter a name." };
-  if (getSlotInfo(task).isFull) {
-    return { ok: false, error: "This task is already full." };
-  }
+  if (name.length > LIMITS.name) return { ok: false, error: "Name is too long." };
+  if (slot.isFull) return { ok: false, error: "This task is already full." };
+
+  const email = nullIfBlank(input.email);
+  if (email && email.length > LIMITS.email) return { ok: false, error: "Email is too long." };
+  if (email && !EMAIL_RE.test(email)) return { ok: false, error: "That email doesn't look right." };
+
+  const phone = nullIfBlank(input.phone);
+  if (phone && phone.length > LIMITS.phone) return { ok: false, error: "Phone is too long." };
+
+  const group = nullIfBlank(input.group);
+  if (group && group.length > LIMITS.group) return { ok: false, error: "Group is too long." };
+
   return {
     ok: true,
-    value: {
-      name,
-      email: nullIfBlank(input.email),
-      phone: nullIfBlank(input.phone),
-      group: nullIfBlank(input.group),
-      minor: input.minor ?? null,
-    },
+    value: { name, email, phone, group, minor: input.minor ?? null },
   };
 }
 
-export function validateRelease(task: BoardTask, signupId: string): VoidResult {
-  const exists = task.signups.some((s) => s.id === signupId);
-  if (!exists) return { ok: false, error: "That signup is no longer here." };
+export function validateRelease(
+  signup: { claimToken: string | null },
+  providedToken: string | null,
+): VoidResult {
+  if (!signup.claimToken || !providedToken || signup.claimToken !== providedToken) {
+    return { ok: false, error: "You can only remove your own signup." };
+  }
   return { ok: true };
 }
 ```
@@ -788,22 +1001,23 @@ export function validateRelease(task: BoardTask, signupId: string): VoidResult {
 Run: `npx vitest run lib/domain/claim.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Commit and push**
 
 ```bash
 git add lib/domain/claim.ts lib/domain/claim.test.ts
-git commit -m "feat: claim and release validation"
+git commit -m "feat: claim validation (limits, honeypot) and token-checked release"
+git push
 ```
 
 ---
 
-## Task 5: Audit-entry construction
+## Task 7: Audit construction, token generation, test-db guard
 
 **Files:**
-- Create: `lib/domain/audit.ts`
+- Create: `lib/domain/audit.ts`, `lib/security/tokens.ts`, `test/db.ts`
 - Test: `lib/domain/audit.test.ts`
 
-- [ ] **Step 1: Write failing tests**
+- [ ] **Step 1: Write failing audit tests**
 
 Create `lib/domain/audit.test.ts`:
 
@@ -812,27 +1026,20 @@ import { expect, test } from "vitest";
 import { claimAuditDetails, releaseAuditDetails } from "@/lib/domain/audit";
 
 test("claimAuditDetails records who joined", () => {
-  expect(
-    claimAuditDetails({ signupId: "s1", name: "Kenji", group: "Scouts" }),
-  ).toEqual({
-    summary: "Kenji claimed a slot",
-    signupId: "s1",
-    name: "Kenji",
-    group: "Scouts",
+  expect(claimAuditDetails({ signupId: "s1", name: "Kenji", group: "Scouts" })).toEqual({
+    summary: "Kenji claimed a slot", signupId: "s1", name: "Kenji", group: "Scouts",
   });
 });
 
-test("releaseAuditDetails captures the removed signup so it can be reverted", () => {
+test("releaseAuditDetails snapshots the removed signup for revert", () => {
   expect(
-    releaseAuditDetails({ signupId: "s1", name: "Kenji", group: null, email: "k@x.com", phone: null, minor: true }),
+    releaseAuditDetails({
+      signupId: "s1", name: "Kenji", group: null,
+      email: "k@x.com", phone: null, minor: true,
+    }),
   ).toEqual({
-    summary: "Kenji was removed",
-    signupId: "s1",
-    name: "Kenji",
-    group: null,
-    email: "k@x.com",
-    phone: null,
-    minor: true,
+    summary: "Kenji was removed", signupId: "s1", name: "Kenji", group: null,
+    email: "k@x.com", phone: null, minor: true,
   });
 });
 ```
@@ -890,30 +1097,37 @@ export function releaseAuditDetails(input: ReleaseAuditInput) {
 Run: `npx vitest run lib/domain/audit.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Implement the token generator**
 
-```bash
-git add lib/domain/audit.ts lib/domain/audit.test.ts
-git commit -m "feat: audit-entry construction"
+Create `lib/security/tokens.ts`:
+
+```typescript
+import { randomUUID } from "node:crypto";
+
+/** Opaque capability token proving a device owns a signup. Not a security secret. */
+export function newClaimToken(): string {
+  return randomUUID();
+}
 ```
 
----
-
-## Task 6: Repository — persist claim/release in a transaction
-
-**Files:**
-- Create: `lib/repository/signups.ts`, `lib/repository/events.ts`, `test/db.ts`
-- Test: `lib/repository/signups.test.ts`
-
-- [ ] **Step 1: Create the test-db reset helper**
+- [ ] **Step 6: Implement the test-db reset helper WITH a safety guard**
 
 Create `test/db.ts`:
 
 ```typescript
 import { prisma } from "@/lib/db";
 
+/**
+ * Wipes all rows. Refuses to run unless DATABASE_URL clearly points at a test
+ * database, so production/dev data can never be destroyed by a stray test run.
+ */
 export async function resetDb() {
-  // Order matters: children before parents.
+  const url = process.env.DATABASE_URL ?? "";
+  if (!/test/i.test(url)) {
+    throw new Error(
+      `resetDb() refused: DATABASE_URL does not look like a test database (${url || "unset"}).`,
+    );
+  }
   await prisma.auditLog.deleteMany();
   await prisma.signup.deleteMany();
   await prisma.task.deleteMany();
@@ -921,7 +1135,23 @@ export async function resetDb() {
 }
 ```
 
-- [ ] **Step 2: Create the board-read repository**
+- [ ] **Step 7: Commit and push**
+
+```bash
+git add lib/domain/audit.ts lib/domain/audit.test.ts lib/security/tokens.ts test/db.ts
+git commit -m "feat: audit construction, claim-token generator, guarded test reset"
+git push
+```
+
+---
+
+## Task 8: Repository — concurrency-safe claim/release
+
+**Files:**
+- Create: `lib/repository/signups.ts`, `lib/repository/events.ts`
+- Test: `lib/repository/signups.test.ts`
+
+- [ ] **Step 1: Create the board-read repository**
 
 Create `lib/repository/events.ts`:
 
@@ -929,7 +1159,7 @@ Create `lib/repository/events.ts`:
 import { prisma } from "@/lib/db";
 import type { BoardTask } from "@/lib/domain/types";
 
-/** Returns the most recently created event plus its tasks, mapped to BoardTask. */
+/** Most-recently-created event plus its tasks, mapped to BoardTask. */
 export async function getActiveEventBoard(): Promise<
   { id: string; name: string; tasks: BoardTask[] } | null
 > {
@@ -951,28 +1181,18 @@ export async function getActiveEventBoard(): Promise<
     id: event.id,
     name: event.name,
     tasks: event.tasks.map((t) => ({
-      id: t.id,
-      kind: t.kind,
-      title: t.title,
-      category: t.category,
-      requestedGroup: t.requestedGroup,
-      neededCount: t.neededCount,
-      date: t.date,
-      startTime: t.startTime,
-      endTime: t.endTime,
-      dueBy: t.dueBy,
-      pointOfContact: t.pointOfContact,
-      location: t.location,
-      definitionOfDone: t.definitionOfDone,
-      status: t.status,
-      waiting: t.waiting,
+      id: t.id, kind: t.kind, title: t.title, category: t.category,
+      requestedGroup: t.requestedGroup, neededCount: t.neededCount, date: t.date,
+      startAt: t.startAt, endAt: t.endAt, dueBy: t.dueBy,
+      pointOfContact: t.pointOfContact, location: t.location,
+      definitionOfDone: t.definitionOfDone, status: t.status, waiting: t.waiting,
       signups: t.signups,
     })),
   };
 }
 ```
 
-- [ ] **Step 3: Write failing repository tests**
+- [ ] **Step 2: Write failing repository tests (including a concurrency test)**
 
 Create `lib/repository/signups.test.ts`:
 
@@ -992,101 +1212,120 @@ async function makeTaskNeeding(n: number): Promise<string> {
   return task.id;
 }
 
-beforeEach(async () => {
-  await resetDb();
-});
-
-afterAll(async () => {
-  await prisma.$disconnect();
-});
+beforeEach(async () => { await resetDb(); });
+afterAll(async () => { await prisma.$disconnect(); });
 
 describe("createSignupWithAudit", () => {
-  test("creates a signup and a claim audit row together", async () => {
+  test("creates a signup + claim audit (with eventId) and returns a token", async () => {
     const taskId = await makeTaskNeeding(2);
     const result = await createSignupWithAudit(taskId, { name: "Kenji", group: "Scouts" });
 
     expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.claimToken).toMatch(/[0-9a-f-]{36}/);
+
     const signups = await prisma.signup.findMany({ where: { taskId } });
     const audits = await prisma.auditLog.findMany({ where: { taskId } });
     expect(signups).toHaveLength(1);
-    expect(signups[0].name).toBe("Kenji");
+    expect(signups[0].claimToken).toBe(result.claimToken);
     expect(audits).toHaveLength(1);
     expect(audits[0].action).toBe("claim");
+    expect(audits[0].eventId).toBeTruthy();
   });
 
   test("refuses to overfill a task", async () => {
     const taskId = await makeTaskNeeding(1);
     await createSignupWithAudit(taskId, { name: "Ann" });
     const result = await createSignupWithAudit(taskId, { name: "Bob" });
-
     expect(result).toEqual({ ok: false, error: "This task is already full." });
-    const signups = await prisma.signup.findMany({ where: { taskId } });
-    expect(signups).toHaveLength(1);
+    expect(await prisma.signup.count({ where: { taskId } })).toBe(1);
+  });
+
+  test("two simultaneous claims for the last slot do not overfill", async () => {
+    const taskId = await makeTaskNeeding(1);
+    const [a, b] = await Promise.allSettled([
+      createSignupWithAudit(taskId, { name: "Ann" }),
+      createSignupWithAudit(taskId, { name: "Bob" }),
+    ]);
+    const oks = [a, b].filter(
+      (r) => r.status === "fulfilled" && r.value.ok,
+    ).length;
+    expect(oks).toBe(1);
+    expect(await prisma.signup.count({ where: { taskId } })).toBe(1);
   });
 });
 
 describe("deleteSignupWithAudit", () => {
-  test("removes the signup and writes a release audit row with a snapshot", async () => {
+  test("removes the signup and writes a release snapshot when the token matches", async () => {
     const taskId = await makeTaskNeeding(2);
     const created = await createSignupWithAudit(taskId, { name: "Kenji", email: "k@x.com" });
     expect(created.ok).toBe(true);
-    const signupId = created.ok ? created.signupId : "";
+    if (!created.ok) return;
 
-    const result = await deleteSignupWithAudit(signupId);
+    const result = await deleteSignupWithAudit(created.signupId, created.claimToken);
     expect(result).toEqual({ ok: true });
 
-    const signups = await prisma.signup.findMany({ where: { taskId } });
+    expect(await prisma.signup.count({ where: { taskId } })).toBe(0);
     const release = await prisma.auditLog.findFirst({ where: { taskId, action: "release" } });
-    expect(signups).toHaveLength(0);
     expect(release).not.toBeNull();
     expect((release!.details as { name: string }).name).toBe("Kenji");
+  });
+
+  test("refuses to remove a signup when the token is wrong", async () => {
+    const taskId = await makeTaskNeeding(2);
+    const created = await createSignupWithAudit(taskId, { name: "Kenji" });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    const result = await deleteSignupWithAudit(created.signupId, "wrong-token");
+    expect(result).toEqual({ ok: false, error: "You can only remove your own signup." });
+    expect(await prisma.signup.count({ where: { taskId } })).toBe(1);
   });
 });
 ```
 
-- [ ] **Step 4: Run to verify failure**
+- [ ] **Step 3: Run to verify failure**
 
-Run: `npx dotenv -e .env.test -- npx vitest run lib/repository/signups.test.ts`
+Run: `npm run test:db -- lib/repository/signups.test.ts`
 Expected: FAIL — `createSignupWithAudit` not found.
 
-- [ ] **Step 5: Implement the repository**
+- [ ] **Step 4: Implement the concurrency-safe repository**
 
 Create `lib/repository/signups.ts`:
 
 ```typescript
 import { prisma } from "@/lib/db";
-import type { BoardTask } from "@/lib/domain/types";
-import { validateClaim, validateRelease, type ClaimInput, type VoidResult } from "@/lib/domain/claim";
+import { validateClaim, validateRelease, type ClaimInput } from "@/lib/domain/claim";
 import { claimAuditDetails, releaseAuditDetails } from "@/lib/domain/audit";
+import { newClaimToken } from "@/lib/security/tokens";
+import type { SlotInfo } from "@/lib/domain/types";
 
-type CreateResult = { ok: true; signupId: string } | { ok: false; error: string };
-
-/** Map a Prisma task+signups row into the domain BoardTask shape. */
-function toBoardTask(t: {
-  id: string; kind: "shift" | "frog"; title: string; category: string | null;
-  requestedGroup: string | null; neededCount: number; date: Date | null;
-  startTime: string | null; endTime: string | null; dueBy: Date | null;
-  pointOfContact: string | null; location: string | null;
-  definitionOfDone: string | null; status: BoardTask["status"]; waiting: boolean;
-  signups: { id: string; name: string; group: string | null; minor: boolean | null }[];
-}): BoardTask {
-  return { ...t };
-}
+type CreateResult =
+  | { ok: true; signupId: string; claimToken: string }
+  | { ok: false; error: string };
+type VoidResult = { ok: true } | { ok: false; error: string };
 
 export async function createSignupWithAudit(
   taskId: string,
   input: ClaimInput,
 ): Promise<CreateResult> {
   return prisma.$transaction(async (tx) => {
-    const task = await tx.task.findUnique({
-      where: { id: taskId },
-      include: { signups: { select: { id: true, name: true, group: true, minor: true } } },
-    });
-    if (!task) return { ok: false as const, error: "That task no longer exists." };
+    // Lock the task row so concurrent claims serialize here — prevents overfill.
+    const locked = await tx.$queryRaw<{ id: string; eventId: string; neededCount: number }[]>`
+      SELECT "id", "eventId", "neededCount" FROM "Task" WHERE "id" = ${taskId} FOR UPDATE
+    `;
+    if (locked.length === 0) {
+      return { ok: false as const, error: "That task no longer exists." };
+    }
+    const { eventId, neededCount } = locked[0];
 
-    const check = validateClaim(toBoardTask({ ...task }), input);
+    const filled = await tx.signup.count({ where: { taskId } });
+    const slot: SlotInfo = { filled, needed: neededCount, isFull: filled >= neededCount };
+
+    const check = validateClaim(input, slot);
     if (!check.ok) return { ok: false as const, error: check.error };
 
+    const claimToken = newClaimToken();
     const signup = await tx.signup.create({
       data: {
         taskId,
@@ -1095,45 +1334,45 @@ export async function createSignupWithAudit(
         phone: check.value.phone,
         group: check.value.group,
         minor: check.value.minor,
+        claimToken,
       },
     });
     await tx.auditLog.create({
       data: {
+        eventId,
         taskId,
         action: "claim",
         details: claimAuditDetails({
-          signupId: signup.id,
-          name: check.value.name,
-          group: check.value.group,
+          signupId: signup.id, name: check.value.name, group: check.value.group,
         }),
       },
     });
-    return { ok: true as const, signupId: signup.id };
+    return { ok: true as const, signupId: signup.id, claimToken };
   });
 }
 
-export async function deleteSignupWithAudit(signupId: string): Promise<VoidResult> {
+export async function deleteSignupWithAudit(
+  signupId: string,
+  providedToken: string | null,
+): Promise<VoidResult> {
   return prisma.$transaction(async (tx) => {
     const signup = await tx.signup.findUnique({
       where: { id: signupId },
-      include: { task: { include: { signups: { select: { id: true, name: true, group: true, minor: true } } } } },
+      include: { task: { select: { eventId: true } } },
     });
     if (!signup) return { ok: false as const, error: "That signup is no longer here." };
 
-    const check = validateRelease(toBoardTask({ ...signup.task }), signupId);
+    const check = validateRelease({ claimToken: signup.claimToken }, providedToken);
     if (!check.ok) return check;
 
     await tx.auditLog.create({
       data: {
+        eventId: signup.task.eventId,
         taskId: signup.taskId,
         action: "release",
         details: releaseAuditDetails({
-          signupId: signup.id,
-          name: signup.name,
-          group: signup.group,
-          email: signup.email,
-          phone: signup.phone,
-          minor: signup.minor,
+          signupId: signup.id, name: signup.name, group: signup.group,
+          email: signup.email, phone: signup.phone, minor: signup.minor,
         }),
       },
     });
@@ -1143,27 +1382,28 @@ export async function deleteSignupWithAudit(signupId: string): Promise<VoidResul
 }
 ```
 
-- [ ] **Step 6: Run to verify pass**
+- [ ] **Step 5: Run to verify pass**
 
-Run: `npx dotenv -e .env.test -- npx vitest run lib/repository/signups.test.ts`
-Expected: PASS — all repository tests green.
+Run: `npm run test:db -- lib/repository/signups.test.ts`
+Expected: PASS — including the concurrency test (exactly one of two simultaneous last-slot claims succeeds).
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 6: Commit and push**
 
 ```bash
-git add lib/repository test/db.ts
-git commit -m "feat: transactional claim/release repository with audit"
+git add lib/repository
+git commit -m "feat: concurrency-safe claim/release repository (FOR UPDATE) with audit"
+git push
 ```
 
 ---
 
-## Task 7: Seed a real event
+## Task 9: Seed a real event
 
 **Files:**
 - Create: `prisma/seed.ts`
-- Modify: `package.json` (add `prisma.seed` config)
+- Modify: `package.json` (`prisma.seed` config)
 
-- [ ] **Step 1: Add seed config to package.json**
+- [ ] **Step 1: Add seed config + tsx**
 
 Add a top-level `"prisma"` key in `package.json`:
 
@@ -1173,13 +1413,11 @@ Add a top-level `"prisma"` key in `package.json`:
 }
 ```
 
-Install the TypeScript runner:
-
 ```bash
 npm install -D tsx
 ```
 
-- [ ] **Step 2: Write the seed script**
+- [ ] **Step 2: Write the seed (times in UTC, commented with Pacific)**
 
 Create `prisma/seed.ts`:
 
@@ -1189,7 +1427,6 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
-  // Fresh slate for local dev.
   await prisma.auditLog.deleteMany();
   await prisma.signup.deleteMany();
   await prisma.task.deleteMany();
@@ -1203,31 +1440,33 @@ async function main() {
     },
   });
 
+  // PDT is UTC-7: 10:00 AM PDT = 17:00Z, 1:00 PM PDT = 20:00Z, etc.
   await prisma.task.createMany({
     data: [
       {
         eventId: event.id, kind: "shift", title: "Games", category: "Games",
         requestedGroup: "Scouts", neededCount: 5,
         date: new Date("2026-07-25T00:00:00Z"),
-        startTime: "10:00 AM", endTime: "1:00 PM",
+        startAt: new Date("2026-07-25T17:00:00Z"), endAt: new Date("2026-07-25T20:00:00Z"),
         location: "Inside Gym", pointOfContact: "Yumi 415-370-1477",
         definitionOfDone: "Booth staffed and tidy at handover.",
       },
       {
         eventId: event.id, kind: "shift", title: "Bingo", category: "Bingo",
         neededCount: 3, date: new Date("2026-07-25T00:00:00Z"),
-        startTime: "1:00 PM", endTime: "4:00 PM", location: "Inside Gym",
+        startAt: new Date("2026-07-25T20:00:00Z"), endAt: new Date("2026-07-25T23:00:00Z"),
+        location: "Inside Gym",
       },
       {
         eventId: event.id, kind: "shift", title: "Food Service", category: "Food/Kitchen",
         requestedGroup: "Scouts", neededCount: 3,
         date: new Date("2026-07-25T00:00:00Z"),
-        startTime: "10:00 AM", endTime: "5:00 PM",
+        // all-day: date set, no startAt/endAt
       },
       {
         eventId: event.id, kind: "frog", title: "Bring 50 paper cups",
         category: "Supplies", neededCount: 1,
-        dueBy: new Date("2026-07-25T00:00:00Z"),
+        dueBy: new Date("2026-07-25T17:00:00Z"),
         definitionOfDone: "Cups delivered to the dining area.",
       },
     ],
@@ -1245,21 +1484,24 @@ main()
   });
 ```
 
-- [ ] **Step 3: Run the seed against the dev database**
+> **Known debt:** seed has tasks only, no signups yet.
+
+- [ ] **Step 3: Seed the dev database**
 
 Run: `npm run db:seed`
-Expected: prints "Seeded event ... with 4 tasks."
+Expected: "Seeded event ... with 4 tasks."
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Commit and push**
 
 ```bash
 git add prisma/seed.ts package.json
 git commit -m "feat: seed Ginza Bazaar event for local dev"
+git push
 ```
 
 ---
 
-## Task 8: Server actions for claim and release
+## Task 10: Server actions for claim and release
 
 **Files:**
 - Create: `app/actions/signups.ts`
@@ -1278,12 +1520,8 @@ import { prisma } from "@/lib/db";
 import { resetDb } from "@/test/db";
 import { claimSlot, releaseSignup } from "@/app/actions/signups";
 
-beforeEach(async () => {
-  await resetDb();
-});
-afterAll(async () => {
-  await prisma.$disconnect();
-});
+beforeEach(async () => { await resetDb(); });
+afterAll(async () => { await prisma.$disconnect(); });
 
 async function seedTask(): Promise<string> {
   const event = await prisma.event.create({
@@ -1295,7 +1533,7 @@ async function seedTask(): Promise<string> {
   return task.id;
 }
 
-test("claimSlot persists a signup from form data", async () => {
+test("claimSlot persists a signup and returns its token", async () => {
   const taskId = await seedTask();
   const fd = new FormData();
   fd.set("taskId", taskId);
@@ -1304,6 +1542,9 @@ test("claimSlot persists a signup from form data", async () => {
 
   const result = await claimSlot(fd);
   expect(result.ok).toBe(true);
+  if (!result.ok) return;
+  expect(result.signupId).toBeTruthy();
+  expect(result.claimToken).toBeTruthy();
   const signups = await prisma.signup.findMany({ where: { taskId } });
   expect(signups.map((s) => s.name)).toEqual(["Kenji"]);
 });
@@ -1313,20 +1554,29 @@ test("claimSlot returns an error for a blank name", async () => {
   const fd = new FormData();
   fd.set("taskId", taskId);
   fd.set("name", "   ");
-
-  const result = await claimSlot(fd);
-  expect(result).toEqual({ ok: false, error: "Please enter a name." });
+  expect(await claimSlot(fd)).toEqual({ ok: false, error: "Please enter a name." });
 });
 
-test("releaseSignup removes a signup", async () => {
+test("claimSlot silently rejects a filled honeypot", async () => {
   const taskId = await seedTask();
   const fd = new FormData();
   fd.set("taskId", taskId);
   fd.set("name", "Kenji");
-  await claimSlot(fd);
-  const signup = await prisma.signup.findFirstOrThrow({ where: { taskId } });
+  fd.set("website", "http://spam.example"); // honeypot field
+  expect(await claimSlot(fd)).toEqual({ ok: false, error: "Could not submit. Please try again." });
+  expect(await prisma.signup.count({ where: { taskId } })).toBe(0);
+});
 
-  const result = await releaseSignup(signup.id);
+test("releaseSignup removes a signup when the token matches", async () => {
+  const taskId = await seedTask();
+  const fd = new FormData();
+  fd.set("taskId", taskId);
+  fd.set("name", "Kenji");
+  const claim = await claimSlot(fd);
+  expect(claim.ok).toBe(true);
+  if (!claim.ok) return;
+
+  const result = await releaseSignup(claim.signupId, claim.claimToken);
   expect(result).toEqual({ ok: true });
   expect(await prisma.signup.count({ where: { taskId } })).toBe(0);
 });
@@ -1334,7 +1584,7 @@ test("releaseSignup removes a signup", async () => {
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `npx dotenv -e .env.test -- npx vitest run app/actions/signups.test.ts`
+Run: `npm run test:db -- app/actions/signups.test.ts`
 Expected: FAIL — module not found.
 
 - [ ] **Step 3: Implement the server actions**
@@ -1347,27 +1597,34 @@ Create `app/actions/signups.ts`:
 import { revalidatePath } from "next/cache";
 import { createSignupWithAudit, deleteSignupWithAudit } from "@/lib/repository/signups";
 
-export type ActionResult = { ok: true } | { ok: false; error: string };
+export type ClaimActionResult =
+  | { ok: true; signupId: string; claimToken: string }
+  | { ok: false; error: string };
+export type ReleaseActionResult = { ok: true } | { ok: false; error: string };
 
-export async function claimSlot(formData: FormData): Promise<ActionResult> {
+export async function claimSlot(formData: FormData): Promise<ClaimActionResult> {
   const taskId = String(formData.get("taskId") ?? "");
-  const name = String(formData.get("name") ?? "");
-  const email = String(formData.get("email") ?? "");
-  const phone = String(formData.get("phone") ?? "");
-  const group = String(formData.get("group") ?? "");
-  const minor = formData.get("minor") === "on" ? true : undefined;
-
   if (!taskId) return { ok: false, error: "Missing task." };
 
-  const result = await createSignupWithAudit(taskId, { name, email, phone, group, minor });
+  const result = await createSignupWithAudit(taskId, {
+    name: String(formData.get("name") ?? ""),
+    email: String(formData.get("email") ?? ""),
+    phone: String(formData.get("phone") ?? ""),
+    group: String(formData.get("group") ?? ""),
+    minor: formData.get("minor") === "on" ? true : undefined,
+    honeypot: String(formData.get("website") ?? ""), // hidden field named "website"
+  });
   if (!result.ok) return { ok: false, error: result.error };
 
   revalidatePath("/");
-  return { ok: true };
+  return { ok: true, signupId: result.signupId, claimToken: result.claimToken };
 }
 
-export async function releaseSignup(signupId: string): Promise<ActionResult> {
-  const result = await deleteSignupWithAudit(signupId);
+export async function releaseSignup(
+  signupId: string,
+  claimToken: string | null,
+): Promise<ReleaseActionResult> {
+  const result = await deleteSignupWithAudit(signupId, claimToken);
   if (!result.ok) return { ok: false, error: result.error };
   revalidatePath("/");
   return { ok: true };
@@ -1376,42 +1633,88 @@ export async function releaseSignup(signupId: string): Promise<ActionResult> {
 
 - [ ] **Step 4: Run to verify pass**
 
-Run: `npx dotenv -e .env.test -- npx vitest run app/actions/signups.test.ts`
+Run: `npm run test:db -- app/actions/signups.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Commit and push**
 
 ```bash
 git add app/actions/signups.ts app/actions/signups.test.ts
-git commit -m "feat: claim/release server actions"
+git commit -m "feat: claim/release server actions with honeypot and token"
+git push
 ```
 
 ---
 
-## Task 9: Board UI — server components
+## Task 11: Board UI and the claim/release interaction
+
+> **Use the `frontend-design` skill for this task.** The code below is a correct,
+> tested baseline; treat it as the structure and behavior contract, then apply the
+> skill to elevate visual craft and honor the volunteer mental model in
+> "User Experience & Mental Models" above. Keep the test selectors (roles, labels,
+> text) intact so the tests still pass.
 
 **Files:**
-- Create: `components/Board.tsx`, `components/TaskCard.tsx`
-- Modify: `app/page.tsx`, `app/globals.css`
+- Create: `components/Board.tsx`, `components/TaskCard.tsx`, `components/ClaimForm.tsx`, `components/Claimant.tsx`, `lib/client/ownership.ts`
+- Modify: `app/page.tsx`
+- Test: `components/TaskCard.test.tsx`, `components/ClaimForm.test.tsx`, `components/Claimant.test.tsx`
 
-- [ ] **Step 1: Write a render test for TaskCard**
+- [ ] **Step 1: Implement device-local ownership helpers**
+
+Create `lib/client/ownership.ts`:
+
+```typescript
+"use client";
+
+const KEY = "frogboard.claims";
+
+function readMap(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(window.localStorage.getItem(KEY) ?? "{}");
+  } catch {
+    return {};
+  }
+}
+
+export function rememberClaim(signupId: string, token: string) {
+  const map = readMap();
+  map[signupId] = token;
+  window.localStorage.setItem(KEY, JSON.stringify(map));
+}
+
+export function getClaimToken(signupId: string): string | null {
+  return readMap()[signupId] ?? null;
+}
+
+export function forgetClaim(signupId: string) {
+  const map = readMap();
+  delete map[signupId];
+  window.localStorage.setItem(KEY, JSON.stringify(map));
+}
+```
+
+- [ ] **Step 2: Write a failing render test for TaskCard**
 
 Create `components/TaskCard.test.tsx`:
 
 ```typescript
 import { render, screen } from "@testing-library/react";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { TaskCard } from "@/components/TaskCard";
 import type { BoardTask } from "@/lib/domain/types";
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock("@/app/actions/signups", () => ({ claimSlot: vi.fn(), releaseSignup: vi.fn() }));
 
 function task(overrides: Partial<BoardTask>): BoardTask {
   return {
     id: "t1", kind: "shift", title: "Games", category: "Games",
     requestedGroup: "Scouts", neededCount: 3, date: new Date("2026-07-25T00:00:00Z"),
-    startTime: "10:00 AM", endTime: "1:00 PM", dueBy: null,
-    pointOfContact: "Yumi 415-370-1477", location: "Inside Gym",
-    definitionOfDone: "Booth tidy at handover.", status: "todo",
-    waiting: false, signups: [], ...overrides,
+    startAt: new Date("2026-07-25T17:00:00Z"), endAt: new Date("2026-07-25T20:00:00Z"),
+    dueBy: null, pointOfContact: "Yumi 415-370-1477", location: "Inside Gym",
+    definitionOfDone: "Booth tidy at handover.", status: "todo", waiting: false,
+    signups: [], ...overrides,
   };
 }
 
@@ -1425,26 +1728,159 @@ test("shows title, time window, slot count, location and contact", () => {
 });
 
 test("lists claimant names", () => {
-  render(
-    <TaskCard
-      task={task({ signups: [{ id: "s1", name: "Kenji", group: "Scouts", minor: null }] })}
-    />,
-  );
+  render(<TaskCard task={task({ signups: [{ id: "s1", name: "Kenji", group: "Scouts", minor: null }] })} />);
   expect(screen.getByText("Kenji")).toBeInTheDocument();
 });
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [ ] **Step 3: Run to verify failure**
 
 Run: `npx vitest run components/TaskCard.test.tsx`
-Expected: FAIL — module not found.
+Expected: FAIL — modules not found.
 
-- [ ] **Step 3: Implement TaskCard**
+- [ ] **Step 4: Implement ClaimForm (client, honeypot, stores token)**
+
+Create `components/ClaimForm.tsx`:
+
+```tsx
+"use client";
+
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { claimSlot } from "@/app/actions/signups";
+import { rememberClaim } from "@/lib/client/ownership";
+
+export function ClaimForm({ taskId }: { taskId: string }) {
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const router = useRouter();
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mt-3 w-full rounded-xl bg-emerald-600 py-2 font-medium text-white hover:bg-emerald-700"
+      >
+        🐸 Grab a frog
+      </button>
+    );
+  }
+
+  function onSubmit(formData: FormData) {
+    setError(null);
+    formData.set("taskId", taskId);
+    startTransition(async () => {
+      const result = await claimSlot(formData);
+      if (result.ok) {
+        rememberClaim(result.signupId, result.claimToken);
+        setOpen(false);
+        router.refresh();
+      } else {
+        setError(result.error);
+      }
+    });
+  }
+
+  return (
+    <form action={onSubmit} className="mt-3 space-y-2">
+      {/* Honeypot: hidden from humans; bots fill it and get rejected. */}
+      <input
+        type="text" name="website" tabIndex={-1} autoComplete="off"
+        className="hidden" aria-hidden="true"
+      />
+      <label className="block text-sm font-medium text-emerald-900">
+        Your name
+        <input name="name" autoFocus maxLength={80}
+          className="mt-1 w-full rounded-lg border border-emerald-300 px-3 py-2" />
+      </label>
+      <label className="block text-sm text-emerald-800">
+        Group (optional)
+        <input name="group" maxLength={40}
+          className="mt-1 w-full rounded-lg border border-emerald-200 px-3 py-2" />
+      </label>
+      <label className="flex items-center gap-2 text-sm text-emerald-800">
+        <input type="checkbox" name="minor" /> Under 18
+      </label>
+      {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+      <div className="flex gap-2">
+        <button type="submit" disabled={pending}
+          className="flex-1 rounded-xl bg-emerald-600 py-2 font-medium text-white hover:bg-emerald-700 disabled:opacity-60">
+          {pending ? "Adding…" : "Add me"}
+        </button>
+        <button type="button" onClick={() => setOpen(false)}
+          className="rounded-xl border border-emerald-300 px-4 py-2 text-emerald-800">
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+```
+
+- [ ] **Step 5: Implement Claimant (client, device-owned remove)**
+
+Create `components/Claimant.tsx`:
+
+```tsx
+"use client";
+
+import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { releaseSignup } from "@/app/actions/signups";
+import { getClaimToken, forgetClaim } from "@/lib/client/ownership";
+
+export function Claimant({
+  signupId, name, group,
+}: {
+  signupId: string;
+  name: string;
+  group: string | null;
+}) {
+  const [owned, setOwned] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const router = useRouter();
+
+  // Only the device that made the claim shows a remove control.
+  useEffect(() => {
+    setOwned(getClaimToken(signupId) !== null);
+  }, [signupId]);
+
+  function onRemove() {
+    const token = getClaimToken(signupId);
+    startTransition(async () => {
+      const result = await releaseSignup(signupId, token);
+      if (result.ok) {
+        forgetClaim(signupId);
+        router.refresh();
+      }
+    });
+  }
+
+  return (
+    <li className="inline-flex items-center gap-1 rounded-full bg-emerald-100 py-1 pl-3 pr-2 text-sm text-emerald-900">
+      <span>{name}</span>
+      {group && <span className="text-emerald-600">· {group}</span>}
+      {owned && (
+        <button type="button" onClick={onRemove} disabled={pending}
+          aria-label={`Remove ${name}`}
+          className="ml-1 rounded-full px-2 text-emerald-700 hover:bg-emerald-200 disabled:opacity-50">
+          ×
+        </button>
+      )}
+    </li>
+  );
+}
+```
+
+- [ ] **Step 6: Implement TaskCard**
 
 Create `components/TaskCard.tsx`:
 
 ```tsx
-import { formatWhen, getSlotInfo } from "@/lib/domain/board";
+import { getSlotInfo } from "@/lib/domain/board";
+import { formatWhen } from "@/lib/domain/time";
 import type { BoardTask } from "@/lib/domain/types";
 import { ClaimForm } from "@/components/ClaimForm";
 import { Claimant } from "@/components/Claimant";
@@ -1489,33 +1925,109 @@ export function TaskCard({ task }: { task: BoardTask }) {
 }
 ```
 
-- [ ] **Step 4: Run TaskCard test (still fails — ClaimForm/Claimant missing)**
-
-Run: `npx vitest run components/TaskCard.test.tsx`
-Expected: FAIL — cannot resolve `ClaimForm` / `Claimant`. These are built in Task 10; create temporary stubs now so this task's test passes:
-
-Create `components/ClaimForm.tsx` (temporary stub, replaced in Task 10):
-
-```tsx
-export function ClaimForm({ taskId }: { taskId: string }) {
-  return <div data-testid="claim-form" data-task={taskId} />;
-}
-```
-
-Create `components/Claimant.tsx` (temporary stub, replaced in Task 10):
-
-```tsx
-export function Claimant({ name }: { signupId: string; name: string; group: string | null }) {
-  return <li>{name}</li>;
-}
-```
-
-- [ ] **Step 5: Run TaskCard test to verify pass**
+- [ ] **Step 7: Run TaskCard test to verify pass**
 
 Run: `npx vitest run components/TaskCard.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 6: Implement Board**
+- [ ] **Step 8: Write and pass the ClaimForm interaction test**
+
+Create `components/ClaimForm.test.tsx`:
+
+```typescript
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { expect, test, vi, beforeEach } from "vitest";
+
+const claimSlot = vi.fn();
+vi.mock("@/app/actions/signups", () => ({
+  claimSlot: (fd: FormData) => claimSlot(fd),
+  releaseSignup: vi.fn(),
+}));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+
+import { ClaimForm } from "@/components/ClaimForm";
+
+beforeEach(() => {
+  claimSlot.mockReset();
+  window.localStorage.clear();
+});
+
+test("submits a name, calls the action, and stores the returned token", async () => {
+  claimSlot.mockResolvedValue({ ok: true, signupId: "s1", claimToken: "tok-1" });
+  const user = userEvent.setup();
+  render(<ClaimForm taskId="t1" />);
+
+  await user.click(screen.getByRole("button", { name: /grab a frog/i }));
+  await user.type(screen.getByLabelText(/your name/i), "Kenji");
+  await user.click(screen.getByRole("button", { name: /^add me$/i }));
+
+  expect(claimSlot).toHaveBeenCalledOnce();
+  const fd = claimSlot.mock.calls[0][0] as FormData;
+  expect(fd.get("name")).toBe("Kenji");
+  expect(fd.get("taskId")).toBe("t1");
+  expect(JSON.parse(window.localStorage.getItem("frogboard.claims")!)).toEqual({ s1: "tok-1" });
+});
+
+test("shows the error message when the action fails", async () => {
+  claimSlot.mockResolvedValue({ ok: false, error: "This task is already full." });
+  const user = userEvent.setup();
+  render(<ClaimForm taskId="t1" />);
+
+  await user.click(screen.getByRole("button", { name: /grab a frog/i }));
+  await user.type(screen.getByLabelText(/your name/i), "Kenji");
+  await user.click(screen.getByRole("button", { name: /^add me$/i }));
+
+  expect(await screen.findByText("This task is already full.")).toBeInTheDocument();
+});
+```
+
+Run: `npx vitest run components/ClaimForm.test.tsx`
+Expected: PASS.
+
+- [ ] **Step 9: Write and pass the Claimant ownership test**
+
+Create `components/Claimant.test.tsx`:
+
+```typescript
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { expect, test, vi, beforeEach } from "vitest";
+
+const releaseSignup = vi.fn();
+vi.mock("@/app/actions/signups", () => ({
+  releaseSignup: (id: string, token: string | null) => releaseSignup(id, token),
+  claimSlot: vi.fn(),
+}));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+
+import { Claimant } from "@/components/Claimant";
+
+beforeEach(() => {
+  releaseSignup.mockReset();
+  window.localStorage.clear();
+});
+
+test("hides remove when this device does not own the signup", () => {
+  render(<Claimant signupId="s1" name="Kenji" group="Scouts" />);
+  expect(screen.queryByRole("button", { name: /remove kenji/i })).toBeNull();
+});
+
+test("shows remove and passes the stored token when this device owns the signup", async () => {
+  window.localStorage.setItem("frogboard.claims", JSON.stringify({ s1: "tok-1" }));
+  releaseSignup.mockResolvedValue({ ok: true });
+  const user = userEvent.setup();
+  render(<Claimant signupId="s1" name="Kenji" group="Scouts" />);
+
+  await user.click(screen.getByRole("button", { name: /remove kenji/i }));
+  expect(releaseSignup).toHaveBeenCalledWith("s1", "tok-1");
+});
+```
+
+Run: `npx vitest run components/Claimant.test.tsx`
+Expected: PASS.
+
+- [ ] **Step 10: Implement Board and wire the home page**
 
 Create `components/Board.tsx`:
 
@@ -1549,8 +2061,6 @@ export function Board({ eventName, tasks }: { eventName: string; tasks: BoardTas
 }
 ```
 
-- [ ] **Step 7: Wire the home page**
-
 Replace `app/page.tsx` with:
 
 ```tsx
@@ -1573,315 +2083,45 @@ export default async function Home() {
 }
 ```
 
-- [ ] **Step 8: Verify the build compiles**
+- [ ] **Step 11: Build and manually verify the full loop**
 
-Run: `npm run build`
-Expected: compiles with no type errors.
+Run: `npm run build` (expected: no type errors), then `npm run dev` and open http://localhost:3000. Grab a frog, add a name → it appears, count increments, and a remove "×" shows for *you*. Open the same board in a private window → no remove button on your signup. Remove it in your first window → it disappears. Stop the server.
 
-- [ ] **Step 9: Manually verify the board renders**
-
-Run: `npm run dev`, open http://localhost:3000
-Expected: the seeded event title and four cards grouped by day, each showing "0 of N filled". Stop the server with Ctrl-C.
-
-- [ ] **Step 10: Commit**
+- [ ] **Step 12: Commit and push**
 
 ```bash
-git add components/Board.tsx components/TaskCard.tsx components/TaskCard.test.tsx components/ClaimForm.tsx components/Claimant.tsx app/page.tsx
-git commit -m "feat: server-rendered board and task cards"
+git add components lib/client app/page.tsx
+git commit -m "feat: board UI, claim form (honeypot+token), device-owned release"
+git push
 ```
 
 ---
 
-## Task 10: Claim/release interaction with optimistic UI
+## Task 12: Connect Vercel CD and verify production
 
 **Files:**
-- Modify: `components/ClaimForm.tsx`, `components/Claimant.tsx`
-- Test: `components/ClaimForm.test.tsx`
+- Create: `README.md`
+- Modify: `package.json` (build runs migrations)
 
-- [ ] **Step 1: Write a failing interaction test**
+- [ ] **Step 1: Make the build run migrations (build-once, migrate-in-pipeline)**
 
-Create `components/ClaimForm.test.tsx`:
+In `package.json`, change the build script:
 
-```typescript
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { expect, test, vi, beforeEach } from "vitest";
-
-const claimSlot = vi.fn();
-vi.mock("@/app/actions/signups", () => ({
-  claimSlot: (fd: FormData) => claimSlot(fd),
-  releaseSignup: vi.fn(),
-}));
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ refresh: vi.fn() }),
-}));
-
-import { ClaimForm } from "@/components/ClaimForm";
-
-beforeEach(() => claimSlot.mockReset());
-
-test("opens the form, submits a name, and calls the action", async () => {
-  claimSlot.mockResolvedValue({ ok: true });
-  const user = userEvent.setup();
-  render(<ClaimForm taskId="t1" />);
-
-  await user.click(screen.getByRole("button", { name: /grab a frog/i }));
-  await user.type(screen.getByLabelText(/your name/i), "Kenji");
-  await user.click(screen.getByRole("button", { name: /^add me$/i }));
-
-  expect(claimSlot).toHaveBeenCalledOnce();
-  const fd = claimSlot.mock.calls[0][0] as FormData;
-  expect(fd.get("name")).toBe("Kenji");
-  expect(fd.get("taskId")).toBe("t1");
-});
-
-test("shows the error message when the action fails", async () => {
-  claimSlot.mockResolvedValue({ ok: false, error: "This task is already full." });
-  const user = userEvent.setup();
-  render(<ClaimForm taskId="t1" />);
-
-  await user.click(screen.getByRole("button", { name: /grab a frog/i }));
-  await user.type(screen.getByLabelText(/your name/i), "Kenji");
-  await user.click(screen.getByRole("button", { name: /^add me$/i }));
-
-  expect(await screen.findByText("This task is already full.")).toBeInTheDocument();
-});
+```json
+"build": "prisma generate && prisma migrate deploy && next build"
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [ ] **Step 2: Connect Vercel**
 
-Run: `npx vitest run components/ClaimForm.test.tsx`
-Expected: FAIL — the stub has no button.
+In the Vercel dashboard: New Project → import the `frogboard` repo. Set the `DATABASE_URL` environment variable to your Neon **prod** connection string (Production scope). Deploy. From now on, every push to `main` auto-deploys and runs `prisma migrate deploy` in the build — no manual prod migrations.
 
-- [ ] **Step 3: Implement the real ClaimForm**
-
-Replace `components/ClaimForm.tsx` with:
-
-```tsx
-"use client";
-
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { claimSlot } from "@/app/actions/signups";
-
-export function ClaimForm({ taskId }: { taskId: string }) {
-  const [open, setOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-  const router = useRouter();
-
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="mt-3 w-full rounded-xl bg-emerald-600 py-2 font-medium text-white hover:bg-emerald-700"
-      >
-        🐸 Grab a frog
-      </button>
-    );
-  }
-
-  async function onSubmit(formData: FormData) {
-    setError(null);
-    formData.set("taskId", taskId);
-    startTransition(async () => {
-      const result = await claimSlot(formData);
-      if (result.ok) {
-        setOpen(false);
-        router.refresh();
-      } else {
-        setError(result.error);
-      }
-    });
-  }
-
-  return (
-    <form action={onSubmit} className="mt-3 space-y-2">
-      <label className="block text-sm font-medium text-emerald-900">
-        Your name
-        <input
-          name="name"
-          autoFocus
-          className="mt-1 w-full rounded-lg border border-emerald-300 px-3 py-2"
-        />
-      </label>
-      <label className="block text-sm text-emerald-800">
-        Group (optional)
-        <input name="group" className="mt-1 w-full rounded-lg border border-emerald-200 px-3 py-2" />
-      </label>
-      <label className="flex items-center gap-2 text-sm text-emerald-800">
-        <input type="checkbox" name="minor" /> Under 18
-      </label>
-      {error && <p className="text-sm font-medium text-red-600">{error}</p>}
-      <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={pending}
-          className="flex-1 rounded-xl bg-emerald-600 py-2 font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
-        >
-          Add me
-        </button>
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          className="rounded-xl border border-emerald-300 px-4 py-2 text-emerald-800"
-        >
-          Cancel
-        </button>
-      </div>
-    </form>
-  );
-}
-```
-
-- [ ] **Step 4: Run ClaimForm test to verify pass**
-
-Run: `npx vitest run components/ClaimForm.test.tsx`
-Expected: PASS.
-
-- [ ] **Step 5: Write a failing test for Claimant remove**
-
-Create `components/Claimant.test.tsx`:
-
-```typescript
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { expect, test, vi, beforeEach } from "vitest";
-
-const releaseSignup = vi.fn();
-vi.mock("@/app/actions/signups", () => ({
-  releaseSignup: (id: string) => releaseSignup(id),
-  claimSlot: vi.fn(),
-}));
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ refresh: vi.fn() }),
-}));
-
-import { Claimant } from "@/components/Claimant";
-
-beforeEach(() => releaseSignup.mockReset());
-
-test("clicking remove calls releaseSignup with the id", async () => {
-  releaseSignup.mockResolvedValue({ ok: true });
-  const user = userEvent.setup();
-  render(<Claimant signupId="s1" name="Kenji" group="Scouts" />);
-
-  await user.click(screen.getByRole("button", { name: /remove kenji/i }));
-  expect(releaseSignup).toHaveBeenCalledWith("s1");
-});
-```
-
-- [ ] **Step 6: Run to verify failure**
-
-Run: `npx vitest run components/Claimant.test.tsx`
-Expected: FAIL — stub has no button.
-
-- [ ] **Step 7: Implement the real Claimant**
-
-Replace `components/Claimant.tsx` with:
-
-```tsx
-"use client";
-
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { releaseSignup } from "@/app/actions/signups";
-
-export function Claimant({
-  signupId,
-  name,
-  group,
-}: {
-  signupId: string;
-  name: string;
-  group: string | null;
-}) {
-  const [pending, startTransition] = useTransition();
-  const router = useRouter();
-
-  function onRemove() {
-    startTransition(async () => {
-      const result = await releaseSignup(signupId);
-      if (result.ok) router.refresh();
-    });
-  }
-
-  return (
-    <li className="inline-flex items-center gap-1 rounded-full bg-emerald-100 py-1 pl-3 pr-1 text-sm text-emerald-900">
-      <span>{name}</span>
-      {group && <span className="text-emerald-600">· {group}</span>}
-      <button
-        type="button"
-        onClick={onRemove}
-        disabled={pending}
-        aria-label={`Remove ${name}`}
-        className="ml-1 rounded-full px-2 text-emerald-700 hover:bg-emerald-200 disabled:opacity-50"
-      >
-        ×
-      </button>
-    </li>
-  );
-}
-```
-
-- [ ] **Step 8: Run Claimant test to verify pass**
-
-Run: `npx vitest run components/Claimant.test.tsx`
-Expected: PASS.
-
-- [ ] **Step 9: Run the full test suite**
-
-Run: `npx dotenv -e .env.test -- npx vitest run`
-Expected: PASS — all domain, repository, action, and component tests green.
-
-- [ ] **Step 10: Manually verify the full claim/release loop**
-
-Run: `npm run dev`, open http://localhost:3000. Grab a frog on a card, add a name, confirm it appears and the count increments; remove it, confirm it disappears and the count decrements. Stop the server.
-
-- [ ] **Step 11: Commit**
-
-```bash
-git add components/ClaimForm.tsx components/ClaimForm.test.tsx components/Claimant.tsx components/Claimant.test.tsx
-git commit -m "feat: claim/release interaction with optimistic refresh"
-```
-
----
-
-## Task 11: Deploy to Vercel + Neon
-
-**Files:**
-- Create: `README.md` (run/deploy notes)
-
-- [ ] **Step 1: Push the repo to GitHub**
-
-```bash
-gh repo create frogboard --private --source=. --remote=origin --push
-```
-
-Expected: repo created and pushed.
-
-- [ ] **Step 2: Import into Vercel**
-
-In the Vercel dashboard: New Project → import the `frogboard` repo. Set the `DATABASE_URL` environment variable to your Neon **dev/prod** connection string. Deploy.
-
-- [ ] **Step 3: Apply migrations to the production database**
-
-Run locally against the prod database (replace URL):
-
-```bash
-DATABASE_URL="<prod-neon-url>" npx prisma migrate deploy
-```
-
-Expected: "All migrations have been successfully applied."
-
-- [ ] **Step 4: Seed the production event (optional for first demo)**
+- [ ] **Step 3: Seed the production event (one-time, for the first demo)**
 
 ```bash
 DATABASE_URL="<prod-neon-url>" npm run db:seed
 ```
 
-- [ ] **Step 5: Write the README**
+- [ ] **Step 4: Write the README**
 
 Create `README.md`:
 
@@ -1892,26 +2132,115 @@ Mobile-first volunteer self-organization board. Phase 1: public board + claim/re
 
 ## Develop
 1. `npm install`
-2. Copy `.env.example` to `.env` and `.env.test`; paste your Neon connection strings.
+2. Copy `.env.example` to `.env` and `.env.test`; paste your Neon connection strings
+   (the test DB name must contain "test").
 3. `npm run db:migrate` then `npm run db:seed`
 4. `npm run dev`
 
 ## Test
-`npx dotenv -e .env.test -- npx vitest run`
+- Unit (no DB): `npm test`
+- Integration (test DB): `npm run test:db`
 
-## Deploy
-Vercel + Neon. Set `DATABASE_URL` in Vercel. Run `prisma migrate deploy` against prod.
+## CI/CD (Jez Humble style)
+- GitHub Actions runs lint + tests + build on every push against a throwaway
+  Postgres container; `main` stays releasable.
+- Vercel auto-deploys `main`. Migrations run in the build via `prisma migrate deploy`.
+  Never migrate prod by hand.
 ```
 
-- [ ] **Step 6: Verify the live site**
+- [ ] **Step 5: Verify the live site on a phone**
 
-Open the Vercel URL on a phone. Confirm the board loads and a claim works end-to-end.
+Open the Vercel URL on a phone. Confirm the board loads and a claim/release works end-to-end.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 6: Commit and push**
 
 ```bash
-git add README.md
-git commit -m "docs: add run and deploy notes"
+git add README.md package.json
+git commit -m "ci: run migrations in build; docs: run/deploy notes"
+git push
+```
+
+---
+
+## Task 13 (stretch): Playwright end-to-end test
+
+A browser-level test of the real claim/release loop. Stretch because it needs a running app + DB; keep it out of the default unit run.
+
+**Files:**
+- Create: `playwright.config.ts`, `e2e/board.spec.ts`
+- Modify: `package.json` (`test:e2e` script), `.github/workflows/ci.yml` (optional e2e job)
+
+- [ ] **Step 1: Install Playwright**
+
+```bash
+npm install -D @playwright/test
+npx playwright install --with-deps chromium
+```
+
+- [ ] **Step 2: Configure Playwright**
+
+Create `playwright.config.ts`:
+
+```typescript
+import { defineConfig } from "@playwright/test";
+
+export default defineConfig({
+  testDir: "./e2e",
+  use: { baseURL: "http://localhost:3000" },
+  webServer: {
+    command: "npm run start",
+    url: "http://localhost:3000",
+    reuseExistingServer: !process.env.CI,
+    timeout: 120_000,
+  },
+});
+```
+
+Add to `"scripts"`:
+
+```json
+"test:e2e": "playwright test"
+```
+
+- [ ] **Step 3: Write the E2E spec**
+
+Create `e2e/board.spec.ts`:
+
+```typescript
+import { test, expect } from "@playwright/test";
+
+test("claim and release a slot end-to-end", async ({ page }) => {
+  await page.goto("/");
+
+  const firstCard = page.locator("article").first();
+  await expect(firstCard).toContainText("filled");
+
+  await firstCard.getByRole("button", { name: /grab a frog/i }).click();
+  await firstCard.getByLabel(/your name/i).fill("E2E Tester");
+  await firstCard.getByRole("button", { name: /^add me$/i }).click();
+
+  await expect(firstCard).toContainText("E2E Tester");
+
+  await firstCard.getByRole("button", { name: /remove e2e tester/i }).click();
+  await expect(firstCard).not.toContainText("E2E Tester");
+});
+```
+
+- [ ] **Step 4: Run the E2E test against a seeded local build**
+
+```bash
+npm run db:seed
+npm run build
+npm run test:e2e
+```
+
+Expected: PASS — the claim appears, then the release removes it.
+
+- [ ] **Step 5: Commit and push**
+
+```bash
+git add playwright.config.ts e2e package.json
+git commit -m "test: Playwright end-to-end claim/release flow"
 git push
 ```
 
@@ -1919,7 +2248,21 @@ git push
 
 ## Definition of Done (Phase 1)
 
-- [ ] All Vitest suites pass: `npx dotenv -e .env.test -- npx vitest run`
-- [ ] `npm run build` succeeds with no type errors
-- [ ] The deployed board loads on a phone and a scout can claim and release a shift
-- [ ] Every claim and release writes an `AuditLog` row (verify in the DB)
+- [ ] CI is green on `main` (lint + unit + integration + build)
+- [ ] Two simultaneous claims for the last slot yield exactly one signup (concurrency test passes)
+- [ ] A signup's "remove" control appears only on the claiming device; a wrong/missing token is rejected
+- [ ] Honeypot and input-limit validations reject bad input; every claim/release writes an `AuditLog` row carrying `eventId`
+- [ ] `resetDb()` refuses to run against a non-test `DATABASE_URL`
+- [ ] The deployed board loads on a phone; a scout can claim and release a shift
+- [ ] (Stretch) Playwright E2E passes
+
+## Exploratory testing charter (run after the tasks, per Hendrickson)
+
+Timebox 30 minutes. Explore: two phones racing for the last slot; very long and emoji names; double-tapping "Add me"; browser back/forward after claiming; clearing localStorage then trying to remove; a frog with no date; daylight-time boundaries. Turn any surprise into a new automated test.
+
+## Known debt carried into later phases
+
+- Rate limiting is not yet implemented (needs a KV store). **Placeholder:** add Upstash/Vercel KV + a per-IP limiter on `claimSlot` in a later phase. Honeypot + length limits are the interim guard.
+- Interaction is pending-state + `router.refresh()`, not true optimistic UI. Tracked enhancement: adopt `useOptimistic` for instant claim/remove rendering.
+- `claimToken` is stored plaintext (capability token, not a credential). Acceptable for anti-graffiti; revisit if it ever guards anything sensitive.
+- Per-event timezone is fixed to `America/Los_Angeles`. Add `Event.timezone` when scouts use it elsewhere.
