@@ -38,13 +38,13 @@ Designed to be reused for any future event, including scout activities.
   scope. Defer roles, auth scopes, and automated messaging.
 - **Frog theme** — the board is a pond, cards are lily pads, claiming is
   scooping up a frog. Warm and low-pressure, reinforcing "grab a card."
-- **Performant — under 200 ms.** Core interactions (board load, claim/release,
-  status move, view switches) target **< 200 ms server response** at p95. Met by:
-  indexed Postgres queries, fetching only the active event's tasks, and keeping
-  the data model flat. Claims/moves use **optimistic UI** so the interface feels
-  instant even before the round-trip confirms. (Caveat: serverless cold starts
-  can exceed this on the first hit; the budget is for warm requests, which is the
-  common case during an event.)
+- **Performant — under 100 ms.** Core interactions (board load, claim/release,
+  status move, view switches) target **< 100 ms server response** at p95. Met by:
+  indexed Postgres queries, fetching only the active event's tasks, keeping the
+  data model flat, and co-locating the app and database region. Claims/moves use
+  **optimistic UI** so the interface feels instant even before the round-trip
+  confirms. (Caveat: serverless cold starts can exceed this on the first hit; the
+  budget is for warm requests, which is the common case during an event.)
 
 ## Tech stack (sensible default, ~$0/month)
 
