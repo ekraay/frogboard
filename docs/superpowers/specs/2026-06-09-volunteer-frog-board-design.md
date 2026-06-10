@@ -81,6 +81,8 @@ reports, and revert DRY.
 - `dueBy` (optional) — for `kind: frog`, a "done by" deadline.
 - `pointOfContact` (optional) — name + optional phone/email of who can explain
   the job.
+- `location` (optional) — where to meet for this task (e.g. "Inside Gym",
+  "Octavia St in front of gym"). Shows on every view.
 - `definitionOfDone` (optional) — short note: when is this task complete.
 - `status` — `"todo"` | `"in_progress"` | `"review"` | `"done"`. Default
   `todo`. Drives the Kanban view; shown as a badge in every other view.
@@ -90,10 +92,13 @@ reports, and revert DRY.
 
 ### Signup
 - `id`, `taskId`
-- `name` (required)
+- `name` (required) — single free-text field (KISS: preserves "type your name";
+  youth often go by first name only). Table view shows one "Name" column.
 - `email` (optional), `phone` (optional)
 - `group` (optional) — asked at claim time via dropdown, so reports can slice by
   who actually signed up.
+- `minor` (optional yes/no) — whether the volunteer is under 18; one optional
+  checkbox at claim time, surfaced for youth-protection counts and the table.
 - `userId` (nullable) — set when a logged-in user claims (links to Auth.js
   `User`); null for anonymous signups. Powers the "my shifts" view and reminders.
 - `createdAt`
@@ -143,6 +148,17 @@ reports, and revert DRY.
 - Status and waiting changes are **logged in the audit log and revertible**, like
   claims. Open whiteboard — anyone can move a card.
 - Status also shows as a badge in the by-day / category / group / person views.
+
+### Table / roster view
+- A third rendering of the same data (alongside board and Kanban), grouped by
+  shift or category — the format BCSF already lives in (see the existing
+  roster sheets).
+- Each shift renders its header (job, date, time, location, contact, definition
+  of done) then a **numbered roster** of signups — with **empty slots shown up to
+  the needed count** (the "Count 1–6" pattern), so gaps are obvious.
+- Columns: count, name, email, group, minor. Status/waiting shown as badges.
+- **CSV export**, so a roster drops straight into the Google Sheets the org
+  already trusts. This is a rendering of the view engine, not a separate system.
 
 ### Physical frog QR codes
 - Every card has a stable URL. Admin can print a QR per card — the physical

@@ -6,7 +6,8 @@
       "Bash(git add *)",
       "Bash(git commit -q -m 'Add volunteer frog board design spec *)",
       "Bash(git commit -q -m 'Add optional passwordless accounts to v1; reversibility notes *)",
-      "Bash(git commit -q -m 'Add Kanban view \\(To Do/In Progress/Review/Done\\) with Waiting flag *)"
+      "Bash(git commit -q -m 'Add Kanban view \\(To Do/In Progress/Review/Done\\) with Waiting flag *)",
+      "Bash(git commit -q -m 'Add table/roster view with CSV export; location and minor fields *)"
     ]
   }
 }
