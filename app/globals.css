@@ -1,26 +1,56 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
+/*
+  Matsuri Pond theme — a Bon Odori festival pond at dusk.
+  Cool teal water, warm paper-lantern light, washi-paper ground.
+*/
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --font-display: var(--font-shippori), Georgia, serif;
+  --font-sans: var(--font-zen), ui-sans-serif, system-ui, sans-serif;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-washi: #fbf4e6; /* warm paper ground */
+  --color-washi-deep: #f3e7cd;
+  --color-ink: #16302c; /* primary text, green-black */
+  --color-ink-soft: #4a6f67; /* muted text */
+
+  --color-pond: #0e7c74; /* teal water / primary */
+  --color-pond-deep: #0a4f4a;
+  --color-lily: #ecfaf3; /* pale pad fill (chips, panels) */
+  --color-lily-line: #bce5d3; /* pad edge */
+
+  --color-reed: #2f9e62; /* frog green — calls to action */
+  --color-reed-deep: #237a4b;
+
+  --color-lantern: #ef6a39; /* vermilion lantern accent */
+  --color-amber: #f4a72c; /* warm lantern glow */
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-washi);
+  /* Lantern glow up top, pond depth below — atmosphere, not flat color. */
+  background-image:
+    radial-gradient(115% 70% at 50% -10%, rgba(244, 167, 44, 0.18), transparent 60%),
+    radial-gradient(140% 90% at 50% 120%, rgba(14, 124, 116, 0.12), transparent 55%);
+  background-attachment: fixed;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Cards drift up into place on load — one calm, staggered reveal. */
+@keyframes pad-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pad-rise {
+    animation: pad-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
 }
