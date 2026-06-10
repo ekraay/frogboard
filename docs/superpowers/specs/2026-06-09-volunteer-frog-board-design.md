@@ -38,13 +38,21 @@ Designed to be reused for any future event, including scout activities.
   scope. Defer roles, auth scopes, and automated messaging.
 - **Frog theme** — the board is a pond, cards are lily pads, claiming is
   scooping up a frog. Warm and low-pressure, reinforcing "grab a card."
-- **Performant — under 100 ms.** Core interactions (board load, claim/release,
-  status move, view switches) target **< 100 ms server response** at p95. Met by:
-  indexed Postgres queries, fetching only the active event's tasks, keeping the
-  data model flat, and co-locating the app and database region. Claims/moves use
-  **optimistic UI** so the interface feels instant even before the round-trip
-  confirms. (Caveat: serverless cold starts can exceed this on the first hit; the
-  budget is for warm requests, which is the common case during an event.)
+- **Performant — rendering speed first, under 100 ms.** The bar is *perceived*
+  speed: every interaction should feel instant. Targets at p95:
+  - **Interaction render < 100 ms** — claim/release, status move, view switch,
+    filter, and waiting-toggle repaint in under 100 ms. Achieved with
+    **optimistic UI** (update the screen immediately, reconcile with the server
+    after) so renders never wait on the network.
+  - **Smooth lists** — board/Kanban/table stay at 60 fps while scrolling;
+    long rosters are virtualized so render cost doesn't grow with task count.
+  - **Fast first paint** — the initial board is server-rendered and
+    interactive quickly; ship minimal client JS, no heavy UI framework on top
+    of React.
+  - The server side supports this with indexed Postgres queries, fetching only
+    the active event's tasks, a flat data model, and co-locating app + database
+    region. (Caveat: serverless cold starts can exceed budgets on the first hit;
+    targets are for warm requests, the common case during an event.)
 
 ## Tech stack (sensible default, ~$0/month)
 
