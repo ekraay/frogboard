@@ -82,6 +82,11 @@ reports, and revert DRY.
 - `pointOfContact` (optional) — name + optional phone/email of who can explain
   the job.
 - `definitionOfDone` (optional) — short note: when is this task complete.
+- `status` — `"todo"` | `"in_progress"` | `"review"` | `"done"`. Default
+  `todo`. Drives the Kanban view; shown as a badge in every other view.
+- `waiting` (boolean, default false) — a decoration/flag on the card,
+  independent of its column. Signals the card is stuck/blocked and needs
+  attention (waiting on a person, delivery, decision). Visible in all views.
 
 ### Signup
 - `id`, `taskId`
@@ -95,7 +100,8 @@ reports, and revert DRY.
 
 ### AuditLog (append-only)
 - `id`, `taskId`
-- `action` — `"claim"` | `"release"` | `"edit"`
+- `action` — `"claim"` | `"release"` | `"edit"` | `"move"` (status change) |
+  `"flag"` (waiting toggle)
 - `details` — enough to render "who did what when" and to revert
 - `createdAt`
 
@@ -120,6 +126,23 @@ reports, and revert DRY.
 - Seeing who's already on a card is how **pairing** happens — join your buddy.
 - **Release:** tap your own name → "remove me." Anyone *can* edit/remove (it's
   the open whiteboard), but every change is logged and revertible.
+
+### Kanban / progress view
+- A second view of the same tasks, grouped into four columns: **To Do →
+  In Progress → Review → Done**. One more lens on the view engine (group-by
+  `status`), not a parallel system.
+- **Move a card** to change its status. Mobile-first: primary interaction is
+  **tap card → "move to →"** menu; drag-and-drop is a desktop nicety. (Mobile is
+  the baseline, not drag.)
+- **Waiting** is a flag toggled on a card (see model) — a "stuck / needs
+  attention" decoration shown in any column, not its own column. Surfaces what
+  Kniberg calls people getting stuck.
+- **Review** column ties to definition of done: a doer moves their card here to
+  signal "meets the DoD, please verify"; the point of contact (natural reviewer,
+  not enforced) moves it to Done.
+- Status and waiting changes are **logged in the audit log and revertible**, like
+  claims. Open whiteboard — anyone can move a card.
+- Status also shows as a badge in the by-day / category / group / person views.
 
 ### Physical frog QR codes
 - Every card has a stable URL. Admin can print a QR per card — the physical
