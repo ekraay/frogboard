@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TaskKind {
+  shift
+  frog
+}
+
+enum TaskStatus {
+  todo
+  in_progress
+  review
+  done
+}
+
+enum AuditAction {
+  claim
+  release
+  edit
+  move
+  flag
+}
+
+model Event {
+  id        String   @id @default(cuid())
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  tasks     Task[]
+  auditLogs AuditLog[]
+  createdAt DateTime @default(now())
+}
+
+model Task {
+  id               String      @id @default(cuid())
+  eventId          String
+  event            Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  kind             TaskKind    @default(shift)
+  title            String
+  category         String?
+  requestedGroup   String?
+  neededCount      Int         @default(1)
+  date             DateTime?   // calendar day; drives grouping; set for scheduled tasks
+  startAt          DateTime?   // exact start when known; null + date set = all-day
+  endAt            DateTime?
+  dueBy            DateTime?   // frog deadline
+  pointOfContact   String?
+  location         String?
+  definitionOfDone String?
+  status           TaskStatus  @default(todo)
+  waiting          Boolean     @default(false)
+  signups          Signup[]
+  auditLogs        AuditLog[]
+  createdAt        DateTime    @default(now())
+
+  @@index([eventId, date])
+}
+
+model Signup {
+  id         String   @id @default(cuid())
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  name       String
+  email      String?
+  phone      String?
+  group      String?
+  minor      Boolean?
+  claimToken String   // capability token for device-local ownership of this signup
+  userId     String?  // reserved for Phase 4 optional accounts
+  createdAt  DateTime @default(now())
+
+  @@index([taskId, createdAt])
+}
+
+model AuditLog {
+  id        String      @id @default(cuid())
+  eventId   String
+  event     Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  taskId    String
+  task      Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  action    AuditAction
+  details   Json
+  createdAt DateTime    @default(now())
+
+  @@index([eventId, createdAt])
+  @@index([taskId, createdAt])
+}
