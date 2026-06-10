@@ -11,7 +11,7 @@
     "test:watch": "vitest",
     "db:migrate": "prisma migrate dev",
     "db:migrate:test": "dotenv -e .env.test -- prisma migrate deploy",
-    "test:db": "dotenv -e .env.test -- vitest run"
+    "test:db": "dotenv -e .env.test -- vitest run --config vitest.db.config.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

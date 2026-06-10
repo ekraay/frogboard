@@ -9,7 +9,9 @@ export default defineConfig({
     setupFiles: ["./test/setup.ts"],
     globals: true,
     include: ["**/*.test.ts", "**/*.test.tsx"],
-    exclude: ["e2e/**", "node_modules/**", ".next/**"],
+    // DB integration tests (*.db.test.ts) run separately via vitest.db.config.ts
+    // against the test database; excluded here so `npm test` stays pure + fast.
+    exclude: ["e2e/**", "node_modules/**", ".next/**", "**/*.db.test.ts"],
   },
   resolve: {
     alias: { "@": path.resolve(__dirname, ".") },
