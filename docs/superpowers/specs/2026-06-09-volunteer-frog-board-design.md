@@ -24,8 +24,13 @@ Designed to be reused for any future event, including scout activities.
   group/area/day/person, reviewed in meetings (the reminder backbone).
 
 ## Principles
-- **No accounts** for volunteers. Open a link, type your name. Email/phone
-  optional, exactly like editing a shared sheet.
+- **Accounts are optional, never required.** Anonymous is the default — open a
+  link, type your name, like editing a shared sheet (this is the youth path,
+  zero friction). Anyone who wants a stable identity, a "my shifts" view, or
+  reminders can *optionally* create a passwordless account. Following the
+  Wikipedia model: trust comes from transparency + revert, not gatekeeping.
+- **Passwordless auth.** Magic link via email (primary) + optional Google
+  one-tap. No passwords. Youth without email simply stay on the anonymous path.
 - **Mobile-first is a hard requirement**, not a polish item — single-column,
   thumb-friendly cards, claim in two taps, no pinch-zoom. This is a core reason
   for leaving PrestoGem.
@@ -39,17 +44,22 @@ Designed to be reused for any future event, including scout activities.
 | Layer | Choice | Why |
 |---|---|---|
 | Framework | Next.js (React + API routes) | One codebase for UI and server logic |
+| Auth | Auth.js (NextAuth) + Prisma adapter | Passwordless magic-link + Google; standard, free |
 | Hosting | Vercel free tier | Push-to-deploy, $0, custom domain |
 | Database | Neon (serverless Postgres) + Prisma ORM | Free tier, relational, clean schema |
-| Email | Resend free tier (3k/mo) | Simple API; deferred to later phase |
+| Email | Resend free tier (3k/mo) | Sends magic links (v1); reminders later |
 | SMS | Twilio | Only paid piece; deferred to later phase |
 
-Run cost is $0/month until SMS is switched on.
+Run cost is $0/month until SMS is switched on. Resend's free tier covers
+magic-link auth email.
 
 ## Data model
 
-Four tables. Shifts and frogs are the same entity with a `kind` flag — they
-share ~80% of fields, so unifying keeps board, reports, and revert DRY.
+Four domain tables (Event, Task, Signup, AuditLog) plus the Auth.js-managed
+identity tables (User, Account, Session, VerificationToken — created by the
+Prisma adapter, not hand-modeled here). Shifts and frogs are the same entity
+with a `kind` flag — they share ~80% of fields, so unifying keeps board,
+reports, and revert DRY.
 
 ### Event
 - `id`
@@ -79,6 +89,8 @@ share ~80% of fields, so unifying keeps board, reports, and revert DRY.
 - `email` (optional), `phone` (optional)
 - `group` (optional) — asked at claim time via dropdown, so reports can slice by
   who actually signed up.
+- `userId` (nullable) — set when a logged-in user claims (links to Auth.js
+  `User`); null for anonymous signups. Powers the "my shifts" view and reminders.
 - `createdAt`
 
 ### AuditLog (append-only)
@@ -113,6 +125,17 @@ share ~80% of fields, so unifying keeps board, reports, and revert DRY.
 - Every card has a stable URL. Admin can print a QR per card — the physical
   frogs. Scan → land on that card's page → read details → tap to claim.
 
+### Optional accounts (passwordless)
+- A "Sign in" affordance, never blocking — the board and claiming work fully
+  without it.
+- **Magic link via email** (primary) + **Google one-tap** (optional). No
+  passwords. Youth without email stay anonymous; nothing changes for them.
+- When signed in: name + email **prefilled** on claim (`userId` attached), and a
+  **"My shifts"** view lists everything that account has claimed across events —
+  the self-serve personal schedule.
+- An account is just a stable identity + contact info. No roles or admin powers
+  attach to it (admin stays the shared-password area).
+
 ### Admin (one shared password, unlisted URL)
 - Create/edit events and their tasks (shifts and frogs).
 - **Bulk import** — paste rows from the existing Google Sheet so 60+ tasks
@@ -129,7 +152,8 @@ filled/needed gap overlay. Not four separate code paths.
 - **By day** → overall schedule, time-ordered (the timeline view).
 - **By category/area** → an area manager's own view (e.g. Kitchen, with gaps).
 - **By group** → an affiliate leader's roster (reminder backbone).
-- **By person** → an individual's personal schedule.
+- **By person** → an individual's personal schedule (admin can pull any; account
+  holders see their own self-serve via "My shifts").
 
 All lenses are on-screen + printable for meetings.
 
@@ -139,8 +163,37 @@ All lenses are on-screen + printable for meetings.
   those future messages will contain.
 
 ## Out of scope (v1 — deferred)
-- Automated email/SMS reminders (Resend/Twilio wired later).
+- Automated email/SMS reminders (Resend/Twilio wired later). Accounts make these
+  a clean fast-follow, but v1 reminders stay leader-relayed via reports.
+- SMS / phone-based login (magic link is email-only in v1; youth use anonymous).
 - Per-area / per-role login scopes and permissions.
 - A dedicated category-management screen (autocomplete instead).
 - An Organization entity above Event (reuse for scouts = just make an event).
 - Recurrence / auto-splitting of long shifts (admin creates multiple rows).
+
+## Reversibility notes (one-way vs two-way doors)
+
+Where to spend caution. Two-way doors are cheap to add later; build them only
+when needed. One-way doors are sticky; design for them now.
+
+**Organization above Event — two-way door.** Adding it later is a routine
+additive migration: create `Organization`, add a nullable `organizationId` to
+`Event`, backfill existing events to a default org. No rewrite, because all core
+logic already hangs off `eventId`. Deferred per YAGNI. Mild caveat: global
+surfaces (single admin password, "all events" list) accumulate until then and
+must be partitioned when orgs arrive — moderate, not a one-way door.
+
+**Volunteer identity (optional accounts) — built on the Wikipedia model.**
+Anonymous participation is the default (type a name, like an IP-attributed
+edit); trust comes from full history + cheap revert (the audit log). Optional
+passwordless accounts layer on top for anyone who wants a stable identity, a
+"my shifts" view, or (later) reminders — never required, so youth friction stays
+zero. `Signup.userId` is nullable: anonymous signups leave it null, signed-in
+claims link to a `User`. This keeps anonymous and account paths independent, so
+either can evolve without breaking the other.
+
+**Task `kind` unification — merge-easy, split-hard.** Shifts and frogs share one
+table. Splitting later touches every query, so unifying is the safe default.
+
+**Audit log completeness — log generously.** You can only revert what you
+logged; under-logging can't be fixed retroactively.
