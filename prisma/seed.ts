@@ -13,6 +13,7 @@ async function main() {
       name: "Ginza Bazaar / Bon Odori 2026",
       startDate: new Date("2026-07-25T00:00:00Z"),
       endDate: new Date("2026-07-26T00:00:00Z"),
+      status: "published",
     },
   });
 
@@ -26,24 +27,28 @@ async function main() {
         startAt: new Date("2026-07-25T17:00:00Z"), endAt: new Date("2026-07-25T20:00:00Z"),
         location: "Inside Gym", pointOfContact: "Yumi 415-370-1477",
         definitionOfDone: "Booth staffed and tidy at handover.",
+        position: 1024,
       },
       {
         eventId: event.id, kind: "shift", title: "Bingo", category: "Bingo",
         neededCount: 3, date: new Date("2026-07-25T00:00:00Z"),
         startAt: new Date("2026-07-25T20:00:00Z"), endAt: new Date("2026-07-25T23:00:00Z"),
         location: "Inside Gym",
+        position: 2048,
       },
       {
         eventId: event.id, kind: "shift", title: "Food Service", category: "Food/Kitchen",
         requestedGroup: "Scouts", neededCount: 3,
         date: new Date("2026-07-25T00:00:00Z"),
         // all-day: date set, no startAt/endAt
+        position: 3072,
       },
       {
         eventId: event.id, kind: "frog", title: "Bring 50 paper cups",
         category: "Supplies", neededCount: 1,
         dueBy: new Date("2026-07-25T17:00:00Z"),
         definitionOfDone: "Cups delivered to the dining area.",
+        position: 4096,
       },
     ],
   });

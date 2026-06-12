@@ -22,9 +22,16 @@ enum TaskStatus {
 enum AuditAction {
   claim
   release
+  create
   edit
   move
+  delete
   flag
+}
+
+enum EventStatus {
+  draft
+  published
 }
 
 model Event {
@@ -32,6 +39,7 @@ model Event {
   name      String
   startDate DateTime
   endDate   DateTime
+  status    EventStatus @default(draft)
   tasks     Task[]
   auditLogs AuditLog[]
   createdAt DateTime @default(now())
@@ -53,6 +61,8 @@ model Task {
   pointOfContact   String?
   location         String?
   definitionOfDone String?
+  description      String?
+  position         Int         @default(0)
   status           TaskStatus  @default(todo)
   waiting          Boolean     @default(false)
   signups          Signup[]
