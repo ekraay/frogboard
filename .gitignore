@@ -43,6 +43,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# brainstorming visual companion
+.superpowers/
+
 # local claude settings
 .claude/settings.local.json
 
