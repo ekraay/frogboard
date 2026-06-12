@@ -1560,7 +1560,9 @@ export async function setEventStatusAction(
 ): Promise<Ok | Err> {
   const gate = await requireOrganizer();
   if (!gate.ok) return gate;
-  await setEventStatus(eventId, status);
+  // setEventStatus returns false when the event no longer exists
+  const changed = await setEventStatus(eventId, status);
+  if (!changed) return { ok: false, error: "That event no longer exists." };
   revalidatePath("/");
   revalidatePath("/organize");
   return { ok: true };

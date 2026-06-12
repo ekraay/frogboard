@@ -23,10 +23,13 @@ describe("events", () => {
     expect(list.map((e) => e.name)).toEqual(["B", "A"]);
     expect(list[1].taskCount).toBe(1);
   });
-  test("setEventStatus flips visibility", async () => {
+  test("setEventStatus flips visibility and reports success", async () => {
     const e = await createEvent("A", new Date(), new Date());
-    await setEventStatus(e.id, "published");
+    expect(await setEventStatus(e.id, "published")).toBe(true);
     expect((await prisma.event.findUnique({ where: { id: e.id } }))!.status).toBe("published");
+  });
+  test("setEventStatus on a missing event reports failure instead of throwing", async () => {
+    expect(await setEventStatus("nope-not-real", "published")).toBe(false);
   });
   test("getEventGrid returns tasks in position order with signup counts", async () => {
     const e = await createEvent("A", new Date("2026-07-24"), new Date("2026-07-26"));

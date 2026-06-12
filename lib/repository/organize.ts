@@ -1,13 +1,19 @@
 import { prisma } from "@/lib/db";
-import type { EventStatus } from "@prisma/client";
+import type { Event, EventStatus } from "@prisma/client";
 
-export async function createEvent(name: string, startDate: Date, endDate: Date) {
+export async function createEvent(name: string, startDate: Date, endDate: Date): Promise<Event> {
   return prisma.event.create({ data: { name, startDate, endDate } });
 }
 
-export async function listEvents() {
+export interface EventListItem {
+  id: string; name: string; startDate: Date; endDate: Date;
+  status: EventStatus; taskCount: number;
+}
+
+export async function listEvents(): Promise<EventListItem[]> {
   const events = await prisma.event.findMany({
-    orderBy: { createdAt: "desc" },
+    // id tiebreak keeps the order deterministic for same-instant creations
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     include: { _count: { select: { tasks: true } } },
   });
   return events.map((e) => ({
@@ -16,8 +22,10 @@ export async function listEvents() {
   }));
 }
 
-export async function setEventStatus(eventId: string, status: EventStatus) {
-  return prisma.event.update({ where: { id: eventId }, data: { status } });
+/** False when the event no longer exists (deleted under the organizer). */
+export async function setEventStatus(eventId: string, status: EventStatus): Promise<boolean> {
+  const result = await prisma.event.updateMany({ where: { id: eventId }, data: { status } });
+  return result.count > 0;
 }
 
 export interface GridTask {
