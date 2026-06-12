@@ -52,4 +52,12 @@ describe("combineWhen", () => {
     const r = combineWhen("frog", null, { kind: "range", start: 600, end: 780 }, ctx);
     expect(r.ok).toBe(false);
   });
+  test("shift with a 'by …' deadline is an error (deadlines are for frogs)", () => {
+    const r = combineWhen("shift", { year: 2026, month: 7, day: 25 }, { kind: "dueBy", dateText: null, time: 600 }, ctx);
+    expect(r).toEqual({ ok: false, field: "time", error: "Shifts take a time range — 'by …' is for frogs." });
+  });
+  test("frog with no time cell at all is fine — an anytime frog", () => {
+    const r = combineWhen("frog", null, { kind: "none" }, ctx);
+    expect(r).toEqual({ ok: true, value: { date: null, startAt: null, endAt: null, dueBy: null } });
+  });
 });
