@@ -112,14 +112,23 @@ signups, then audit-snapshot like Phase 1 release).
 
 **Undo tiers (deliberate):** Phase 2 ships the delete toast only — paste appends
 (never clobbers cells) and edits are single-cell, so delete is the one
-catastrophic act. The append-only AuditLog (with before/after snapshots) is the
-deep backstop from day one: nothing is ever truly lost. **Phase 4 adds the
-rest:** session-scoped Ctrl+Z/⌘Z (client-side stack over the current sitting)
-and the audit-log revert UI for cross-time, git-revert-style undo of any
-specific change. Trigger to pull Ctrl+Z forward: the first organizer who
+catastrophic act. **The server delete is deferred until the undo window closes**:
+Undo cancels it and restores the row intact — task id, signups, and volunteers'
+claim tokens included — so undo is lossless by construction. (If the browser
+closes mid-window, the deferred delete simply never fires; the task survives —
+the safe failure.) Delete-audit rows must outlive their task: `AuditLog.taskId`
+is nullable with `onDelete: SetNull`, never Cascade. The append-only AuditLog
+(with before/after snapshots) is the deep backstop from day one. **Phase 4 adds
+the rest:** session-scoped Ctrl+Z/⌘Z (client-side stack over the current
+sitting) and the audit-log revert UI for cross-time, git-revert-style undo of
+any specific change. Trigger to pull Ctrl+Z forward: the first organizer who
 reflexively reaches for it.
 
-**Reordering:** drag the ⋮⋮ handle, or Alt+↑/↓ with the row focused. Saves
+**Reordering:** Move up/down buttons on each row, plus Alt+↑/↓ with the row
+focused. **Pointer drag-and-drop is out of Phase 2 scope** (revisit when an
+organizer asks); the buttons keep reordering mouse-accessible without DnD
+machinery. A row that hasn't been saved yet can still be moved — its position
+is reconciled when it first saves (the grid persists the visual order). Saves
 `position` like any row edit. **Board ordering rule:** day groups stay
 (by date); *within* a day group, tasks sort by `position` — the organizer's
 order is the priority order. The "No set date" group becomes a hand-ordered
@@ -136,6 +145,9 @@ positions, renumber when crowded.
     July 25 then blanks" convention).
   - **Time ranges split** into start/end (or due-by for frogs).
 - Nothing layout-aware. Junk rows are one keystroke to delete (with undo).
+- **Pasted rows autosave like typed ones:** each appended row that parses
+  cleanly persists immediately; unparseable rows stay flagged ("needs
+  attention") until fixed, then save on blur like any other row.
 - Framing in UI copy: **"Add your tasks — type or paste from your sheet."**
   Accelerator language; never "import".
 - Volunteers/emails in pasted blocks are **not** imported as signups (v1).
@@ -163,7 +175,8 @@ components get fixed in passing:
   (`aria-expanded`, `aria-controls`). Every input has an accessible name
   (column header + row title context).
 - **Keyboard complete:** Tab/Shift-Tab through cells, Enter expands, Esc
-  closes, Alt+↑/↓ reorders (drag is an enhancement, never the only way).
+  closes, Alt+↑/↓ reorders; per-row Move buttons give the same reorder to
+  pointer users (no drag-and-drop dependency).
   Visible focus ring (the Matsuri `--color-reed` outline at ≥3:1 contrast).
 - **Live regions:** Saving/Saved chip is `aria-live="polite"`; the undo toast
   is `role="status"` with the Undo button keyboard-reachable; row-validation
