@@ -37,6 +37,11 @@ export async function signOut(): Promise<Ok> {
   return { ok: true };
 }
 
+/** Form-action wrapper for sign-out (returns void for form action compatibility). */
+export async function signOutAction(): Promise<void> {
+  await signOut();
+}
+
 export async function createEventAction(
   formData: FormData,
 ): Promise<{ ok: true; eventId: string } | Err> {
