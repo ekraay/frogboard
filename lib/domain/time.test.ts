@@ -19,6 +19,11 @@ describe("formatTime (America/Los_Angeles)", () => {
   test("20:00 UTC renders as 1:00 PM PDT", () => {
     expect(formatTime(new Date("2026-07-25T20:00:00Z"))).toBe("1:00 PM");
   });
+  test("18:00 UTC in winter renders as 10:00 AM PST (DST handled)", () => {
+    // Same wall-clock 10:00 AM as summer's 17:00Z, but a different UTC offset —
+    // proves the formatter follows DST rather than a fixed offset.
+    expect(formatTime(new Date("2026-01-15T18:00:00Z"))).toBe("10:00 AM");
+  });
 });
 
 describe("formatWhen", () => {
