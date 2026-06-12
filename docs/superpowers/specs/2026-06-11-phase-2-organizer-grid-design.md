@@ -110,6 +110,15 @@ current signup count (inline nudge: "3 already signed up").
 Fill down · Delete (undo toast ~10s; confirm dialog only if the task has
 signups, then audit-snapshot like Phase 1 release).
 
+**Undo tiers (deliberate):** Phase 2 ships the delete toast only — paste appends
+(never clobbers cells) and edits are single-cell, so delete is the one
+catastrophic act. The append-only AuditLog (with before/after snapshots) is the
+deep backstop from day one: nothing is ever truly lost. **Phase 4 adds the
+rest:** session-scoped Ctrl+Z/⌘Z (client-side stack over the current sitting)
+and the audit-log revert UI for cross-time, git-revert-style undo of any
+specific change. Trigger to pull Ctrl+Z forward: the first organizer who
+reflexively reaches for it.
+
 **Reordering:** drag the ⋮⋮ handle, or Alt+↑/↓ with the row focused. Saves
 `position` like any row edit. **Board ordering rule:** day groups stay
 (by date); *within* a day group, tasks sort by `position` — the organizer's
@@ -182,7 +191,8 @@ components get fixed in passing:
 
 - Kanban, table/roster view, report lenses, CSV export → **Phase 3** (the
   schema already carries `status`/`waiting`).
-- Accounts, "My shifts", admin revert UI, QR codes → Phase 4.
+- Accounts, "My shifts", admin revert UI (audit-log undo of any change),
+  session-scoped Ctrl+Z undo stack, QR codes → Phase 4.
 - Importing volunteer names/emails as signups; live Google Sheets API sync;
   column-mapping wizard; per-cell realtime sync; views/filters/formulas;
   per-event timezone (still fixed `America/Los_Angeles`).
