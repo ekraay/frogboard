@@ -45,6 +45,11 @@ describe("signIn", () => {
     expect(r).toEqual({ ok: false, error: "That password doesn't match." });
     expect(cookieJar.has(SESSION_COOKIE)).toBe(false);
   });
+  test("signOut clears the session cookie", async () => {
+    authenticate();
+    await signOut();
+    expect(cookieJar.has(SESSION_COOKIE)).toBe(false);
+  });
 });
 
 describe("auth gate", () => {

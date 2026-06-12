@@ -4,6 +4,12 @@ import type { EventCtx } from "@/lib/domain/cells";
 
 const ctx: EventCtx = { year: 2026, start: { year: 2026, month: 7, day: 24 }, end: { year: 2026, month: 7, day: 26 } };
 
+describe("utcMidnight", () => {
+  test("renders a calendar day as its UTC midnight instant", () => {
+    expect(utcMidnight({ year: 2026, month: 7, day: 25 }).toISOString()).toBe("2026-07-25T00:00:00.000Z");
+  });
+});
+
 describe("pacificToUtc", () => {
   test("PDT: Jul 25 2026 10:00 → 17:00Z", () => {
     expect(pacificToUtc({ year: 2026, month: 7, day: 25 }, 600).toISOString()).toBe("2026-07-25T17:00:00.000Z");
