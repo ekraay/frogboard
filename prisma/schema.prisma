@@ -93,8 +93,8 @@ model AuditLog {
   id        String      @id @default(cuid())
   eventId   String
   event     Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  taskId    String
-  task      Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId    String?
+  task      Task?       @relation(fields: [taskId], references: [id], onDelete: SetNull)
   action    AuditAction
   details   Json
   createdAt DateTime    @default(now())
