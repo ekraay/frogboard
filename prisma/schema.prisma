@@ -70,6 +70,7 @@ model Task {
   createdAt        DateTime    @default(now())
 
   @@index([eventId, date])
+  @@index([eventId, position])
 }
 
 model Signup {
