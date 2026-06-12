@@ -77,6 +77,8 @@ export async function upsertTaskWithAudit(
 ): Promise<UpsertResult> {
   return prisma.$transaction(async (tx) => {
     if (taskId === null) {
+      // Two concurrent creates can read the same max and tie positions; the
+      // next renumberTasks corrects it. Acceptable for a single-organizer org.
       const last = await tx.task.aggregate({ where: { eventId }, _max: { position: true } });
       const position = (last._max.position ?? 0) + POSITION_GAP;
       const task = await tx.task.create({ data: { eventId, position, ...fields } });
@@ -87,6 +89,16 @@ export async function upsertTaskWithAudit(
         },
       });
       return { ok: true as const, taskId: task.id };
+    }
+
+    // Lock the task row first (same primitive as createSignupWithAudit) so a
+    // concurrent volunteer claim can't slip between our signup-count read and
+    // the update — otherwise needed could silently drop below signups.
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "Task" WHERE "id" = ${taskId} FOR UPDATE
+    `;
+    if (locked.length === 0) {
+      return { ok: false as const, error: "That task no longer exists." };
     }
 
     const before = await tx.task.findUnique({
@@ -124,6 +136,14 @@ export async function upsertTaskWithAudit(
 
 export async function deleteTaskWithAudit(taskId: string): Promise<{ ok: true } | { ok: false; error: string }> {
   return prisma.$transaction(async (tx) => {
+    // Lock so a concurrent claim can't add a signup between our snapshot and
+    // the cascade delete (it would vanish unrecorded). Post-lock claims see
+    // the task gone and fail cleanly.
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "Task" WHERE "id" = ${taskId} FOR UPDATE
+    `;
+    if (locked.length === 0) return { ok: false as const, error: "That task is already gone." };
+
     const task = await tx.task.findUnique({ where: { id: taskId }, include: { signups: true } });
     if (!task) return { ok: false as const, error: "That task is already gone." };
     await tx.auditLog.create({
