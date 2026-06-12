@@ -12,7 +12,8 @@
     "db:migrate": "prisma migrate dev",
     "db:migrate:test": "dotenv -e .env.test -- prisma migrate deploy",
     "db:seed": "prisma db seed",
-    "test:db": "dotenv -e .env.test -- vitest run --config vitest.db.config.ts"
+    "test:db": "dotenv -e .env.test -- vitest run --config vitest.db.config.ts",
+    "test:e2e": "playwright test"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
@@ -24,6 +25,7 @@
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
