@@ -29,6 +29,17 @@ describe("parseDateCell", () => {
     const r = parseDateCell("banana", ctx);
     expect(r.ok).toBe(false);
   });
+  test("rejects two-digit years explicitly", () => {
+    expect(parseDateCell("7/25/99", ctx)).toEqual({ ok: false, error: "Use a four-digit year." });
+  });
+  test("rejects a date that doesn't exist (2/30)", () => {
+    expect(parseDateCell("2/30", ctx)).toEqual({ ok: false, error: "That date doesn't exist." });
+  });
+  test("weekday with no match inside the event window fails gently", () => {
+    const r = parseDateCell("Mon", ctx); // Jul 24–26 2026 has no Monday
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/Mon/);
+  });
 });
 
 describe("parseTimeCell", () => {
@@ -58,6 +69,18 @@ describe("parseTimeCell", () => {
   });
   test("gibberish fails gently", () => {
     expect(parseTimeCell("whenever").ok).toBe(false);
+  });
+  test("refuses an ambiguous backwards range instead of guessing 2 AM (2-1pm)", () => {
+    expect(parseTimeCell("2-1pm")).toEqual({ ok: false, error: "End time must be after start." });
+  });
+  test("noon range borrows correctly (12-1pm)", () => {
+    expect(parseTimeCell("12-1pm")).toEqual({ ok: true, value: { kind: "range", start: 720, end: 780 } });
+  });
+  test.each([
+    ["12pm", 720],
+    ["12am", 0],
+  ])("single time %s handles the 12 o'clock traps", (input, start) => {
+    expect(parseTimeCell(input)).toEqual({ ok: true, value: { kind: "start", start } });
   });
 });
 

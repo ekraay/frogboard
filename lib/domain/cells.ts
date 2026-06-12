@@ -49,7 +49,8 @@ export function parseDateCell(text: string, ctx: EventCtx): CellResult<DateParts
   // m/d or m/d/y
   const slash = /^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/.exec(t);
   if (slash) {
-    const year = slash[3] ? (slash[3].length === 2 ? 2000 + Number(slash[3]) : Number(slash[3])) : ctx.year;
+    if (slash[3] && slash[3].length === 2) return { ok: false, error: "Use a four-digit year." };
+    const year = slash[3] ? Number(slash[3]) : ctx.year;
     const d = { year, month: Number(slash[1]), day: Number(slash[2]) };
     return validDate(d) ? { ok: true, value: d } : { ok: false, error: "That date doesn't exist." };
   }
@@ -128,7 +129,14 @@ export function parseTimeCell(text: string): CellResult<TimeCellValue> {
       // so the shift runs forward (10 AM–1 PM).
       if (a.meridiem === null && b.meridiem !== null) {
         const borrowed = b.meridiem === "pm" && a.minutes < 720 ? a.minutes + 720 : a.minutes;
-        start = borrowed < end ? borrowed : a.minutes;
+        if (borrowed < end) {
+          start = borrowed;
+        } else if (a.minutes >= 360) {
+          // plausible early shift (6:00 AM or later) — keep the AM reading
+          start = a.minutes;
+        } else {
+          return { ok: false, error: "End time must be after start." };
+        }
       }
       if (start >= end) return { ok: false, error: "End time must be after start." };
       return { ok: true, value: { kind: "range", start, end } };
