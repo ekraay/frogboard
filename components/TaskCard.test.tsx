@@ -12,7 +12,7 @@ function task(overrides: Partial<BoardTask>): BoardTask {
     requestedGroup: "Scouts", neededCount: 3, date: new Date("2026-07-25T00:00:00Z"),
     startAt: new Date("2026-07-25T17:00:00Z"), endAt: new Date("2026-07-25T20:00:00Z"),
     dueBy: null, pointOfContact: "Yumi 415-370-1477", location: "Inside Gym",
-    definitionOfDone: "Booth tidy at handover.", status: "todo", waiting: false,
+    definitionOfDone: "Booth tidy at handover.", position: 0, status: "todo", waiting: false,
     signups: [], ...overrides,
   };
 }

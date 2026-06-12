@@ -6,9 +6,11 @@ export async function getActiveEventBoard(): Promise<
   { id: string; name: string; tasks: BoardTask[] } | null
 > {
   const event = await prisma.event.findFirst({
+    where: { status: "published" },
     orderBy: { createdAt: "desc" },
     include: {
       tasks: {
+        orderBy: { position: "asc" },
         include: {
           signups: {
             orderBy: { createdAt: "asc" },
@@ -27,8 +29,8 @@ export async function getActiveEventBoard(): Promise<
       requestedGroup: t.requestedGroup, neededCount: t.neededCount, date: t.date,
       startAt: t.startAt, endAt: t.endAt, dueBy: t.dueBy,
       pointOfContact: t.pointOfContact, location: t.location,
-      definitionOfDone: t.definitionOfDone, status: t.status, waiting: t.waiting,
-      signups: t.signups,
+      definitionOfDone: t.definitionOfDone, position: t.position, status: t.status,
+      waiting: t.waiting, signups: t.signups,
     })),
   };
 }

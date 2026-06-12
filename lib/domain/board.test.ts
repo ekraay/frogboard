@@ -8,7 +8,7 @@ function task(overrides: Partial<BoardTask>): BoardTask {
     requestedGroup: null, neededCount: 3, date: new Date("2026-07-25T00:00:00Z"),
     startAt: null, endAt: null, dueBy: null, pointOfContact: null,
     location: null, definitionOfDone: null, status: "todo", waiting: false,
-    signups: [], ...overrides,
+    position: 0, signups: [], ...overrides,
   };
 }
 
@@ -56,12 +56,12 @@ describe("groupTasksByDay", () => {
     expect(group.key).toBe("2026-07-26");
     expect(group.label).toBe("Sunday, Jul 26");
   });
-  test("sorts tasks within a day by startAt, timed before all-day", () => {
+  test("sorts tasks within a day by position — the organizer's order is the order", () => {
     const [group] = groupTasksByDay([
-      task({ id: "allday", startAt: null }),
-      task({ id: "late", startAt: new Date("2026-07-25T21:00:00Z") }),
-      task({ id: "early", startAt: new Date("2026-07-25T17:00:00Z") }),
+      task({ id: "third", position: 3072, startAt: new Date("2026-07-25T15:00:00Z") }),
+      task({ id: "first", position: 1024, startAt: new Date("2026-07-25T21:00:00Z") }),
+      task({ id: "second", position: 2048, startAt: null }),
     ]);
-    expect(group.tasks.map((t) => t.id)).toEqual(["early", "late", "allday"]);
+    expect(group.tasks.map((t) => t.id)).toEqual(["first", "second", "third"]);
   });
 });
