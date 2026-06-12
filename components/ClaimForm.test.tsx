@@ -43,3 +43,22 @@ test("shows the error message when the action fails", async () => {
 
   expect(await screen.findByText("This task is already full.")).toBeInTheDocument();
 });
+
+test("does not double-submit when Add me is tapped twice quickly", async () => {
+  // Exploratory charter: a frantic double-tap must not create two signups.
+  // The pending transition disables the button after the first submit.
+  let resolve: (v: { ok: true; signupId: string; claimToken: string }) => void = () => {};
+  claimSlot.mockReturnValue(new Promise((r) => { resolve = r; }));
+  const user = userEvent.setup();
+  render(<ClaimForm taskId="t1" />);
+
+  await user.click(screen.getByRole("button", { name: /grab a frog/i }));
+  await user.type(screen.getByLabelText(/your name/i), "Kenji");
+  const addMe = screen.getByRole("button", { name: /^add me$/i });
+  await user.click(addMe);
+  await user.click(addMe).catch(() => {});
+
+  expect(claimSlot).toHaveBeenCalledOnce();
+  expect(addMe).toBeDisabled();
+  resolve({ ok: true, signupId: "s1", claimToken: "tok-1" });
+});

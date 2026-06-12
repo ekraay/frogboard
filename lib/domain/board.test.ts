@@ -41,6 +41,21 @@ describe("groupTasksByDay", () => {
     ]);
     expect(result.map((g) => g.key)).toEqual(["2026-07-25", "2026-07-26", "all-day"]);
   });
+  test("groups by the `date` field, not the Pacific day of startAt", () => {
+    // Characterization of a known tension (exploratory charter #7): `date` is a
+    // UTC calendar day; times render in Pacific. A task dated Jul 26 whose
+    // startAt (05:00Z) is actually Jul 25 10pm PDT still groups under Jul 26.
+    // Phase 2's organizer UI must derive `date` from startAt's Pacific day.
+    const [group] = groupTasksByDay([
+      task({
+        date: new Date("2026-07-26T00:00:00Z"),
+        startAt: new Date("2026-07-26T05:00:00Z"),
+        endAt: new Date("2026-07-26T06:00:00Z"),
+      }),
+    ]);
+    expect(group.key).toBe("2026-07-26");
+    expect(group.label).toBe("Sunday, Jul 26");
+  });
   test("sorts tasks within a day by startAt, timed before all-day", () => {
     const [group] = groupTasksByDay([
       task({ id: "allday", startAt: null }),

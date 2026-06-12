@@ -36,6 +36,12 @@ describe("validateClaim", () => {
       ok: false, error: "Name is too long.",
     });
   });
+  test("preserves a Unicode name (emoji + CJK) intact", () => {
+    // Exploratory charter: youth/family names may include emoji and kanji.
+    const result = validateClaim({ name: "🐸 Kenji 山田" }, open);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.name).toBe("🐸 Kenji 山田");
+  });
   test("rejects a malformed email", () => {
     expect(validateClaim({ name: "Kenji", email: "not-an-email" }, open)).toEqual({
       ok: false, error: "That email doesn't look right.",
