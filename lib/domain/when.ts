@@ -4,6 +4,9 @@
 import { EVENT_TZ } from "@/lib/domain/time";
 import { parseDateCell, type DateParts, type EventCtx, type TimeCellValue } from "@/lib/domain/cells";
 
+/** A date-only deadline ("by Saturday") means the end of that day, 11:59 PM. */
+const END_OF_DAY_MINUTES = 23 * 60 + 59;
+
 function tzOffsetMinutes(at: Date): number {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: EVENT_TZ, hour12: false,
@@ -11,6 +14,8 @@ function tzOffsetMinutes(at: Date): number {
     hour: "2-digit", minute: "2-digit", second: "2-digit",
   }).formatToParts(at);
   const get = (type: string) => Number(parts.find((p) => p.type === type)!.value);
+  // V8 always emits "00" for midnight; the % 24 guards non-V8 engines that
+  // historically emitted "24" with hour12: false.
   const asUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour") % 24, get("minute"), get("second"));
   return Math.round((asUtc - at.getTime()) / 60_000);
 }
@@ -59,7 +64,7 @@ export function combineWhen(
       day = parsed.value;
     }
     if (!day) day = ctx.start;
-    const minutes = time.time ?? 23 * 60 + 59; // date-only deadline = end of that day
+    const minutes = time.time ?? END_OF_DAY_MINUTES;
     return { ok: true, value: { date: null, startAt: null, endAt: null, dueBy: pacificToUtc(day, minutes) } };
   }
 

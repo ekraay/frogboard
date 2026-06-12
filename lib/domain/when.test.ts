@@ -11,6 +11,9 @@ describe("pacificToUtc", () => {
   test("PST: Jan 15 2026 10:00 → 18:00Z", () => {
     expect(pacificToUtc({ year: 2026, month: 1, day: 15 }, 600).toISOString()).toBe("2026-01-15T18:00:00.000Z");
   });
+  // The 02:30 wall time doesn't exist on this night; our two-pass algorithm
+  // snaps BEFORE the gap (01:30 PST = 09:30Z). Library conventions vary; either
+  // side is acceptable for this domain — the contract is determinism, no crash.
   test("spring-forward gap resolves without crashing (Mar 8 2026 02:30)", () => {
     const d = pacificToUtc({ year: 2026, month: 3, day: 8 }, 150);
     expect(d.toISOString()).toMatch(/^2026-03-08T(09|10):30/);
@@ -59,5 +62,16 @@ describe("combineWhen", () => {
   test("frog with no time cell at all is fine — an anytime frog", () => {
     const r = combineWhen("frog", null, { kind: "none" }, ctx);
     expect(r).toEqual({ ok: true, value: { date: null, startAt: null, endAt: null, dueBy: null } });
+  });
+  test("shift with a single start time sets startAt only", () => {
+    const r = combineWhen("shift", { year: 2026, month: 7, day: 25 }, { kind: "start", start: 600 }, ctx);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.startAt?.toISOString()).toBe("2026-07-25T17:00:00.000Z");
+    expect(r.value.endAt).toBeNull();
+  });
+  test("frog with a single start time is rejected like a range", () => {
+    const r = combineWhen("frog", null, { kind: "start", start: 600 }, ctx);
+    expect(r.ok).toBe(false);
   });
 });
