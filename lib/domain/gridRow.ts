@@ -5,7 +5,10 @@ import { combineWhen } from "@/lib/domain/when";
 import { EVENT_TZ, formatTime } from "@/lib/domain/time";
 
 export interface RawCells {
-  title: string; kind: string; date: string; need: string; time: string;
+  title: string;
+  /** "shift" | "frog"; anything else normalizes to "shift" in parseRow. */
+  kind: string;
+  date: string; need: string; time: string;
   category: string; group: string; location: string;
   description: string; definitionOfDone: string; pointOfContact: string;
 }

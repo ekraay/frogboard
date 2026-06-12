@@ -67,5 +67,10 @@ describe("taskToCells round-trip", () => {
       location: null, description: null, definitionOfDone: null, pointOfContact: null,
     });
     expect(c.time).toBe("by Jul 25 10:00 AM");
+    const ctx2 = { year: 2026, start: { year: 2026, month: 7, day: 24 }, end: { year: 2026, month: 7, day: 26 } };
+    const r = parseRow(c, ctx2);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.dueBy?.toISOString()).toBe("2026-07-25T17:00:00.000Z");
   });
 });
