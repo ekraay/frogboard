@@ -79,6 +79,20 @@ describe("createEventAction + setEventStatusAction", () => {
     const r = await setEventStatusAction("nope-not-real", "published");
     expect(r).toEqual({ ok: false, error: "That event no longer exists." });
   });
+  test("accepts forgiving typed dates (e.g. 9/25, no year)", async () => {
+    authenticate();
+    const r = await createEventAction(fd({ name: "Bazaar", startDate: "9/25", endDate: "9/27" }));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const e = (await prisma.event.findUnique({ where: { id: r.eventId } }))!;
+    expect(e.startDate.getUTCMonth()).toBe(8); // September
+    expect(e.endDate.getUTCDate()).toBe(27);
+  });
+  test("rejects an end before the start with a clear, field-tagged message", async () => {
+    authenticate();
+    const r = await createEventAction(fd({ name: "Backwards", startDate: "9/27/2026", endDate: "9/25/2026" }));
+    expect(r).toEqual({ ok: false, field: "endDate", error: "The last day can't be before the first." });
+  });
 });
 
 describe("saveTask", () => {

@@ -27,13 +27,14 @@ export function NewEventForm() {
       </label>
       <div className="grid grid-cols-2 gap-3">
         <label className="block text-sm font-medium text-ink-soft">First day
-          <input type="date" name="startDate" className={input} />
+          <input name="startDate" inputMode="numeric" autoComplete="off" placeholder="9/25/2026" className={input} />
         </label>
         <label className="block text-sm font-medium text-ink-soft">Last day
-          <input type="date" name="endDate" className={input} />
+          <input name="endDate" inputMode="numeric" autoComplete="off" placeholder="9/27/2026" className={input} />
         </label>
       </div>
-      {error && <p role="alert" className="text-sm font-medium text-lantern">{error}</p>}
+      <p className="text-xs text-ink-soft">Type the dates — &ldquo;9/25/2026&rdquo;, &ldquo;Sep 25 2026&rdquo;, or just &ldquo;9/25&rdquo;.</p>
+      {error && <p role="alert" className="text-sm font-medium text-lantern-deep">{error}</p>}
       <button type="submit" disabled={pending}
         className="rounded-xl bg-reed px-4 py-2 font-bold text-white transition hover:bg-reed-deep disabled:opacity-60">
         {pending ? "Creating…" : "Create event"}

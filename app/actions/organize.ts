@@ -10,6 +10,7 @@ import {
 } from "@/lib/repository/organize";
 import { prisma } from "@/lib/db";
 import { parseRow, type RawCells } from "@/lib/domain/gridRow";
+import { parseEventDates } from "@/lib/domain/eventDates";
 import type { DateParts, EventCtx } from "@/lib/domain/cells";
 
 type Ok = { ok: true };
@@ -49,12 +50,13 @@ export async function createEventAction(
   if (!gate.ok) return gate;
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { ok: false, error: "Give the event a name." };
-  const startDate = new Date(String(formData.get("startDate") ?? ""));
-  const endDate = new Date(String(formData.get("endDate") ?? ""));
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate < startDate) {
-    return { ok: false, error: "Check the first and last days." };
-  }
-  const event = await createEvent(name, startDate, endDate);
+  const dates = parseEventDates(
+    String(formData.get("startDate") ?? ""),
+    String(formData.get("endDate") ?? ""),
+    new Date().getUTCFullYear(),
+  );
+  if (!dates.ok) return { ok: false, error: dates.error, field: dates.field };
+  const event = await createEvent(name, dates.startDate, dates.endDate);
   revalidatePath("/organize");
   return { ok: true, eventId: event.id };
 }
