@@ -57,7 +57,6 @@ export function ClaimForm({ taskId }: { taskId: string }) {
         Your name
         <input
           name="name"
-          autoFocus
           maxLength={80}
           placeholder="e.g. Kenji"
           className="mt-1 w-full rounded-xl border border-lily-line bg-white px-3 py-2.5 text-ink outline-none transition focus:border-reed focus:ring-2 focus:ring-reed/30"

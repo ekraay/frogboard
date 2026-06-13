@@ -18,8 +18,8 @@
   --color-lily: #ecfaf3; /* pale pad fill (chips, panels) */
   --color-lily-line: #bce5d3; /* pad edge */
 
-  --color-reed: #2f9e62; /* frog green — calls to action */
-  --color-reed-deep: #237a4b;
+  --color-reed: #0e5e36; /* frog green — calls to action (darkened for WCAG 4.5:1) */
+  --color-reed-deep: #083d22;
 
   --color-lantern: #ef6a39; /* vermilion lantern accent */
   --color-amber: #f4a72c; /* warm lantern glow */

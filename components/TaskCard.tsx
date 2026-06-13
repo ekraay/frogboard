@@ -46,13 +46,13 @@ export function TaskCard({ task }: { task: BoardTask }) {
 
       {/* Icons stay inline in the text node so a category that echoes the title
           doesn't split into a bare matching text node. */}
-      <dl className="mt-3 grid gap-1 text-sm text-ink-soft">
-        {task.category && <div>🏷️ {task.category}</div>}
-        {task.requestedGroup && <div>👥 Requested: {task.requestedGroup}</div>}
-        {task.location && <div>📍 {task.location}</div>}
-        {task.pointOfContact && <div>📞 {task.pointOfContact}</div>}
-        {task.definitionOfDone && <div className="italic">✅ {task.definitionOfDone}</div>}
-      </dl>
+      <ul className="mt-3 grid list-none gap-1 text-sm text-ink-soft">
+        {task.category && <li>🏷️ {task.category}</li>}
+        {task.requestedGroup && <li>👥 Requested: {task.requestedGroup}</li>}
+        {task.location && <li>📍 {task.location}</li>}
+        {task.pointOfContact && <li>📞 {task.pointOfContact}</li>}
+        {task.definitionOfDone && <li className="italic">✅ {task.definitionOfDone}</li>}
+      </ul>
 
       {task.signups.length > 0 && (
         <ul className="mt-4 flex flex-wrap gap-2">

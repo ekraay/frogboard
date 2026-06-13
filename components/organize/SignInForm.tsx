@@ -24,7 +24,7 @@ export function SignInForm() {
       <label className="block text-sm font-bold text-ink">
         Password
         <input
-          type="password" name="password" autoFocus autoComplete="current-password"
+          type="password" name="password" autoComplete="current-password"
           className="mt-1 w-full rounded-xl border border-lily-line bg-white px-3 py-2.5 text-ink outline-none transition focus:border-reed focus:ring-2 focus:ring-reed/30"
         />
       </label>
