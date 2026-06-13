@@ -43,6 +43,19 @@ describe("parseRow", () => {
   });
 });
 
+describe("parseRow length caps", () => {
+  test("rejects an over-long title", () => {
+    const r = parseRow(cells({ title: "x".repeat(201) }), ctx);
+    expect(r).toEqual({ ok: false, field: "title", error: "Title is too long (200 max)." });
+  });
+  test("rejects an over-long description", () => {
+    const r = parseRow(cells({ title: "OK", description: "x".repeat(5001) }), ctx);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.field).toBe("description");
+  });
+});
+
 describe("taskToCells round-trip", () => {
   test("a stored shift renders back to editable strings that re-parse identically", () => {
     const stored = {

@@ -17,8 +17,8 @@ describe("getSlotInfo", () => {
     const t = task({
       neededCount: 3,
       signups: [
-        { id: "s1", name: "Ann", group: null, minor: null },
-        { id: "s2", name: "Bob", group: null, minor: null },
+        { id: "s1", name: "Ann", group: null },
+        { id: "s2", name: "Bob", group: null },
       ],
     });
     expect(getSlotInfo(t)).toEqual({ filled: 2, needed: 3, isFull: false });
@@ -26,7 +26,7 @@ describe("getSlotInfo", () => {
   test("isFull when filled reaches needed", () => {
     const t = task({
       neededCount: 1,
-      signups: [{ id: "s1", name: "Ann", group: null, minor: null }],
+      signups: [{ id: "s1", name: "Ann", group: null }],
     });
     expect(getSlotInfo(t)).toEqual({ filled: 1, needed: 1, isFull: true });
   });

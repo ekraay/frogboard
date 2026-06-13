@@ -35,9 +35,20 @@ export type RowResult =
 
 const nullIfBlank = (s: string) => (s.trim() === "" ? null : s.trim());
 
+function tooLong(s: string, max: number): boolean {
+  return s.trim().length > max;
+}
+
 export function parseRow(cells: RawCells, ctx: EventCtx): RowResult {
   const title = cells.title.trim();
   if (title === "") return { ok: false, field: "title", error: "Every task needs a title." };
+  if (tooLong(cells.title, 200)) return { ok: false, field: "title", error: "Title is too long (200 max)." };
+  if (tooLong(cells.description, 5000)) return { ok: false, field: "description", error: "Description is too long (5000 max)." };
+  if (tooLong(cells.definitionOfDone, 5000)) return { ok: false, field: "definitionOfDone", error: "Definition of done is too long (5000 max)." };
+  if (tooLong(cells.category, 200)) return { ok: false, field: "category", error: "Category is too long (200 max)." };
+  if (tooLong(cells.group, 200)) return { ok: false, field: "group", error: "Group is too long (200 max)." };
+  if (tooLong(cells.location, 200)) return { ok: false, field: "location", error: "Location is too long (200 max)." };
+  if (tooLong(cells.pointOfContact, 200)) return { ok: false, field: "pointOfContact", error: "Point of contact is too long (200 max)." };
   const kind = cells.kind === "frog" ? "frog" : "shift";
 
   const need = parseNeedCell(cells.need);

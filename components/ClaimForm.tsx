@@ -62,6 +62,7 @@ export function ClaimForm({ taskId }: { taskId: string }) {
           className="mt-1 w-full rounded-xl border border-lily-line bg-white px-3 py-2.5 text-ink outline-none transition focus:border-reed focus:ring-2 focus:ring-reed/30"
         />
       </label>
+      <p className="text-xs text-ink-soft">Your name shows on the board so others know the spot&apos;s taken.</p>
       <label className="block text-sm font-medium text-ink-soft">
         Group <span className="font-normal">(optional)</span>
         <input

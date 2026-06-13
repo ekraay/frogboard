@@ -14,7 +14,7 @@ export async function getActiveEventBoard(): Promise<
         include: {
           signups: {
             orderBy: { createdAt: "asc" },
-            select: { id: true, name: true, group: true, minor: true },
+            select: { id: true, name: true, group: true },
           },
         },
       },

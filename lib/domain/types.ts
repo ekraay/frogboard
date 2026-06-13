@@ -5,7 +5,6 @@ export interface BoardSignup {
   id: string;
   name: string;
   group: string | null;
-  minor: boolean | null;
 }
 
 export interface BoardTask {
