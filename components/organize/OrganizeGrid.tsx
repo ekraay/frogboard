@@ -56,6 +56,13 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     }
     update(row.key, (r) => ({ ...r, state: "saving" }));
     const result = await saveTask({ eventId: event.id, taskId: row.taskId, cells: row.cells });
+    if (!result) {
+      update(row.key, (r) => ({
+        ...r, state: "error",
+        problem: { field: "title" as keyof RawCells, error: "Server error — please retry." },
+      }));
+      return;
+    }
     if (result.ok) {
       update(row.key, (r) => ({ ...r, taskId: result.taskId, state: "saved", problem: null }));
       // A brand-new task is created at the end server-side. If its row isn't

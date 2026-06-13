@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
 
@@ -79,4 +79,110 @@ test("expanding a row reveals the prose fields with their question prompts", asy
   expect(screen.getByPlaceholderText("What is this about? Why is it important?")).toBeInTheDocument();
   expect(screen.getByPlaceholderText("What does done look like?")).toBeInTheDocument();
   expect(screen.getByPlaceholderText("Who can help?")).toBeInTheDocument();
+});
+
+test("pasting TSV appends rows with dates carried forward", async () => {
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[]} />);
+  await user.click(screen.getByRole("button", { name: /add row/i })); // focus target
+  const tsv = "Rice cooking\tshift\tSat Jul 25\t2\t6:30 AM - 3:00 PM\nGrilling\tshift\t\t4\t8-11am";
+  const title = screen.getByLabelText("Title, row 1");
+  await user.click(title);
+  await user.paste(tsv);
+  // appended after the manual row: rows 2 and 3
+  expect(screen.getByLabelText("Title, row 2")).toHaveValue("Rice cooking");
+  expect(screen.getByLabelText("Title, row 3")).toHaveValue("Grilling");
+  expect(screen.getByLabelText("Date, row 3")).toHaveValue("Sat Jul 25"); // carried forward
+});
+
+test("delete is deferred; undo cancels it and restores the row intact (signups included)", () => {
+  vi.useFakeTimers();
+  render(<OrganizeGrid event={event} initialTasks={[gridTask({})]} />);
+  fireEvent.click(screen.getByRole("button", { name: /delete, row 1/i }));
+  expect(screen.queryByLabelText("Title, row 1")).toBeNull();
+  expect(deleteTaskAction).not.toHaveBeenCalled(); // deferred — nothing destroyed yet
+  fireEvent.click(screen.getByRole("button", { name: /undo/i }));
+  expect(screen.getByLabelText("Title, row 1")).toHaveValue("Games");
+  expect(saveTask).not.toHaveBeenCalled(); // same task id — no re-create needed
+  act(() => { vi.runOnlyPendingTimers(); });
+  expect(deleteTaskAction).not.toHaveBeenCalled(); // undo cancelled the timer
+  vi.useRealTimers();
+});
+
+test("without undo, the server delete fires when the window closes", () => {
+  vi.useFakeTimers();
+  deleteTaskAction.mockResolvedValue({ ok: true });
+  render(<OrganizeGrid event={event} initialTasks={[gridTask({})]} />);
+  fireEvent.click(screen.getByRole("button", { name: /delete, row 1/i }));
+  expect(deleteTaskAction).not.toHaveBeenCalled();
+  act(() => { vi.advanceTimersByTime(10_000); });
+  expect(deleteTaskAction).toHaveBeenCalledWith("t1");
+  vi.useRealTimers();
+});
+
+test("valid pasted rows persist immediately; unparseable ones wait flagged", async () => {
+  saveTask.mockResolvedValue({ ok: true, taskId: "t-pasted" });
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[]} />);
+  await user.click(screen.getByRole("button", { name: /add row/i }));
+  const title = screen.getByLabelText("Title, row 1");
+  await user.click(title);
+  await user.paste("Rice cooking\tshift\tSat Jul 25\t2\t6:30 AM - 3:00 PM\nMystery\tshift\tJul 25\tlots\t");
+  await screen.findByText(/needs attention/i); // the 'lots' row is flagged
+  expect(saveTask).toHaveBeenCalledTimes(1); // only the valid pasted row saved
+  const input = saveTask.mock.calls[0][0] as { cells: { title: string } };
+  expect(input.cells.title).toBe("Rice cooking");
+});
+
+test("an unsaved row moved between saved rows lands there when it saves", async () => {
+  saveTask.mockResolvedValue({ ok: true, taskId: "t-new" });
+  reorderTasksAction.mockResolvedValue({ ok: true });
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[
+    gridTask({ id: "t1", title: "First", position: 1024 }),
+    gridTask({ id: "t2", title: "Second", position: 2048 }),
+  ]} />);
+  await user.click(screen.getByRole("button", { name: /add row/i })); // row 3, unsaved
+  await user.type(screen.getByLabelText("Title, row 3"), "Middle");
+  await user.click(screen.getByRole("button", { name: /move up, row 3/i })); // now row 2
+  expect(screen.getByLabelText("Title, row 2")).toHaveValue("Middle");
+  await user.click(document.body); // blur → the new row saves
+  await screen.findByText(/saved/i);
+  // after the create, the grid reconciles the visual order with the server
+  expect(reorderTasksAction).toHaveBeenLastCalledWith("e1", ["t1", "t-new", "t2"]);
+});
+
+test("deleting a row with signups asks for confirmation first", async () => {
+  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[gridTask({ signupCount: 2 })]} />);
+  await user.click(screen.getByRole("button", { name: /delete, row 1/i }));
+  expect(confirmSpy).toHaveBeenCalled();
+  expect(screen.getByLabelText("Title, row 1")).toBeInTheDocument(); // declined → stays
+  confirmSpy.mockRestore();
+});
+
+test("Alt+ArrowUp moves a row and persists the new order", async () => {
+  reorderTasksAction.mockResolvedValue({ ok: true });
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[
+    gridTask({ id: "t1", title: "First", position: 1024 }),
+    gridTask({ id: "t2", title: "Second", position: 2048 }),
+  ]} />);
+  const second = screen.getByLabelText("Title, row 2");
+  await user.click(second);
+  await user.keyboard("{Alt>}{ArrowUp}{/Alt}");
+  expect(screen.getByLabelText("Title, row 1")).toHaveValue("Second");
+  expect(reorderTasksAction).toHaveBeenCalledWith("e1", ["t2", "t1"]);
+});
+
+test("Open sign-ups flips the banner to Live", async () => {
+  setEventStatusAction.mockResolvedValue({ ok: true });
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[]} />);
+  expect(screen.getByText(/draft/i)).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: /open sign-ups/i }));
+  expect(await screen.findByText(/live/i)).toBeInTheDocument();
+  expect(setEventStatusAction).toHaveBeenCalledWith("e1", "published");
+  expect(screen.getByRole("button", { name: /close sign-ups/i })).toBeInTheDocument();
 });
