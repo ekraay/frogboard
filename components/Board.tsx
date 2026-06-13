@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { groupTasksByDay } from "@/lib/domain/board";
 import type { BoardTask } from "@/lib/domain/types";
 import { TaskCard } from "@/components/TaskCard";
@@ -41,6 +42,15 @@ export function Board({ eventName, tasks }: { eventName: string; tasks: BoardTas
           </div>
         </section>
       ))}
+
+      <footer className="mt-14 border-t border-lily-line/60 pt-6 text-center">
+        <Link
+          href="/organize"
+          className="text-xs font-semibold text-ink-soft underline-offset-4 transition hover:text-pond hover:underline"
+        >
+          Organizers →
+        </Link>
+      </footer>
     </main>
   );
 }
