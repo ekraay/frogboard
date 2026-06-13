@@ -1,56 +1,135 @@
 @import "tailwindcss";
 
 /*
-  Matsuri Pond theme — a Bon Odori festival pond at dusk.
-  Cool teal water, warm paper-lantern light, washi-paper ground.
+  Matsuri at Dusk — a Bon Odori summer-festival pond in the evening.
+  Warm paper-lantern light up top, cool teal pond below, washi-paper ground.
+  Kept intentionally LIGHT: the board lives on phones held up in afternoon sun,
+  where a dark theme washes out. Atmosphere comes from layered light, not gloom.
 */
 @theme inline {
   --font-display: var(--font-shippori), Georgia, serif;
   --font-sans: var(--font-zen), ui-sans-serif, system-ui, sans-serif;
 
-  --color-washi: #fbf4e6; /* warm paper ground */
-  --color-washi-deep: #f3e7cd;
-  --color-ink: #16302c; /* primary text, green-black */
-  --color-ink-soft: #4a6f67; /* muted text */
+  --color-washi: #faf3e3; /* warm paper ground */
+  --color-washi-deep: #f1e4c8;
+  --color-ink: #15302b; /* primary text, green-black */
+  --color-ink-soft: #46685f; /* muted text (>=4.5:1 on washi) */
 
-  --color-pond: #0e7c74; /* teal water / primary */
-  --color-pond-deep: #0a4f4a;
-  --color-lily: #ecfaf3; /* pale pad fill (chips, panels) */
-  --color-lily-line: #bce5d3; /* pad edge */
+  --color-pond: #0c7a70; /* teal water / primary */
+  --color-pond-deep: #0a4a45;
+  --color-lily: #ebfaf2; /* pale pad fill (chips, panels) */
+  --color-lily-line: #b6e3cf; /* pad edge */
 
-  --color-reed: #0e5e36; /* frog green — calls to action (darkened for WCAG 4.5:1) */
+  --color-reed: #0e5e36; /* frog green — CTA fills (white text >=7:1) */
   --color-reed-deep: #083d22;
 
-  --color-lantern: #ef6a39; /* vermilion lantern accent */
-  --color-amber: #f4a72c; /* warm lantern glow */
+  --color-lantern: #e25325; /* vermilion accent — fills, glow, decoration */
+  --color-lantern-deep: #b23a16; /* vermilion for TEXT (>=4.5:1 on light) */
+  --color-amber: #f0a429; /* warm lantern glow */
 }
 
 body {
   background-color: var(--color-washi);
-  /* Lantern glow up top, pond depth below — atmosphere, not flat color. */
+  /*
+    Four layers, painted back-to-front:
+    1. faint paper grain (kept behind opaque cards — never over text)
+    2. concentric pond ripples rising from the bottom centre
+    3. a teal pond haze pooling at the foot of the page
+    4. a warm lantern glow washing down from the top
+  */
   background-image:
-    radial-gradient(115% 70% at 50% -10%, rgba(244, 167, 44, 0.18), transparent 60%),
-    radial-gradient(140% 90% at 50% 120%, rgba(14, 124, 116, 0.12), transparent 55%);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E"),
+    repeating-radial-gradient(circle at 50% 128%, transparent 0 46px, rgba(12, 122, 112, 0.045) 46px 48px),
+    radial-gradient(150% 95% at 50% 122%, rgba(12, 122, 112, 0.16), transparent 56%),
+    radial-gradient(120% 75% at 50% -12%, rgba(240, 164, 41, 0.22), transparent 60%);
   background-attachment: fixed;
+  background-blend-mode: soft-light, normal, normal, normal;
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
 
-/* Cards drift up into place on load — one calm, staggered reveal. */
-@keyframes pad-rise {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* ---- Paper-lantern garland (decorative, aria-hidden) ---- */
+.garland {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: clamp(14px, 6vw, 40px);
+  height: 46px;
+  margin-bottom: 0.5rem;
+}
+/* the string the lanterns hang from */
+.garland::before {
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: 8%;
+  right: 8%;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgba(21, 48, 43, 0.35) 12%, rgba(21, 48, 43, 0.35) 88%, transparent);
+}
+.lantern {
+  position: relative;
+  width: 18px;
+  height: 26px;
+  border-radius: 60% 60% 55% 55% / 45% 45% 55% 55%;
+  background:
+    radial-gradient(120% 90% at 35% 30%, rgba(255, 240, 200, 0.9), transparent 55%),
+    linear-gradient(180deg, var(--color-amber), var(--color-lantern));
+  box-shadow: 0 0 18px 2px rgba(240, 164, 41, 0.55), inset 0 -4px 6px rgba(168, 50, 20, 0.4);
+  transform-origin: top center;
+  animation: lantern-sway 4s ease-in-out infinite;
+}
+/* ribbing */
+.lantern::before {
+  content: "";
+  position: absolute;
+  inset: 3px 7px;
+  border-left: 1px solid rgba(168, 50, 20, 0.25);
+  border-right: 1px solid rgba(168, 50, 20, 0.25);
+  border-radius: 50%;
+}
+/* top cap + bottom tassel */
+.lantern::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 2px;
+  height: 6px;
+  transform: translateX(-50%);
+  background: var(--color-lantern);
+  border-radius: 2px;
+}
+.lantern:nth-child(odd) { animation-delay: -2s; height: 30px; }
+.lantern:nth-child(3n) { width: 22px; }
+
+@keyframes lantern-sway {
+  0%, 100% { transform: rotate(-5deg); }
+  50% { transform: rotate(5deg); }
 }
 
+/* ---- Card reveal: lily pads surfacing, then breathing ---- */
+@keyframes pad-rise {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
 @media (prefers-reduced-motion: no-preference) {
   .pad-rise {
-    animation: pad-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: pad-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
+  .lantern-glow { animation: glow-pulse 5s ease-in-out infinite; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { filter: drop-shadow(0 0 0 transparent); }
+  50% { filter: drop-shadow(0 1px 10px rgba(240, 164, 41, 0.45)); }
+}
+
+/* visible, on-brand focus ring everywhere keyboard users land */
+:focus-visible {
+  outline: 2px solid var(--color-pond);
+  outline-offset: 2px;
 }

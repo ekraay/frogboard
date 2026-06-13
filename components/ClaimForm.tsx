@@ -76,7 +76,7 @@ export function ClaimForm({ taskId }: { taskId: string }) {
         <input type="checkbox" name="minor" className="h-4 w-4 accent-reed" /> Under 18
       </label>
       {error && (
-        <p className="rounded-lg bg-lantern/10 px-3 py-2 text-sm font-medium text-lantern">
+        <p role="alert" className="rounded-lg bg-lantern/10 px-3 py-2 text-sm font-medium text-lantern-deep">
           {error}
         </p>
       )}
