@@ -75,7 +75,7 @@ export function GridRow({
           <button
             type="button"
             aria-expanded={row.expanded}
-            aria-controls={`row-details-${row.key}`}
+            aria-controls={row.expanded ? `row-details-${row.key}` : undefined}
             aria-label={`Details, row ${index + 1}`}
             onClick={() => onToggle(row.key)}
             className="rounded p-1 text-ink-soft transition hover:bg-lily"

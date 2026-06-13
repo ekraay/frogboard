@@ -33,7 +33,7 @@ function gridTask(overrides: Partial<GridTask>): GridTask {
 }
 
 beforeEach(() => {
-  saveTask.mockReset(); deleteTaskAction.mockReset(); reorderTasksAction.mockReset();
+  saveTask.mockReset(); deleteTaskAction.mockReset(); reorderTasksAction.mockReset(); setEventStatusAction.mockReset();
 });
 
 test("renders tasks as rows with readable cells", () => {
@@ -185,4 +185,16 @@ test("Open sign-ups flips the banner to Live", async () => {
   expect(await screen.findByText(/live/i)).toBeInTheDocument();
   expect(setEventStatusAction).toHaveBeenCalledWith("e1", "published");
   expect(screen.getByRole("button", { name: /close sign-ups/i })).toBeInTheDocument();
+});
+
+test("a thrown saveTask lands the row in an attention state, not a stuck spinner", async () => {
+  saveTask.mockRejectedValue(new Error("network down"));
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[gridTask({})]} />);
+  const title = screen.getByLabelText("Title, row 1");
+  await user.clear(title);
+  await user.type(title, "Games Booth");
+  await user.click(document.body);
+  expect(await screen.findByText(/needs attention/i)).toBeInTheDocument();
+  expect(screen.getByText(/couldn't save|server error|retry/i)).toBeInTheDocument();
 });

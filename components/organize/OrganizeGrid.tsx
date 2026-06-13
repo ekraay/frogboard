@@ -37,6 +37,11 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
   const rowsRef = useRef<RowState[]>([]);
   useEffect(() => { rowsRef.current = rows; });
 
+  // Cancel a pending delete-timer if the grid unmounts mid-undo-window.
+  useEffect(() => {
+    return () => { if (deleted) clearTimeout(deleted.timer); };
+  }, [deleted]);
+
   const update = (key: string, fn: (r: RowState) => RowState) =>
     setRows((rs) => rs.map((r) => (r.key === key ? fn(r) : r)));
 
@@ -55,36 +60,36 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
       return;
     }
     update(row.key, (r) => ({ ...r, state: "saving" }));
-    const result = await saveTask({ eventId: event.id, taskId: row.taskId, cells: row.cells });
-    if (!result) {
-      update(row.key, (r) => ({
-        ...r, state: "error",
-        problem: { field: "title" as keyof RawCells, error: "Server error — please retry." },
-      }));
-      return;
-    }
-    if (result.ok) {
-      update(row.key, (r) => ({ ...r, taskId: result.taskId, state: "saved", problem: null }));
-      // A brand-new task is created at the end server-side. If its row isn't
-      // last in the grid (it was reordered before saving), persist the visual
-      // order so the board reflects where the organizer put it.
-      if (row.taskId === null) {
-        const order = rowsRef.current
-          .map((r) => (r.key === row.key ? result.taskId : r.taskId))
-          .filter((id): id is string => id !== null);
-        if (order[order.length - 1] !== result.taskId) void reorderTasks(event.id, order);
+    try {
+      const result = await saveTask({ eventId: event.id, taskId: row.taskId, cells: row.cells });
+      if (result.ok) {
+        update(row.key, (r) => ({ ...r, taskId: result.taskId, state: "saved", problem: null }));
+        // A brand-new task is created at the end server-side. If its row isn't
+        // last in the grid (it was reordered before saving), persist the visual
+        // order so the board reflects where the organizer put it.
+        if (row.taskId === null) {
+          const order = rowsRef.current
+            .map((r) => (r.key === row.key ? result.taskId : r.taskId))
+            .filter((id): id is string => id !== null);
+          if (order[order.length - 1] !== result.taskId) void reorderTasks(event.id, order);
+        }
+      } else {
+        update(row.key, (r) => ({
+          ...r, state: "error",
+          problem: { field: (result.field as keyof RawCells) ?? "title", error: result.error },
+        }));
       }
-    } else {
+    } catch {
       update(row.key, (r) => ({
         ...r, state: "error",
-        problem: { field: (result.field as keyof RawCells) ?? "title", error: result.error },
+        problem: { field: "title" as keyof RawCells, error: "Couldn't save — please retry." },
       }));
     }
   }
 
   function onBlurRow(key: string) {
-    const row = rows.find((r) => r.key === key);
-    if (row && row.state === "dirty") void persistRow(row);
+    const row = rowsRef.current.find((r) => r.key === key);
+    if (row && row.state === "dirty") persistRow(row).catch(() => {});
   }
 
   function addRow() {
@@ -162,16 +167,14 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
   }
 
   function onMove(key: string, delta: -1 | 1) {
-    setRows((rs) => {
-      const i = rs.findIndex((r) => r.key === key);
-      const j = i + delta;
-      if (i < 0 || j < 0 || j >= rs.length) return rs;
-      const copy = [...rs];
-      [copy[i], copy[j]] = [copy[j], copy[i]];
-      const ids = copy.map((r) => r.taskId).filter((id): id is string => id !== null);
-      void reorderTasks(event.id, ids);
-      return copy;
-    });
+    const i = rows.findIndex((r) => r.key === key);
+    const j = i + delta;
+    if (i < 0 || j < 0 || j >= rows.length) return;
+    const copy = [...rows];
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+    setRows(copy);
+    const ids = copy.map((r) => r.taskId).filter((id): id is string => id !== null);
+    void reorderTasks(event.id, ids);
   }
 
   function onPaste(e: React.ClipboardEvent) {
@@ -197,9 +200,9 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     // Pasted rows autosave like typed ones: valid rows persist immediately
     // (sequentially, preserving order); unparseable rows are marked "needs
     // attention" by persistRow and wait for a fix.
-    void (async () => {
+    (async () => {
       for (const r of newRows) await persistRow(r);
-    })();
+    })().catch(() => {});
   }
 
   async function toggleStatus() {
