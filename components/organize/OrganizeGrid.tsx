@@ -8,6 +8,7 @@ import type { EventCtx } from "@/lib/domain/cells";
 import type { GridTask } from "@/lib/repository/organize";
 import { parseTsv, applyPaste } from "@/lib/domain/paste";
 import { GridRow, GRID_COLUMNS, type RowState } from "@/components/organize/GridRow";
+import { PasteTasksDialog } from "@/components/organize/PasteTasksDialog";
 
 interface GridEvent {
   id: string; name: string; status: "draft" | "published"; startDate: Date; endDate: Date;
@@ -29,6 +30,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     })),
   );
   const [status, setStatus] = useState(event.status);
+  const [pasting, setPasting] = useState(false);
   const [deleted, setDeleted] = useState<
     { row: RowState; index: number; timer: ReturnType<typeof setTimeout> } | null
   >(null);
@@ -108,6 +110,20 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
         signupCount: 0, state: "dirty", problem: null, expanded: false,
       }];
     });
+  }
+
+  // "Paste a list" modal: one title per line → one task, appended and saved.
+  function addManyTitles(titles: string[]) {
+    const newRows: RowState[] = titles.map((title) => ({
+      key: crypto.randomUUID(), taskId: null,
+      cells: { ...emptyCells(), title },
+      signupCount: 0, state: "dirty", problem: null, expanded: false,
+    }));
+    setRows((rs) => [...rs, ...newRows]);
+    setPasting(false);
+    (async () => {
+      for (const r of newRows) await persistRow(r);
+    })().catch(() => {});
   }
 
   function onFillDown(key: string, field: keyof RawCells) {
@@ -256,17 +272,21 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
         </div>
       </div>
 
-      <div className="mb-1.5 flex gap-2 text-sm">
+      <div className="mb-1.5 flex flex-wrap gap-2 text-sm">
+        <button type="button" onClick={() => setPasting(true)}
+          className="rounded-lg bg-reed/10 px-3 py-1.5 font-semibold text-reed-deep transition hover:bg-reed/20">📋 Paste a list</button>
         <button type="button" onClick={addRow}
           className="rounded-lg border border-lily-line bg-white px-3 py-1.5 transition hover:border-reed">+ Add row</button>
         <button type="button" onClick={duplicateRow}
           className="rounded-lg border border-lily-line bg-white px-3 py-1.5 transition hover:border-reed">⧉ Duplicate last</button>
       </div>
       <p className="mb-2 text-xs text-ink-soft">
-        Pasting from a sheet? Copy <span className="font-semibold text-ink">one column</span> (e.g. the task names),
-        click the matching column here, and paste — it fills down. (⌘/Ctrl-D copies a cell down.)
-        Open <span className="font-semibold text-ink">Details</span> on a row for description, contact, and what “done” looks like.
+        <span className="font-semibold text-ink">Paste a list</span> drops one task per line. To bring a column from your sheet,
+        copy it, click the matching column here, and paste. Open <span className="font-semibold text-ink">Details</span> for
+        description, contact, and what “done” looks like.
       </p>
+
+      {pasting && <PasteTasksDialog onAdd={addManyTitles} onClose={() => setPasting(false)} />}
 
       <table className="w-full border-separate border-spacing-0 rounded-2xl border border-lily-line bg-white text-left">
         <caption className="sr-only">Tasks for {event.name}</caption>
