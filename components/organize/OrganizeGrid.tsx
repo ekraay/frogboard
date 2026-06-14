@@ -236,20 +236,23 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
         </div>
       </div>
 
-      <div className="mb-2 flex gap-2 text-sm">
+      <div className="mb-1.5 flex gap-2 text-sm">
         <button type="button" onClick={addRow}
           className="rounded-lg border border-lily-line bg-white px-3 py-1.5 transition hover:border-reed">+ Add row</button>
         <button type="button" onClick={duplicateRow}
           className="rounded-lg border border-lily-line bg-white px-3 py-1.5 transition hover:border-reed">⧉ Duplicate last</button>
         <span className="self-center text-xs text-ink-soft">…or paste rows from your sheet (Ctrl/⌘-D fills a cell down)</span>
       </div>
+      <p className="mb-2 text-xs text-ink-soft">
+        Open <span className="font-semibold text-ink">Details</span> on a row to add a description, who to ask, and what “done” looks like — all optional.
+      </p>
 
       <table className="w-full border-separate border-spacing-0 rounded-2xl border border-lily-line bg-white text-left">
         <caption className="sr-only">Tasks for {event.name}</caption>
         <thead>
           <tr className="bg-lily text-xs font-bold uppercase tracking-wide text-ink">
             <th scope="col" className="w-6 rounded-tl-2xl p-2"><span className="sr-only">Reorder</span></th>
-            <th scope="col" className="w-8 p-2"><span className="sr-only">Details</span></th>
+            <th scope="col" className="p-2">Details</th>
             {GRID_COLUMNS.map((c) => <th key={c.field} scope="col" className="p-2">{c.label}</th>)}
             <th scope="col" className="p-2"><span className="sr-only">Signups</span></th>
             <th scope="col" className="rounded-tr-2xl p-2"><span className="sr-only">Delete</span></th>
