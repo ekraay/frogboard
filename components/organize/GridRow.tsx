@@ -109,6 +109,8 @@ export function GridRow({
           field === "kind" ? (
             <td key={field} className={width}>
               <select
+                data-rowkey={row.key}
+                data-field={field}
                 aria-label={`${label}, row ${index + 1}`}
                 value={row.cells.kind}
                 onChange={(e) => onCell(row.key, "kind", e.target.value)}
@@ -122,6 +124,8 @@ export function GridRow({
           ) : (
             <td key={field} className={width}>
               <input
+                data-rowkey={row.key}
+                data-field={field}
                 aria-label={`${label}, row ${index + 1}`}
                 aria-invalid={invalid(field) || undefined}
                 aria-describedby={invalid(field) ? `row-problem-${row.key}` : undefined}

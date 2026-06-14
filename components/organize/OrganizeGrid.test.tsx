@@ -81,18 +81,32 @@ test("expanding a row reveals the prose fields with their question prompts", asy
   expect(screen.getByPlaceholderText("Who can help?")).toBeInTheDocument();
 });
 
-test("pasting TSV appends rows with dates carried forward", async () => {
+test("paste lands at the focused cell, filling that column and growing rows", async () => {
   const user = userEvent.setup();
   render(<OrganizeGrid event={event} initialTasks={[]} />);
-  await user.click(screen.getByRole("button", { name: /add row/i })); // focus target
+  await user.click(screen.getByRole("button", { name: /add row/i })); // one empty row to anchor on
   const tsv = "Rice cooking\tshift\tSat Jul 25\t2\t6:30 AM - 3:00 PM\nGrilling\tshift\t\t4\t8-11am";
-  const title = screen.getByLabelText("Title, row 1");
-  await user.click(title);
+  await user.click(screen.getByLabelText("Title, row 1")); // anchor: row 1, Title column
   await user.paste(tsv);
-  // appended after the manual row: rows 2 and 3
-  expect(screen.getByLabelText("Title, row 2")).toHaveValue("Rice cooking");
-  expect(screen.getByLabelText("Title, row 3")).toHaveValue("Grilling");
-  expect(screen.getByLabelText("Date, row 3")).toHaveValue("Sat Jul 25"); // carried forward
+  // first pasted row fills the anchored (empty) row 1; the second appends as row 2
+  expect(screen.getByLabelText("Title, row 1")).toHaveValue("Rice cooking");
+  expect(screen.getByLabelText("Title, row 2")).toHaveValue("Grilling");
+  expect(screen.getByLabelText("Date, row 2")).toHaveValue("Sat Jul 25"); // carried forward
+});
+
+test("a single-column paste into Time fills Time without disturbing Title", async () => {
+  saveTask.mockResolvedValue({ ok: true, taskId: "t-x" });
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[
+    gridTask({ id: "a", title: "Games", startAt: null, endAt: null }),
+    gridTask({ id: "b", title: "Bingo", startAt: null, endAt: null }),
+  ]} />);
+  await user.click(screen.getByLabelText("Time, row 1")); // anchor on the Time column
+  await user.paste("10:00 AM - 1:00 PM\n1:00 PM - 4:00 PM");
+  expect(screen.getByLabelText("Title, row 1")).toHaveValue("Games"); // untouched
+  expect(screen.getByLabelText("Title, row 2")).toHaveValue("Bingo");
+  expect(screen.getByLabelText("Time, row 1")).toHaveValue("10:00 AM - 1:00 PM");
+  expect(screen.getByLabelText("Time, row 2")).toHaveValue("1:00 PM - 4:00 PM");
 });
 
 test("delete is deferred; undo cancels it and restores the row intact (signups included)", () => {

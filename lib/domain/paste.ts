@@ -1,3 +1,5 @@
+import type { RawCells } from "@/lib/domain/gridRow";
+
 /**
  * Clipboard TSV → rows of cells. Sheets wraps cells containing newlines, tabs
  * or quotes in double quotes (RFC 4180 style, inner quotes doubled) — handle
@@ -50,4 +52,47 @@ export function carryForwardColumn(rows: string[][], col: number): string[][] {
     }
     return copy;
   });
+}
+
+/**
+ * Column-aware paste: lands the clipboard grid at the focused cell (anchor
+ * row + column), filling right and down — overwriting existing rows and adding
+ * new ones, exactly like pasting in a spreadsheet. This lets organizers place
+ * each column where it belongs ("copy the times column → click Time → paste")
+ * instead of relying on their sheet's column order matching ours.
+ *
+ * `fieldOrder` is the grid's left-to-right column fields. Cells whose target
+ * column would fall past the last one are dropped. A pasted column that lands
+ * on the Date field carries blanks forward (the sheets' sparse-date convention).
+ */
+export function applyPaste(
+  current: RawCells[],
+  grid: string[][],
+  anchor: { row: number; col: number },
+  fieldOrder: (keyof RawCells)[],
+  blank: () => RawCells,
+): { cells: RawCells[]; affected: number[] } {
+  const row = Math.max(0, Math.min(anchor.row, current.length));
+  const col = Math.max(0, anchor.col);
+
+  // Carry forward the pasted column (if any) that maps onto the Date field.
+  const dateCol = fieldOrder.indexOf("date") - col;
+  const g = dateCol >= 0 ? carryForwardColumn(grid, dateCol) : grid;
+
+  const cells = current.map((c) => ({ ...c }));
+  const affected = new Set<number>();
+
+  g.forEach((pastedRow, r) => {
+    const target = row + r;
+    while (cells.length <= target) cells.push(blank());
+    pastedRow.forEach((value, c) => {
+      const field = fieldOrder[col + c];
+      if (!field) return; // nowhere to put it — past the last column
+      cells[target][field] =
+        field === "kind" ? (/frog/i.test(value) ? "frog" : "shift") : value.trim();
+    });
+    affected.add(target);
+  });
+
+  return { cells, affected: [...affected] };
 }
