@@ -1,8 +1,8 @@
 # Frog Board 🐸
 
 Mobile-first volunteer self-organization board. Volunteers grab a "frog" (a task
-or shift) by adding their name — no account needed. Phase 1: public board with
-claim/release.
+or shift) by adding their name — no account needed. A shared-password organizer
+area (`/organize`) lets leaders set up events in a spreadsheet-style grid.
 
 ## Develop
 
@@ -12,6 +12,21 @@ claim/release.
    to run).
 3. `npm run db:migrate` then `npm run db:seed`
 4. `npm run dev` → http://localhost:3000
+
+## Organizer area (`/organize`)
+
+Leaders create events and edit tasks at `/organize`, gated by one shared
+password in the `ORGANIZER_PASSWORD` env var.
+
+- Locally: set it in `.env` (or inline, e.g. `ORGANIZER_PASSWORD=local-dev npm run dev`)
+  and sign in at http://localhost:3000/organize.
+- **View `/organize` locally with `npm run dev`, not `npm run start`.** A
+  production build marks the session cookie `Secure`, and browsers drop a
+  `Secure` cookie over plain `http://localhost` — so sign-in silently bounces
+  back to the password screen. This is correct for the real (HTTPS) deployment;
+  it only bites local prod-over-http.
+- In production: set a strong `ORGANIZER_PASSWORD` (e.g. `openssl rand -base64 24`)
+  in the Vercel project's environment variables before going live.
 
 ## Test
 

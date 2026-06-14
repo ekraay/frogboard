@@ -12,7 +12,7 @@ function task(overrides: Partial<BoardTask>): BoardTask {
     requestedGroup: "Scouts", neededCount: 3, date: new Date("2026-07-25T00:00:00Z"),
     startAt: new Date("2026-07-25T17:00:00Z"), endAt: new Date("2026-07-25T20:00:00Z"),
     dueBy: null, pointOfContact: "Yumi 415-370-1477", location: "Inside Gym",
-    definitionOfDone: "Booth tidy at handover.", status: "todo", waiting: false,
+    definitionOfDone: "Booth tidy at handover.", position: 0, status: "todo", waiting: false,
     signups: [], ...overrides,
   };
 }
@@ -27,6 +27,13 @@ test("shows title, time window, slot count, location and contact", () => {
 });
 
 test("lists claimant names", () => {
-  render(<TaskCard task={task({ signups: [{ id: "s1", name: "Kenji", group: "Scouts", minor: null }] })} />);
+  render(<TaskCard task={task({ signups: [{ id: "s1", name: "Kenji", group: "Scouts" }] })} />);
   expect(screen.getByText("Kenji")).toBeInTheDocument();
+});
+
+test("a claimant does not carry the minor flag to the public board", () => {
+  const signup = { id: "s1", name: "Kenji", group: "Scouts" };
+  // @ts-expect-error — minor must NOT be part of the public BoardSignup shape
+  const withMinor: import("@/lib/domain/types").BoardSignup = { ...signup, minor: true };
+  void withMinor;
 });

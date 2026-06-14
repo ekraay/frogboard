@@ -11,7 +11,7 @@ function task(overrides: Partial<BoardTask>): BoardTask {
     id: "t1", kind: "shift", title: "Games", category: null, requestedGroup: null,
     neededCount: 3, date: new Date("2026-07-25T00:00:00Z"),
     startAt: null, endAt: null, dueBy: null, pointOfContact: null, location: null,
-    definitionOfDone: null, status: "todo", waiting: false, signups: [], ...overrides,
+    definitionOfDone: null, position: 0, status: "todo", waiting: false, signups: [], ...overrides,
   };
 }
 

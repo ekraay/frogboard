@@ -5,7 +5,6 @@ export interface BoardSignup {
   id: string;
   name: string;
   group: string | null;
-  minor: boolean | null;
 }
 
 export interface BoardTask {
@@ -22,6 +21,7 @@ export interface BoardTask {
   pointOfContact: string | null;
   location: string | null;
   definitionOfDone: string | null;
+  position: number;
   status: TaskStatus;
   waiting: boolean;
   signups: BoardSignup[];

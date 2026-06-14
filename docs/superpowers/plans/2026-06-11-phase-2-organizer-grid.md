@@ -6,6 +6,13 @@
 
 **Architecture:** Pure domain parsers (`lib/domain/`) → repository write seam (`lib/repository/organize.ts`, transactional, audit-logged) → server actions (`app/actions/organize.ts`, cookie-gated) → client grid components (`components/organize/`). The public board gains a `published` filter and position-based within-day ordering. Spec: `docs/superpowers/specs/2026-06-11-phase-2-organizer-grid-design.md`.
 
+**Scope clarifications (hardened after external review):**
+- **Reordering = per-row Move up/down buttons + Alt+↑/↓.** Pointer drag-and-drop is NOT in Phase 2.
+- **Delete is deferred, not immediate:** the server delete fires only when the 10 s undo window closes; Undo cancels it and restores the row intact (task id, signups, claim tokens — lossless).
+- **Delete-audit rows must outlive their task:** `AuditLog.taskId` becomes nullable with `onDelete: SetNull` (Task 7 Step 0) — the current Cascade would delete the delete-snapshot with the task.
+- **Pasted rows autosave:** valid pasted rows persist immediately; unparseable ones stay flagged until fixed.
+- **Unsaved rows can be reordered:** their position reconciles on first save (the grid persists the visual order after a create).
+
 **Tech Stack:** Next.js 16 App Router (READ `node_modules/next/dist/docs/` guides before framework code — breaking changes vs training data), Prisma 6 (pinned), Vitest 4 (unit jsdom / `*.db.test.ts` node via `vitest.db.config.ts`), Playwright + @axe-core/playwright, Tailwind v4 Matsuri tokens, eslint-plugin-jsx-a11y.
 
 **Conventions (from Phase 1 — follow exactly):**
@@ -1024,8 +1031,30 @@ git commit -m "feat: organize repository — event create/list/status, grid read
 ### Task 7: Repository — task upsert/delete/reorder with audit
 
 **Files:**
+- Modify: `prisma/schema.prisma` (+ new migration)
 - Modify: `lib/repository/organize.ts`
 - Modify (tests): `lib/repository/organize.db.test.ts`
+
+- [ ] **Step 0: Make delete-audit rows outlive their task (schema fix)**
+
+The current `AuditLog.taskId` relation is `onDelete: Cascade` — deleting a task
+would cascade-delete its own delete snapshot, defeating the audit trail. In
+`prisma/schema.prisma`, change the AuditLog task relation to:
+
+```prisma
+  taskId    String?
+  task      Task?       @relation(fields: [taskId], references: [id], onDelete: SetNull)
+```
+
+(Indexes referencing `taskId` stay as they are; existing Phase 1 writes always
+set `taskId`, which a nullable column accepts.) Then:
+
+```bash
+npx prisma migrate dev --name audit_survives_task_delete
+npm run db:migrate:test
+npm test && npm run test:db && npx tsc --noEmit
+git add prisma && git commit -m "fix: audit logs survive task deletion (taskId SetNull, not Cascade)"
+```
 
 - [ ] **Step 1: Add the failing tests** (append to `organize.db.test.ts`)
 
@@ -1093,6 +1122,17 @@ describe("deleteTaskWithAudit", () => {
     const details = log!.details as { task: { title: string }; signups: { name: string }[] };
     expect(details.task.title).toBe("Doomed");
     expect(details.signups.map((s) => s.name)).toEqual(["Kenji"]);
+  });
+  test("the delete audit row outlives the task (SetNull, not Cascade)", async () => {
+    const e = await createEvent("A", new Date(), new Date());
+    const r = await upsertTaskWithAudit(e.id, null, fields({ title: "Doomed" }));
+    if (!r.ok) throw new Error("setup");
+    await deleteTaskWithAudit(r.taskId);
+    // ALL audit rows for the deleted task survive, detached from it:
+    const logs = await prisma.auditLog.findMany({ where: { eventId: e.id } });
+    expect(logs.map((l) => l.action).sort()).toEqual(["create", "delete"]);
+    expect(logs.every((l) => l.taskId === null)).toBe(true);
+    expect(logs.every((l) => l.eventId === e.id)).toBe(true);
   });
 });
 
@@ -1520,7 +1560,9 @@ export async function setEventStatusAction(
 ): Promise<Ok | Err> {
   const gate = await requireOrganizer();
   if (!gate.ok) return gate;
-  await setEventStatus(eventId, status);
+  // setEventStatus returns false when the event no longer exists
+  const changed = await setEventStatus(eventId, status);
+  if (!changed) return { ok: false, error: "That event no longer exists." };
   revalidatePath("/");
   revalidatePath("/organize");
   return { ok: true };
@@ -1988,9 +2030,13 @@ export function GridRow({
           if (!e.currentTarget.contains(e.relatedTarget as Node)) onBlurRow(row.key);
         }}
       >
-        <td className="px-1 text-center align-middle">
-          <span aria-hidden className="cursor-grab text-ink-soft/50" draggable
-            data-rowkey={row.key}>⋮⋮</span>
+        <td className="whitespace-nowrap px-1 text-center align-middle">
+          <button type="button" aria-label={`Move up, row ${index + 1}`}
+            onClick={() => onMove(row.key, -1)}
+            className="rounded p-0.5 text-ink-soft transition hover:bg-lily">↑</button>
+          <button type="button" aria-label={`Move down, row ${index + 1}`}
+            onClick={() => onMove(row.key, 1)}
+            className="rounded p-0.5 text-ink-soft transition hover:bg-lily">↓</button>
         </td>
         <td className="px-1">
           <button
@@ -2104,9 +2150,13 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     })),
   );
   const [status, setStatus] = useState(event.status);
-  const [deleted, setDeleted] = useState<{ row: RowState; index: number } | null>(null);
-  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [deleted, setDeleted] = useState<
+    { row: RowState; index: number; timer: ReturnType<typeof setTimeout> } | null
+  >(null);
   const router = useRouter();
+  // Always-current rows for async callbacks (order reconciliation after saves).
+  const rowsRef = useRef<RowState[]>([]);
+  rowsRef.current = rows;
 
   const update = (key: string, fn: (r: RowState) => RowState) =>
     setRows((rs) => rs.map((r) => (r.key === key ? fn(r) : r)));
@@ -2129,6 +2179,15 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     const result = await saveTask({ eventId: event.id, taskId: row.taskId, cells: row.cells });
     if (result.ok) {
       update(row.key, (r) => ({ ...r, taskId: result.taskId, state: "saved", problem: null }));
+      // A brand-new task is created at the end server-side. If its row isn't
+      // last in the grid (it was reordered before saving), persist the visual
+      // order so the board reflects where the organizer put it.
+      if (row.taskId === null) {
+        const order = rowsRef.current
+          .map((r) => (r.key === row.key ? result.taskId : r.taskId))
+          .filter((id): id is string => id !== null);
+        if (order[order.length - 1] !== result.taskId) void reorderTasks(event.id, order);
+      }
     } else {
       update(row.key, (r) => ({
         ...r, state: "error",
@@ -2171,6 +2230,17 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     });
   }
 
+  /** A prior pending delete commits now — one undo window at a time. */
+  function flushPendingDelete() {
+    setDeleted((d) => {
+      if (d) {
+        clearTimeout(d.timer);
+        if (d.row.taskId) void deleteTask(d.row.taskId);
+      }
+      return null;
+    });
+  }
+
   function onDelete(key: string) {
     const index = rows.findIndex((r) => r.key === key);
     const row = rows[index];
@@ -2179,23 +2249,30 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
         !window.confirm(`"${row.cells.title}" has ${row.signupCount} signup(s). Delete it anyway?`)) {
       return;
     }
+    flushPendingDelete();
     setRows((rs) => rs.filter((r) => r.key !== key));
-    if (row.taskId) void deleteTask(row.taskId);
-    setDeleted({ row, index });
-    if (undoTimer.current) clearTimeout(undoTimer.current);
-    undoTimer.current = setTimeout(() => setDeleted(null), 10_000);
+    // The server delete is DEFERRED until the undo window closes, so Undo can
+    // restore the row intact — task id, signups, claim tokens, everything.
+    // (If the tab closes mid-window the delete never fires; the task survives
+    // on reload — the safe failure.)
+    const timer = setTimeout(() => {
+      if (row.taskId) void deleteTask(row.taskId);
+      setDeleted(null);
+    }, 10_000);
+    setDeleted({ row, index, timer });
   }
 
   function onUndoDelete() {
-    if (!deleted) return;
-    const restored: RowState = { ...deleted.row, taskId: null, state: "dirty", problem: null };
-    setRows((rs) => {
-      const copy = [...rs];
-      copy.splice(Math.min(deleted.index, copy.length), 0, restored);
-      return copy;
+    setDeleted((d) => {
+      if (!d) return null;
+      clearTimeout(d.timer);
+      setRows((rs) => {
+        const copy = [...rs];
+        copy.splice(Math.min(d.index, copy.length), 0, d.row);
+        return copy;
+      });
+      return null;
     });
-    setDeleted(null);
-    void persistRow(restored);
   }
 
   function onMove(key: string, delta: -1 | 1) {
@@ -2219,20 +2296,24 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     // date, need, time, …). Sheets rarely match exactly; cells stay editable.
     const dateCol = GRID_COLUMNS.findIndex((c) => c.field === "date");
     const parsed = carryForwardColumn(parseTsv(text), dateCol);
-    setRows((rs) => [
-      ...rs,
-      ...parsed
-        .filter((cells) => cells.some((c) => c.trim() !== ""))
-        .map((cells) => {
-          const raw = emptyCells();
-          GRID_COLUMNS.forEach((col, i) => { if (cells[i] !== undefined) raw[col.field] = cells[i].trim(); });
-          if (raw.kind !== "frog") raw.kind = "shift";
-          return {
-            key: crypto.randomUUID(), taskId: null, cells: raw,
-            signupCount: 0, state: "dirty" as const, problem: null, expanded: false,
-          };
-        }),
-    ]);
+    const newRows: RowState[] = parsed
+      .filter((cells) => cells.some((c) => c.trim() !== ""))
+      .map((cells) => {
+        const raw = emptyCells();
+        GRID_COLUMNS.forEach((col, i) => { if (cells[i] !== undefined) raw[col.field] = cells[i].trim(); });
+        if (raw.kind !== "frog") raw.kind = "shift";
+        return {
+          key: crypto.randomUUID(), taskId: null, cells: raw,
+          signupCount: 0, state: "dirty" as const, problem: null, expanded: false,
+        };
+      });
+    setRows((rs) => [...rs, ...newRows]);
+    // Pasted rows autosave like typed ones: valid rows persist immediately
+    // (sequentially, preserving order); unparseable rows are marked "needs
+    // attention" by persistRow and wait for a fix.
+    void (async () => {
+      for (const r of newRows) await persistRow(r);
+    })();
   }
 
   async function toggleStatus() {
@@ -2348,17 +2429,63 @@ test("pasting TSV appends rows with dates carried forward", async () => {
   expect(screen.getByLabelText("Date, row 3")).toHaveValue("Sat Jul 25"); // carried forward
 });
 
-test("deleting a row shows the undo toast and undo restores it", async () => {
-  deleteTaskAction.mockResolvedValue({ ok: true });
-  saveTask.mockResolvedValue({ ok: true, taskId: "t-new" });
-  const user = userEvent.setup();
+test("delete is deferred; undo cancels it and restores the row intact (signups included)", async () => {
+  vi.useFakeTimers();
+  const user = userEvent.setup({ advanceTimers: (ms) => vi.advanceTimersByTime(ms) });
   render(<OrganizeGrid event={event} initialTasks={[gridTask({})]} />);
   await user.click(screen.getByRole("button", { name: /delete, row 1/i }));
-  expect(deleteTaskAction).toHaveBeenCalledWith("t1");
   expect(screen.queryByLabelText("Title, row 1")).toBeNull();
+  expect(deleteTaskAction).not.toHaveBeenCalled(); // deferred — nothing destroyed yet
   await user.click(screen.getByRole("button", { name: /undo/i }));
   expect(screen.getByLabelText("Title, row 1")).toHaveValue("Games");
-  expect(saveTask).toHaveBeenCalled(); // restored row re-persists
+  expect(saveTask).not.toHaveBeenCalled(); // same task id — no re-create needed
+  vi.runOnlyPendingTimers();
+  expect(deleteTaskAction).not.toHaveBeenCalled(); // undo cancelled the timer
+  vi.useRealTimers();
+});
+
+test("without undo, the server delete fires when the window closes", async () => {
+  vi.useFakeTimers();
+  deleteTaskAction.mockResolvedValue({ ok: true });
+  const user = userEvent.setup({ advanceTimers: (ms) => vi.advanceTimersByTime(ms) });
+  render(<OrganizeGrid event={event} initialTasks={[gridTask({})]} />);
+  await user.click(screen.getByRole("button", { name: /delete, row 1/i }));
+  expect(deleteTaskAction).not.toHaveBeenCalled();
+  vi.advanceTimersByTime(10_000);
+  expect(deleteTaskAction).toHaveBeenCalledWith("t1");
+  vi.useRealTimers();
+});
+
+test("valid pasted rows persist immediately; unparseable ones wait flagged", async () => {
+  saveTask.mockResolvedValue({ ok: true, taskId: "t-pasted" });
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[]} />);
+  await user.click(screen.getByRole("button", { name: /add row/i }));
+  const title = screen.getByLabelText("Title, row 1");
+  await user.click(title);
+  await user.paste("Rice cooking\tshift\tSat Jul 25\t2\t6:30 AM - 3:00 PM\nMystery\tshift\tJul 25\tlots\t");
+  await screen.findByText(/needs attention/i); // the 'lots' row is flagged
+  expect(saveTask).toHaveBeenCalledTimes(1); // only the valid pasted row saved
+  const input = saveTask.mock.calls[0][0] as { cells: { title: string } };
+  expect(input.cells.title).toBe("Rice cooking");
+});
+
+test("an unsaved row moved between saved rows lands there when it saves", async () => {
+  saveTask.mockResolvedValue({ ok: true, taskId: "t-new" });
+  reorderTasksAction.mockResolvedValue({ ok: true });
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[
+    gridTask({ id: "t1", title: "First", position: 1024 }),
+    gridTask({ id: "t2", title: "Second", position: 2048 }),
+  ]} />);
+  await user.click(screen.getByRole("button", { name: /add row/i })); // row 3, unsaved
+  await user.type(screen.getByLabelText("Title, row 3"), "Middle");
+  await user.click(screen.getByRole("button", { name: /move up, row 3/i })); // now row 2
+  expect(screen.getByLabelText("Title, row 2")).toHaveValue("Middle");
+  await user.click(document.body); // blur → the new row saves
+  await screen.findByText(/saved/i);
+  // after the create, the grid reconciles the visual order with the server
+  expect(reorderTasksAction).toHaveBeenLastCalledWith("e1", ["t1", "t-new", "t2"]);
 });
 
 test("deleting a row with signups asks for confirmation first", async () => {
@@ -2618,16 +2745,18 @@ CI green → merge (merge commit, per repo convention). **Manual post-merge step
 - [ ] `/organize` rejects without the password; grid unreachable signed-out
 - [ ] Public board shows only published events; closing sign-ups hides the event
 - [ ] A row autosaves on blur; chip reflects Saving/Saved/attention; failed saves keep text
-- [ ] Pasting a Ginza-style block appends rows with dates carried forward
-- [ ] Reordering persists and the public board renders the organizer's within-day order
+- [ ] Pasting a Ginza-style block appends rows with dates carried forward; valid pasted rows reach the DB with no further interaction, invalid ones are flagged
+- [ ] Reordering (Move buttons + Alt+↑/↓) persists and the public board renders the organizer's within-day order; a row reordered before its first save lands in the right position once saved
 - [ ] Editing a task with signups preserves them; needed cannot drop below signups; delete with signups confirms and audit-snapshots
+- [ ] The delete-audit row outlives its task (`AuditLog.taskId` SetNull — verified by a DB test)
 - [ ] Timed tasks can never show a day header that disagrees with their times (date derived from the same row)
-- [ ] Undo restores a deleted row within ~10 s
+- [ ] Undo restores a deleted row intact — signups and claim tokens included — because the server delete fires only after the ~10 s window closes
 - [ ] axe reports zero WCAG 2.1 A/AA violations on board, sign-in, events, and grid pages
 
 ## Known debt carried forward
 
 - Session Ctrl+Z undo stack and audit-log revert UI → Phase 4 (per spec).
-- Drag-handle pointer DnD is decorative until wired; keyboard reorder (Alt+↑/↓) is the tested, accessible path. Wire HTML5 DnD when an organizer asks.
-- `beforeunload` warning for a dirty focused row — add with the DnD pass.
+- Pointer drag-and-drop reordering — explicitly NOT in Phase 2; Move up/down buttons + Alt+↑/↓ ship now. Add DnD when an organizer asks.
+- A deferred delete is dropped by a hard navigation mid-window (the task survives on reload — the safe failure). Acceptable; revisit only if organizers report confusion.
+- `beforeunload` warning for a dirty focused row — future polish.
 - Kanban / roster / report lenses / CSV → Phase 3.

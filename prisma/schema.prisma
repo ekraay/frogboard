@@ -22,9 +22,16 @@ enum TaskStatus {
 enum AuditAction {
   claim
   release
+  create
   edit
   move
+  delete
   flag
+}
+
+enum EventStatus {
+  draft
+  published
 }
 
 model Event {
@@ -32,6 +39,7 @@ model Event {
   name      String
   startDate DateTime
   endDate   DateTime
+  status    EventStatus @default(draft)
   tasks     Task[]
   auditLogs AuditLog[]
   createdAt DateTime @default(now())
@@ -53,6 +61,8 @@ model Task {
   pointOfContact   String?
   location         String?
   definitionOfDone String?
+  description      String?
+  position         Int         @default(0)
   status           TaskStatus  @default(todo)
   waiting          Boolean     @default(false)
   signups          Signup[]
@@ -60,6 +70,7 @@ model Task {
   createdAt        DateTime    @default(now())
 
   @@index([eventId, date])
+  @@index([eventId, position])
 }
 
 model Signup {
@@ -82,8 +93,8 @@ model AuditLog {
   id        String      @id @default(cuid())
   eventId   String
   event     Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  taskId    String
-  task      Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId    String?
+  task      Task?       @relation(fields: [taskId], references: [id], onDelete: SetNull)
   action    AuditAction
   details   Json
   createdAt DateTime    @default(now())

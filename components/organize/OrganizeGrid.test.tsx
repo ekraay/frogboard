@@ -1,0 +1,200 @@
+import { render, screen, fireEvent, act } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, expect, test, vi } from "vitest";
+
+const saveTask = vi.fn();
+const deleteTaskAction = vi.fn();
+const reorderTasksAction = vi.fn();
+const setEventStatusAction = vi.fn();
+vi.mock("@/app/actions/organize", () => ({
+  saveTask: (i: unknown) => saveTask(i),
+  deleteTask: (id: string) => deleteTaskAction(id),
+  reorderTasks: (e: string, ids: string[]) => reorderTasksAction(e, ids),
+  setEventStatusAction: (e: string, s: string) => setEventStatusAction(e, s),
+}));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+
+import { OrganizeGrid } from "@/components/organize/OrganizeGrid";
+import type { GridTask } from "@/lib/repository/organize";
+
+const event = {
+  id: "e1", name: "Ginza", status: "draft" as const,
+  startDate: new Date("2026-07-24T00:00:00Z"), endDate: new Date("2026-07-26T00:00:00Z"),
+};
+
+function gridTask(overrides: Partial<GridTask>): GridTask {
+  return {
+    id: "t1", kind: "shift", title: "Games", category: null, requestedGroup: null,
+    neededCount: 5, date: new Date("2026-07-25T00:00:00Z"),
+    startAt: new Date("2026-07-25T17:00:00Z"), endAt: new Date("2026-07-25T20:00:00Z"),
+    dueBy: null, location: null, description: null, definitionOfDone: null,
+    pointOfContact: null, position: 1024, signupCount: 0, ...overrides,
+  };
+}
+
+beforeEach(() => {
+  saveTask.mockReset(); deleteTaskAction.mockReset(); reorderTasksAction.mockReset(); setEventStatusAction.mockReset();
+});
+
+test("renders tasks as rows with readable cells", () => {
+  render(<OrganizeGrid event={event} initialTasks={[gridTask({})]} />);
+  expect(screen.getByLabelText("Title, row 1")).toHaveValue("Games");
+  expect(screen.getByLabelText("Time, row 1")).toHaveValue("10:00 AM–1:00 PM");
+  expect(screen.getByLabelText("Date, row 1")).toHaveValue("Jul 25");
+});
+
+test("editing a cell and leaving the row autosaves it", async () => {
+  saveTask.mockResolvedValue({ ok: true, taskId: "t1" });
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[gridTask({})]} />);
+  const title = screen.getByLabelText("Title, row 1");
+  await user.clear(title);
+  await user.type(title, "Games Booth");
+  await user.click(document.body); // leave the row
+  await screen.findByText(/saved/i);
+  expect(saveTask).toHaveBeenCalledOnce();
+  const input = saveTask.mock.calls[0][0] as { taskId: string; cells: { title: string } };
+  expect(input.taskId).toBe("t1");
+  expect(input.cells.title).toBe("Games Booth");
+});
+
+test("an unparseable cell marks the row and pauses its saving", async () => {
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[gridTask({})]} />);
+  const need = screen.getByLabelText("Need, row 1");
+  await user.clear(need);
+  await user.type(need, "lots");
+  await user.click(document.body);
+  expect(await screen.findByText(/needs attention/i)).toBeInTheDocument();
+  expect(saveTask).not.toHaveBeenCalled();
+});
+
+test("expanding a row reveals the prose fields with their question prompts", async () => {
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[gridTask({})]} />);
+  const expander = screen.getByRole("button", { name: /details, row 1/i });
+  expect(expander).toHaveAttribute("aria-expanded", "false");
+  await user.click(expander);
+  expect(expander).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByPlaceholderText("What is this about? Why is it important?")).toBeInTheDocument();
+  expect(screen.getByPlaceholderText("What does done look like?")).toBeInTheDocument();
+  expect(screen.getByPlaceholderText("Who can help?")).toBeInTheDocument();
+});
+
+test("pasting TSV appends rows with dates carried forward", async () => {
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[]} />);
+  await user.click(screen.getByRole("button", { name: /add row/i })); // focus target
+  const tsv = "Rice cooking\tshift\tSat Jul 25\t2\t6:30 AM - 3:00 PM\nGrilling\tshift\t\t4\t8-11am";
+  const title = screen.getByLabelText("Title, row 1");
+  await user.click(title);
+  await user.paste(tsv);
+  // appended after the manual row: rows 2 and 3
+  expect(screen.getByLabelText("Title, row 2")).toHaveValue("Rice cooking");
+  expect(screen.getByLabelText("Title, row 3")).toHaveValue("Grilling");
+  expect(screen.getByLabelText("Date, row 3")).toHaveValue("Sat Jul 25"); // carried forward
+});
+
+test("delete is deferred; undo cancels it and restores the row intact (signups included)", () => {
+  vi.useFakeTimers();
+  render(<OrganizeGrid event={event} initialTasks={[gridTask({})]} />);
+  fireEvent.click(screen.getByRole("button", { name: /delete, row 1/i }));
+  expect(screen.queryByLabelText("Title, row 1")).toBeNull();
+  expect(deleteTaskAction).not.toHaveBeenCalled(); // deferred — nothing destroyed yet
+  fireEvent.click(screen.getByRole("button", { name: /undo/i }));
+  expect(screen.getByLabelText("Title, row 1")).toHaveValue("Games");
+  expect(saveTask).not.toHaveBeenCalled(); // same task id — no re-create needed
+  act(() => { vi.runOnlyPendingTimers(); });
+  expect(deleteTaskAction).not.toHaveBeenCalled(); // undo cancelled the timer
+  vi.useRealTimers();
+});
+
+test("without undo, the server delete fires when the window closes", () => {
+  vi.useFakeTimers();
+  deleteTaskAction.mockResolvedValue({ ok: true });
+  render(<OrganizeGrid event={event} initialTasks={[gridTask({})]} />);
+  fireEvent.click(screen.getByRole("button", { name: /delete, row 1/i }));
+  expect(deleteTaskAction).not.toHaveBeenCalled();
+  act(() => { vi.advanceTimersByTime(10_000); });
+  expect(deleteTaskAction).toHaveBeenCalledWith("t1");
+  vi.useRealTimers();
+});
+
+test("valid pasted rows persist immediately; unparseable ones wait flagged", async () => {
+  saveTask.mockResolvedValue({ ok: true, taskId: "t-pasted" });
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[]} />);
+  await user.click(screen.getByRole("button", { name: /add row/i }));
+  const title = screen.getByLabelText("Title, row 1");
+  await user.click(title);
+  await user.paste("Rice cooking\tshift\tSat Jul 25\t2\t6:30 AM - 3:00 PM\nMystery\tshift\tJul 25\tlots\t");
+  await screen.findByText(/needs attention/i); // the 'lots' row is flagged
+  expect(saveTask).toHaveBeenCalledTimes(1); // only the valid pasted row saved
+  const input = saveTask.mock.calls[0][0] as { cells: { title: string } };
+  expect(input.cells.title).toBe("Rice cooking");
+});
+
+test("an unsaved row moved between saved rows lands there when it saves", async () => {
+  saveTask.mockResolvedValue({ ok: true, taskId: "t-new" });
+  reorderTasksAction.mockResolvedValue({ ok: true });
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[
+    gridTask({ id: "t1", title: "First", position: 1024 }),
+    gridTask({ id: "t2", title: "Second", position: 2048 }),
+  ]} />);
+  await user.click(screen.getByRole("button", { name: /add row/i })); // row 3, unsaved
+  await user.type(screen.getByLabelText("Title, row 3"), "Middle");
+  await user.click(screen.getByRole("button", { name: /move up, row 3/i })); // now row 2
+  expect(screen.getByLabelText("Title, row 2")).toHaveValue("Middle");
+  await user.click(document.body); // blur → the new row saves
+  await screen.findByText(/saved/i);
+  // after the create, the grid reconciles the visual order with the server
+  expect(reorderTasksAction).toHaveBeenLastCalledWith("e1", ["t1", "t-new", "t2"]);
+});
+
+test("deleting a row with signups asks for confirmation first", async () => {
+  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[gridTask({ signupCount: 2 })]} />);
+  await user.click(screen.getByRole("button", { name: /delete, row 1/i }));
+  expect(confirmSpy).toHaveBeenCalled();
+  expect(screen.getByLabelText("Title, row 1")).toBeInTheDocument(); // declined → stays
+  confirmSpy.mockRestore();
+});
+
+test("Alt+ArrowUp moves a row and persists the new order", async () => {
+  reorderTasksAction.mockResolvedValue({ ok: true });
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[
+    gridTask({ id: "t1", title: "First", position: 1024 }),
+    gridTask({ id: "t2", title: "Second", position: 2048 }),
+  ]} />);
+  const second = screen.getByLabelText("Title, row 2");
+  await user.click(second);
+  await user.keyboard("{Alt>}{ArrowUp}{/Alt}");
+  expect(screen.getByLabelText("Title, row 1")).toHaveValue("Second");
+  expect(reorderTasksAction).toHaveBeenCalledWith("e1", ["t2", "t1"]);
+});
+
+test("Open sign-ups flips the banner to Live", async () => {
+  setEventStatusAction.mockResolvedValue({ ok: true });
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[]} />);
+  expect(screen.getByText(/draft/i)).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: /open sign-ups/i }));
+  expect(await screen.findByText(/live/i)).toBeInTheDocument();
+  expect(setEventStatusAction).toHaveBeenCalledWith("e1", "published");
+  expect(screen.getByRole("button", { name: /close sign-ups/i })).toBeInTheDocument();
+});
+
+test("a thrown saveTask lands the row in an attention state, not a stuck spinner", async () => {
+  saveTask.mockRejectedValue(new Error("network down"));
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[gridTask({})]} />);
+  const title = screen.getByLabelText("Title, row 1");
+  await user.clear(title);
+  await user.type(title, "Games Booth");
+  await user.click(document.body);
+  expect(await screen.findByText(/needs attention/i)).toBeInTheDocument();
+  expect(screen.getByText(/couldn't save|server error|retry/i)).toBeInTheDocument();
+});

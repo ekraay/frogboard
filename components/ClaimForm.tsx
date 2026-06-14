@@ -57,12 +57,12 @@ export function ClaimForm({ taskId }: { taskId: string }) {
         Your name
         <input
           name="name"
-          autoFocus
           maxLength={80}
           placeholder="e.g. Kenji"
           className="mt-1 w-full rounded-xl border border-lily-line bg-white px-3 py-2.5 text-ink outline-none transition focus:border-reed focus:ring-2 focus:ring-reed/30"
         />
       </label>
+      <p className="text-xs text-ink-soft">Your name shows on the board so others know the spot&apos;s taken.</p>
       <label className="block text-sm font-medium text-ink-soft">
         Group <span className="font-normal">(optional)</span>
         <input
@@ -76,7 +76,7 @@ export function ClaimForm({ taskId }: { taskId: string }) {
         <input type="checkbox" name="minor" className="h-4 w-4 accent-reed" /> Under 18
       </label>
       {error && (
-        <p className="rounded-lg bg-lantern/10 px-3 py-2 text-sm font-medium text-lantern">
+        <p role="alert" className="rounded-lg bg-lantern/10 px-3 py-2 text-sm font-medium text-lantern-deep">
           {error}
         </p>
       )}

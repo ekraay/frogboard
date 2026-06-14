@@ -28,11 +28,6 @@ function dayLabel(d: Date): string {
   }).format(d);
 }
 
-/** Sort key: timed tasks by startAt ascending, all-day (no startAt) last. */
-function startKey(t: BoardTask): number {
-  return t.startAt ? t.startAt.getTime() : Number.MAX_SAFE_INTEGER;
-}
-
 export function groupTasksByDay(tasks: BoardTask[]): DayGroup[] {
   const groups = new Map<string, DayGroup>();
 
@@ -49,12 +44,7 @@ export function groupTasksByDay(tasks: BoardTask[]): DayGroup[] {
   }
 
   for (const g of groups.values()) {
-    g.tasks.sort((a, b) => {
-      const ka = startKey(a);
-      const kb = startKey(b);
-      if (ka !== kb) return ka - kb;
-      return a.title.localeCompare(b.title);
-    });
+    g.tasks.sort((a, b) => a.position - b.position || a.title.localeCompare(b.title));
   }
 
   return [...groups.values()].sort((a, b) => {
