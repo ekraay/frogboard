@@ -4,11 +4,13 @@ import { beforeEach, expect, test, vi } from "vitest";
 
 const saveTask = vi.fn();
 const deleteTaskAction = vi.fn();
+const clearTasksAction = vi.fn();
 const reorderTasksAction = vi.fn();
 const setEventStatusAction = vi.fn();
 vi.mock("@/app/actions/organize", () => ({
   saveTask: (i: unknown) => saveTask(i),
   deleteTask: (id: string) => deleteTaskAction(id),
+  clearTasks: (e: string, ids: string[]) => clearTasksAction(e, ids),
   reorderTasks: (e: string, ids: string[]) => reorderTasksAction(e, ids),
   setEventStatusAction: (e: string, s: string) => setEventStatusAction(e, s),
 }));
@@ -33,7 +35,8 @@ function gridTask(overrides: Partial<GridTask>): GridTask {
 }
 
 beforeEach(() => {
-  saveTask.mockReset(); deleteTaskAction.mockReset(); reorderTasksAction.mockReset(); setEventStatusAction.mockReset();
+  saveTask.mockReset(); deleteTaskAction.mockReset(); clearTasksAction.mockReset();
+  reorderTasksAction.mockReset(); setEventStatusAction.mockReset();
 });
 
 test("renders tasks as rows with readable cells", () => {
@@ -144,6 +147,55 @@ test("without undo, the server delete fires when the window closes", () => {
   expect(deleteTaskAction).not.toHaveBeenCalled();
   act(() => { vi.advanceTimersByTime(10_000); });
   expect(deleteTaskAction).toHaveBeenCalledWith("t1");
+  vi.useRealTimers();
+});
+
+test("Clear all is absent when the grid is empty", () => {
+  render(<OrganizeGrid event={event} initialTasks={[]} />);
+  expect(screen.queryByRole("button", { name: /clear all/i })).toBeNull();
+});
+
+test("Clear all asks before wiping; declining keeps the rows", () => {
+  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+  render(<OrganizeGrid event={event} initialTasks={[gridTask({})]} />);
+  fireEvent.click(screen.getByRole("button", { name: /clear all/i }));
+  expect(confirmSpy).toHaveBeenCalled();
+  expect(screen.getByLabelText("Title, row 1")).toBeInTheDocument();
+  confirmSpy.mockRestore();
+});
+
+test("Clear all empties the grid (deferred) and Undo brings every row back", () => {
+  vi.useFakeTimers();
+  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+  render(<OrganizeGrid event={event} initialTasks={[
+    gridTask({ id: "t1", title: "First", position: 1024 }),
+    gridTask({ id: "t2", title: "Second", position: 2048 }),
+  ]} />);
+  fireEvent.click(screen.getByRole("button", { name: /clear all/i }));
+  expect(screen.queryByLabelText("Title, row 1")).toBeNull();
+  expect(clearTasksAction).not.toHaveBeenCalled(); // deferred — nothing destroyed yet
+  fireEvent.click(screen.getByRole("button", { name: /undo/i }));
+  expect(screen.getByLabelText("Title, row 1")).toHaveValue("First");
+  expect(screen.getByLabelText("Title, row 2")).toHaveValue("Second");
+  act(() => { vi.runOnlyPendingTimers(); });
+  expect(clearTasksAction).not.toHaveBeenCalled(); // undo cancelled the timer
+  confirmSpy.mockRestore();
+  vi.useRealTimers();
+});
+
+test("without undo, Clear all commits one batched delete of every task id", () => {
+  vi.useFakeTimers();
+  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+  clearTasksAction.mockResolvedValue({ ok: true, count: 2 });
+  render(<OrganizeGrid event={event} initialTasks={[
+    gridTask({ id: "t1", title: "First", position: 1024 }),
+    gridTask({ id: "t2", title: "Second", position: 2048 }),
+  ]} />);
+  fireEvent.click(screen.getByRole("button", { name: /clear all/i }));
+  expect(clearTasksAction).not.toHaveBeenCalled();
+  act(() => { vi.advanceTimersByTime(10_000); });
+  expect(clearTasksAction).toHaveBeenCalledWith("e1", ["t1", "t2"]);
+  confirmSpy.mockRestore();
   vi.useRealTimers();
 });
 

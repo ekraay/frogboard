@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { resetDb } from "@/test/db";
 import {
   createEvent, listEvents, setEventStatus, deleteEvent, getEventGrid,
-  upsertTaskWithAudit, deleteTaskWithAudit, renumberTasks,
+  upsertTaskWithAudit, deleteTaskWithAudit, deleteTasks, renumberTasks,
 } from "@/lib/repository/organize";
 import type { ParsedTaskFields } from "@/lib/domain/gridRow";
 
@@ -128,6 +128,39 @@ describe("deleteTaskWithAudit", () => {
     expect(logs.map((l) => l.action).sort()).toEqual(["create", "delete"]);
     expect(logs.every((l) => l.taskId === null)).toBe(true);
     expect(logs.every((l) => l.eventId === e.id)).toBe(true);
+  });
+});
+
+describe("deleteTasks", () => {
+  test("deletes only the listed tasks in the event and reports the count", async () => {
+    const e = await createEvent("A", new Date(), new Date());
+    const a = await prisma.task.create({ data: { eventId: e.id, title: "A", position: 1024 } });
+    const b = await prisma.task.create({ data: { eventId: e.id, title: "B", position: 2048 } });
+    await prisma.task.create({ data: { eventId: e.id, title: "C", position: 3072 } });
+    expect(await deleteTasks(e.id, [a.id, b.id])).toBe(2);
+    const left = await prisma.task.findMany({ where: { eventId: e.id } });
+    expect(left.map((t) => t.title)).toEqual(["C"]);
+  });
+  test("never reaches across events — a foreign id is left alone", async () => {
+    const e1 = await createEvent("One", new Date(), new Date());
+    const e2 = await createEvent("Two", new Date(), new Date());
+    const mine = await prisma.task.create({ data: { eventId: e1.id, title: "Mine", position: 1024 } });
+    const theirs = await prisma.task.create({ data: { eventId: e2.id, title: "Theirs", position: 1024 } });
+    expect(await deleteTasks(e1.id, [mine.id, theirs.id])).toBe(1);
+    expect(await prisma.task.findUnique({ where: { id: theirs.id } })).not.toBeNull();
+  });
+  test("cascades signups away with the task", async () => {
+    const e = await createEvent("A", new Date(), new Date());
+    const t = await prisma.task.create({ data: { eventId: e.id, title: "T", position: 1024 } });
+    await prisma.signup.create({ data: { taskId: t.id, name: "Kenji", claimToken: "tok" } });
+    await deleteTasks(e.id, [t.id]);
+    expect(await prisma.signup.count()).toBe(0);
+  });
+  test("an empty id list is a no-op", async () => {
+    const e = await createEvent("A", new Date(), new Date());
+    await prisma.task.create({ data: { eventId: e.id, title: "T", position: 1024 } });
+    expect(await deleteTasks(e.id, [])).toBe(0);
+    expect(await prisma.task.count()).toBe(1);
   });
 });
 

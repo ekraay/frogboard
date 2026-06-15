@@ -175,6 +175,19 @@ export async function deleteTaskWithAudit(taskId: string): Promise<{ ok: true } 
   });
 }
 
+/**
+ * Bulk-delete the listed tasks, scoped to one event so a stray id from another
+ * event can't be swept up. Signups cascade away; past audit rows survive
+ * (AuditLog.taskId is SetNull). Mirrors deleteEvent's un-audited bulk style —
+ * this is a "start over" cleanup, not a tracked single edit. Returns the count
+ * actually removed.
+ */
+export async function deleteTasks(eventId: string, taskIds: string[]): Promise<number> {
+  if (taskIds.length === 0) return 0;
+  const result = await prisma.task.deleteMany({ where: { eventId, id: { in: taskIds } } });
+  return result.count;
+}
+
 export async function renumberTasks(
   eventId: string,
   orderedIds: string[],

@@ -6,7 +6,8 @@ import {
   passwordMatches, sessionToken, isValidSession, SESSION_COOKIE, SESSION_MAX_AGE,
 } from "@/lib/security/session";
 import {
-  createEvent, setEventStatus, deleteEvent, upsertTaskWithAudit, deleteTaskWithAudit, renumberTasks,
+  createEvent, setEventStatus, deleteEvent,
+  upsertTaskWithAudit, deleteTaskWithAudit, deleteTasks, renumberTasks,
 } from "@/lib/repository/organize";
 import { prisma } from "@/lib/db";
 import { parseRow, type RawCells } from "@/lib/domain/gridRow";
@@ -118,6 +119,19 @@ export async function deleteTask(taskId: string): Promise<Ok | Err> {
   if (!result.ok) return result;
   revalidatePath("/");
   return { ok: true };
+}
+
+/** "Start over": bulk-remove the listed tasks for an event. Scoped server-side
+ *  so a stray id can't reach another event. Returns how many were cleared. */
+export async function clearTasks(
+  eventId: string,
+  taskIds: string[],
+): Promise<{ ok: true; count: number } | Err> {
+  const gate = await requireOrganizer();
+  if (!gate.ok) return gate;
+  const count = await deleteTasks(eventId, taskIds);
+  revalidatePath("/");
+  return { ok: true, count };
 }
 
 export async function reorderTasks(eventId: string, orderedIds: string[]): Promise<Ok | Err> {
