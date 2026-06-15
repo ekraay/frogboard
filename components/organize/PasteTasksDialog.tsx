@@ -1,17 +1,21 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { linesToTaskTitles } from "@/lib/domain/import";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { parseTsv } from "@/lib/domain/paste";
+import { detectColumns, buildImportRows } from "@/lib/domain/import";
+import { emptyCells, type RawCells } from "@/lib/domain/gridRow";
 
 /**
  * A distinct "paste a list" modal (AnyList-style) — a clear copy/paste
- * affordance, separate from row-by-row entry. Each line becomes one task.
+ * affordance, separate from row-by-row entry. Each line becomes a task. When
+ * lines carry columns (a copy from a sheet), we detect the name/time/count and
+ * preview them, so the organizer sees exactly what will be created.
  */
 export function PasteTasksDialog({
   onAdd,
   onClose,
 }: {
-  onAdd: (titles: string[]) => void;
+  onAdd: (rows: RawCells[]) => void;
   onClose: () => void;
 }) {
   const [text, setText] = useState("");
@@ -24,7 +28,12 @@ export function PasteTasksDialog({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const titles = linesToTaskTitles(text);
+  const tasks = useMemo(() => {
+    if (text.trim() === "") return [];
+    const grid = parseTsv(text);
+    const { headerRow, fields } = detectColumns(grid);
+    return buildImportRows(grid, fields, headerRow, emptyCells);
+  }, [text]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[10vh]">
@@ -38,7 +47,7 @@ export function PasteTasksDialog({
       >
         <h2 id="paste-tasks-title" className="font-display text-xl font-bold text-ink">Paste a list of tasks</h2>
         <p className="mt-1 text-sm text-ink-soft">
-          Each line becomes a task. Add the dates, times, and counts afterward in the grid.
+          Each line becomes a task. Paste whole rows from your sheet — we’ll pull out the name, time, and count.
         </p>
         <label htmlFor="paste-tasks-text" className="sr-only">Tasks, one per line</label>
         <textarea
@@ -46,21 +55,27 @@ export function PasteTasksDialog({
           ref={ref}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          rows={10}
+          rows={8}
           placeholder={"Games booth\nBingo\nFood service\nBring 50 paper cups"}
           className="mt-3 w-full rounded-xl border border-lily-line bg-white px-3 py-2.5 text-sm text-ink outline-none placeholder:text-ink-soft focus:border-reed focus:ring-2 focus:ring-reed/30"
         />
 
-        {titles.length > 0 && (
+        {tasks.length > 0 && (
           <div className="mt-3 rounded-xl border border-lily-line bg-lily/40 p-3">
             <p className="text-[0.7rem] font-bold uppercase tracking-wider text-ink-soft">
-              Preview — {titles.length} task{titles.length > 1 ? "s" : ""} will be added
+              Preview — {tasks.length} task{tasks.length > 1 ? "s" : ""} will be added
             </p>
-            <ul aria-label="Preview of tasks to add" className="mt-1.5 max-h-40 space-y-0.5 overflow-auto text-sm text-ink">
-              {titles.map((t, i) => (
+            <ul aria-label="Preview of tasks to add" className="mt-1.5 max-h-44 space-y-1 overflow-auto text-sm text-ink">
+              {tasks.map((t, i) => (
                 <li key={i} className="flex items-center gap-2">
-                  <span aria-hidden className="text-reed">🐸</span>
-                  <span className="truncate">{t}</span>
+                  <span aria-hidden className="shrink-0 text-reed">🐸</span>
+                  <span className="min-w-0 flex-1 truncate font-medium">{t.title}</span>
+                  {t.time && <span className="shrink-0 text-xs text-ink-soft">{t.time}</span>}
+                  {t.need && (
+                    <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-ink-soft">
+                      {t.need}
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
@@ -77,11 +92,11 @@ export function PasteTasksDialog({
           </button>
           <button
             type="button"
-            disabled={titles.length === 0}
-            onClick={() => onAdd(titles)}
+            disabled={tasks.length === 0}
+            onClick={() => onAdd(tasks)}
             className="rounded-xl bg-reed px-4 py-2 text-sm font-bold text-white transition hover:bg-reed-deep disabled:opacity-60"
           >
-            {titles.length > 0 ? `Add ${titles.length} task${titles.length > 1 ? "s" : ""}` : "Add tasks"}
+            {tasks.length > 0 ? `Add ${tasks.length} task${tasks.length > 1 ? "s" : ""}` : "Add tasks"}
           </button>
         </div>
       </div>

@@ -29,7 +29,31 @@ test("turns each pasted line into a task and reports the count", async () => {
   // live count on the button, blank line ignored
   const add = screen.getByRole("button", { name: /add 3 tasks/i });
   await user.click(add);
-  expect(onAdd).toHaveBeenCalledWith(["Games booth", "Bingo", "Food service"]);
+  const cells = onAdd.mock.calls[0][0] as { title: string }[];
+  expect(cells.map((c) => c.title)).toEqual(["Games booth", "Bingo", "Food service"]);
+});
+
+test("pulls the name, time, and count from multi-column lines (not the date)", async () => {
+  const user = userEvent.setup();
+  render(<PasteTasksDialog onAdd={onAdd} onClose={onClose} />);
+  await user.click(screen.getByLabelText(/tasks, one per line/i));
+  // sheet shape: date \t task \t time \t count
+  await user.paste(
+    "Tuesday, July 21\tLayout tables\t6:00 PM - 10:00 PM\t15\n" +
+    "Wednesday, July 22\tBingo\t6:00 PM - 10:00 PM\t5",
+  );
+  const preview = screen.getByRole("list", { name: /preview/i });
+  // the NAME shows, not the date
+  expect(within(preview).getByText("Layout tables")).toBeInTheDocument();
+  expect(within(preview).getByText("Bingo")).toBeInTheDocument();
+  expect(within(preview).queryByText("Tuesday, July 21")).toBeNull();
+  // time and count show too
+  expect(within(preview).getAllByText("6:00 PM - 10:00 PM")).toHaveLength(2);
+  expect(within(preview).getByText("15")).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: /add 2 tasks/i }));
+  const cells = onAdd.mock.calls[0][0] as { title: string; time: string; need: string }[];
+  expect(cells[0]).toMatchObject({ title: "Layout tables", time: "6:00 PM - 10:00 PM", need: "15" });
 });
 
 test("Add is disabled until there's at least one line", () => {

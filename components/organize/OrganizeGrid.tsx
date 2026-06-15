@@ -112,11 +112,11 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     });
   }
 
-  // "Paste a list" modal: one title per line → one task, appended and saved.
-  function addManyTitles(titles: string[]) {
-    const newRows: RowState[] = titles.map((title) => ({
-      key: crypto.randomUUID(), taskId: null,
-      cells: { ...emptyCells(), title },
+  // "Paste a list" modal: each pasted task (name + detected time/count/…) is
+  // appended and saved.
+  function addManyTasks(cells: RawCells[]) {
+    const newRows: RowState[] = cells.map((c) => ({
+      key: crypto.randomUUID(), taskId: null, cells: c,
       signupCount: 0, state: "dirty", problem: null, expanded: false,
     }));
     setRows((rs) => [...rs, ...newRows]);
@@ -289,7 +289,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
         description, contact, and what “done” looks like.
       </p>
 
-      {pasting && <PasteTasksDialog onAdd={addManyTitles} onClose={() => setPasting(false)} />}
+      {pasting && <PasteTasksDialog onAdd={addManyTasks} onClose={() => setPasting(false)} />}
 
       <table className="w-full border-separate border-spacing-0 rounded-2xl border border-lily-line bg-white text-left">
         <caption className="sr-only">Tasks for {event.name}</caption>
