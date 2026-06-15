@@ -109,6 +109,19 @@ test("a single-column paste into Time fills Time without disturbing Title", asyn
   expect(screen.getByLabelText("Time, row 2")).toHaveValue("1:00 PM - 4:00 PM");
 });
 
+test("pasting inside the Paste-a-list modal does not leak into the grid", async () => {
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[]} />);
+  await user.click(screen.getByRole("button", { name: /paste a list/i }));
+  const box = screen.getByLabelText(/tasks, one per line/i);
+  await user.click(box);
+  await user.paste("Setup\nCleanup");
+  // the modal received the text (its count updates)…
+  expect(screen.getByRole("button", { name: /add 2 tasks/i })).toBeInTheDocument();
+  // …and the grid did NOT create rows from the modal's paste
+  expect(screen.queryByLabelText("Title, row 1")).toBeNull();
+});
+
 test("delete is deferred; undo cancels it and restores the row intact (signups included)", () => {
   vi.useFakeTimers();
   render(<OrganizeGrid event={event} initialTasks={[gridTask({})]} />);

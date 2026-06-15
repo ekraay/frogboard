@@ -194,6 +194,14 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
   }
 
   function onPaste(e: React.ClipboardEvent) {
+    // Only intercept a paste that landed in a grid CELL. Anything else — most
+    // importantly the "Paste a list" modal's textarea, which renders inside
+    // this wrapper — handles its own paste natively.
+    const el = e.target as HTMLElement;
+    const anchorField = el?.dataset?.field as keyof RawCells | undefined;
+    const anchorKey = el?.dataset?.rowkey;
+    if (!anchorField || !anchorKey) return;
+
     const text = e.clipboardData.getData("text/plain");
     // A lone value (no rows/columns) types into the focused cell normally.
     if (!text.includes("\t") && !text.includes("\n")) return;
@@ -201,14 +209,9 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
 
     // Anchor at the focused cell so the paste lands where the organizer is
     // (column-aware): "copy the times column → click Time → paste".
-    const el = e.target as HTMLElement;
-    const anchorField = el?.dataset?.field as keyof RawCells | undefined;
-    const anchorKey = el?.dataset?.rowkey;
     const order = GRID_COLUMNS.map((c) => c.field);
-    const anchorRow = anchorKey
-      ? Math.max(0, rows.findIndex((r) => r.key === anchorKey))
-      : rows.length; // no focused cell → append at the end
-    const anchorCol = anchorField ? Math.max(0, order.indexOf(anchorField)) : 0;
+    const anchorRow = Math.max(0, rows.findIndex((r) => r.key === anchorKey));
+    const anchorCol = Math.max(0, order.indexOf(anchorField));
 
     const result = applyPaste(
       rows.map((r) => r.cells),

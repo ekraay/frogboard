@@ -50,6 +50,23 @@ export function PasteTasksDialog({
           placeholder={"Games booth\nBingo\nFood service\nBring 50 paper cups"}
           className="mt-3 w-full rounded-xl border border-lily-line bg-white px-3 py-2.5 text-sm text-ink outline-none placeholder:text-ink-soft focus:border-reed focus:ring-2 focus:ring-reed/30"
         />
+
+        {titles.length > 0 && (
+          <div className="mt-3 rounded-xl border border-lily-line bg-lily/40 p-3">
+            <p className="text-[0.7rem] font-bold uppercase tracking-wider text-ink-soft">
+              Preview — {titles.length} task{titles.length > 1 ? "s" : ""} will be added
+            </p>
+            <ul aria-label="Preview of tasks to add" className="mt-1.5 max-h-40 space-y-0.5 overflow-auto text-sm text-ink">
+              {titles.map((t, i) => (
+                <li key={i} className="flex items-center gap-2">
+                  <span aria-hidden className="text-reed">🐸</span>
+                  <span className="truncate">{t}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <div className="mt-4 flex items-center justify-end gap-2">
           <button
             type="button"

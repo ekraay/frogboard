@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
 import { PasteTasksDialog } from "@/components/organize/PasteTasksDialog";
@@ -6,6 +6,17 @@ import { PasteTasksDialog } from "@/components/organize/PasteTasksDialog";
 const onAdd = vi.fn();
 const onClose = vi.fn();
 beforeEach(() => { onAdd.mockReset(); onClose.mockReset(); });
+
+test("previews exactly the tasks that will be created", async () => {
+  const user = userEvent.setup();
+  render(<PasteTasksDialog onAdd={onAdd} onClose={onClose} />);
+  await user.click(screen.getByLabelText(/tasks, one per line/i));
+  await user.paste("Games booth\n\nBingo"); // blank line dropped
+  const preview = screen.getByRole("list", { name: /preview/i });
+  expect(within(preview).getAllByRole("listitem")).toHaveLength(2); // blank line dropped
+  expect(within(preview).getByText("Games booth")).toBeInTheDocument();
+  expect(within(preview).getByText("Bingo")).toBeInTheDocument();
+});
 
 test("turns each pasted line into a task and reports the count", async () => {
   const user = userEvent.setup();
