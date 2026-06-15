@@ -287,6 +287,9 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
         <span className="font-semibold text-ink">Paste a list</span> drops one task per line. To bring a column from your sheet,
         copy it, click the matching column here, and paste. Open <span className="font-semibold text-ink">Details</span> for
         description, contact, and what “done” looks like.
+        <br />
+        <span className="font-semibold text-ink">Kind:</span> a <em>Shift</em> is a scheduled time slot;
+        a <em>🐸 Frog</em> is a one-off need volunteers grab (it can have a “by” deadline instead of a time).
       </p>
 
       {pasting && <PasteTasksDialog onAdd={addManyTasks} onClose={() => setPasting(false)} />}
