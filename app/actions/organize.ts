@@ -6,7 +6,7 @@ import {
   passwordMatches, sessionToken, isValidSession, SESSION_COOKIE, SESSION_MAX_AGE,
 } from "@/lib/security/session";
 import {
-  createEvent, setEventStatus, upsertTaskWithAudit, deleteTaskWithAudit, renumberTasks,
+  createEvent, setEventStatus, deleteEvent, upsertTaskWithAudit, deleteTaskWithAudit, renumberTasks,
 } from "@/lib/repository/organize";
 import { prisma } from "@/lib/db";
 import { parseRow, type RawCells } from "@/lib/domain/gridRow";
@@ -63,13 +63,23 @@ export async function createEventAction(
 
 export async function setEventStatusAction(
   eventId: string,
-  status: "draft" | "published",
+  status: "draft" | "published" | "archived",
 ): Promise<Ok | Err> {
   const gate = await requireOrganizer();
   if (!gate.ok) return gate;
   // setEventStatus returns false when the event no longer exists
   const changed = await setEventStatus(eventId, status);
   if (!changed) return { ok: false, error: "That event no longer exists." };
+  revalidatePath("/");
+  revalidatePath("/organize");
+  return { ok: true };
+}
+
+export async function deleteEventAction(eventId: string): Promise<Ok | Err> {
+  const gate = await requireOrganizer();
+  if (!gate.ok) return gate;
+  const deleted = await deleteEvent(eventId);
+  if (!deleted) return { ok: false, error: "That event no longer exists." };
   revalidatePath("/");
   revalidatePath("/organize");
   return { ok: true };

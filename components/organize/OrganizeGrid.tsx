@@ -6,11 +6,12 @@ import { saveTask, deleteTask, reorderTasks, setEventStatusAction } from "@/app/
 import { parseRow, taskToCells, emptyCells, type RawCells } from "@/lib/domain/gridRow";
 import type { EventCtx } from "@/lib/domain/cells";
 import type { GridTask } from "@/lib/repository/organize";
-import { parseTsv, carryForwardColumn } from "@/lib/domain/paste";
+import { parseTsv, applyPaste } from "@/lib/domain/paste";
 import { GridRow, GRID_COLUMNS, type RowState } from "@/components/organize/GridRow";
+import { PasteTasksDialog } from "@/components/organize/PasteTasksDialog";
 
 interface GridEvent {
-  id: string; name: string; status: "draft" | "published"; startDate: Date; endDate: Date;
+  id: string; name: string; status: "draft" | "published" | "archived"; startDate: Date; endDate: Date;
 }
 
 function toParts(d: Date) {
@@ -29,6 +30,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     })),
   );
   const [status, setStatus] = useState(event.status);
+  const [pasting, setPasting] = useState(false);
   const [deleted, setDeleted] = useState<
     { row: RowState; index: number; timer: ReturnType<typeof setTimeout> } | null
   >(null);
@@ -110,6 +112,20 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     });
   }
 
+  // "Paste a list" modal: each pasted task (name + detected time/count/…) is
+  // appended and saved.
+  function addManyTasks(cells: RawCells[]) {
+    const newRows: RowState[] = cells.map((c) => ({
+      key: crypto.randomUUID(), taskId: null, cells: c,
+      signupCount: 0, state: "dirty", problem: null, expanded: false,
+    }));
+    setRows((rs) => [...rs, ...newRows]);
+    setPasting(false);
+    (async () => {
+      for (const r of newRows) await persistRow(r);
+    })().catch(() => {});
+  }
+
   function onFillDown(key: string, field: keyof RawCells) {
     setRows((rs) => {
       const i = rs.findIndex((r) => r.key === key);
@@ -178,30 +194,53 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
   }
 
   function onPaste(e: React.ClipboardEvent) {
+    // Only intercept a paste that landed in a grid CELL. Anything else — most
+    // importantly the "Paste a list" modal's textarea, which renders inside
+    // this wrapper — handles its own paste natively.
+    const el = e.target as HTMLElement;
+    const anchorField = el?.dataset?.field as keyof RawCells | undefined;
+    const anchorKey = el?.dataset?.rowkey;
+    if (!anchorField || !anchorKey) return;
+
     const text = e.clipboardData.getData("text/plain");
-    if (!text.includes("\t") && !text.includes("\n")) return; // single-cell paste: default behavior
+    // A lone value (no rows/columns) types into the focused cell normally.
+    if (!text.includes("\t") && !text.includes("\n")) return;
     e.preventDefault();
-    // Pasted blocks map left-to-right onto the grid columns (title, kind,
-    // date, need, time, …). Sheets rarely match exactly; cells stay editable.
-    const dateCol = GRID_COLUMNS.findIndex((c) => c.field === "date");
-    const parsed = carryForwardColumn(parseTsv(text), dateCol);
-    const newRows: RowState[] = parsed
-      .filter((cells) => cells.some((c) => c.trim() !== ""))
-      .map((cells) => {
-        const raw = emptyCells();
-        GRID_COLUMNS.forEach((col, i) => { if (cells[i] !== undefined) raw[col.field] = cells[i].trim(); });
-        if (raw.kind !== "frog") raw.kind = "shift";
-        return {
-          key: crypto.randomUUID(), taskId: null, cells: raw,
-          signupCount: 0, state: "dirty" as const, problem: null, expanded: false,
-        };
-      });
-    setRows((rs) => [...rs, ...newRows]);
-    // Pasted rows autosave like typed ones: valid rows persist immediately
-    // (sequentially, preserving order); unparseable rows are marked "needs
-    // attention" by persistRow and wait for a fix.
+
+    // Anchor at the focused cell so the paste lands where the organizer is
+    // (column-aware): "copy the times column → click Time → paste".
+    const order = GRID_COLUMNS.map((c) => c.field);
+    const anchorRow = Math.max(0, rows.findIndex((r) => r.key === anchorKey));
+    const anchorCol = Math.max(0, order.indexOf(anchorField));
+
+    const result = applyPaste(
+      rows.map((r) => r.cells),
+      parseTsv(text),
+      { row: anchorRow, col: anchorCol },
+      order,
+      emptyCells,
+    );
+
+    // Map cells back to rows: keep key/taskId/signups for rows the paste
+    // touched (mark them dirty), and mint fresh rows for any it appended.
+    const next: RowState[] = result.cells.map((cells, i) => {
+      const existing = rows[i];
+      if (existing) {
+        return result.affected.includes(i)
+          ? { ...existing, cells, state: "dirty", problem: null }
+          : existing;
+      }
+      return {
+        key: crypto.randomUUID(), taskId: null, cells,
+        signupCount: 0, state: "dirty", problem: null, expanded: false,
+      };
+    });
+    setRows(next);
+
+    // Autosave every touched row (valid ones persist; unparseable ones flag).
+    const touched = result.affected.map((i) => next[i]);
     (async () => {
-      for (const r of newRows) await persistRow(r);
+      for (const r of touched) await persistRow(r);
     })().catch(() => {});
   }
 
@@ -236,16 +275,24 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
         </div>
       </div>
 
-      <div className="mb-1.5 flex gap-2 text-sm">
+      <div className="mb-1.5 flex flex-wrap gap-2 text-sm">
+        <button type="button" onClick={() => setPasting(true)}
+          className="rounded-lg bg-reed/10 px-3 py-1.5 font-semibold text-reed-deep transition hover:bg-reed/20">📋 Paste a list</button>
         <button type="button" onClick={addRow}
           className="rounded-lg border border-lily-line bg-white px-3 py-1.5 transition hover:border-reed">+ Add row</button>
         <button type="button" onClick={duplicateRow}
           className="rounded-lg border border-lily-line bg-white px-3 py-1.5 transition hover:border-reed">⧉ Duplicate last</button>
-        <span className="self-center text-xs text-ink-soft">…or paste rows from your sheet (Ctrl/⌘-D fills a cell down)</span>
       </div>
       <p className="mb-2 text-xs text-ink-soft">
-        Open <span className="font-semibold text-ink">Details</span> on a row to add a description, who to ask, and what “done” looks like — all optional.
+        <span className="font-semibold text-ink">Paste a list</span> drops one task per line. To bring a column from your sheet,
+        copy it, click the matching column here, and paste. Open <span className="font-semibold text-ink">Details</span> for
+        description, contact, and what “done” looks like.
+        <br />
+        <span className="font-semibold text-ink">Kind:</span> a <em>Shift</em> is a scheduled time slot;
+        a <em>🐸 Frog</em> is a one-off need volunteers grab (it can have a “by” deadline instead of a time).
       </p>
+
+      {pasting && <PasteTasksDialog onAdd={addManyTasks} onClose={() => setPasting(false)} />}
 
       <table className="w-full border-separate border-spacing-0 rounded-2xl border border-lily-line bg-white text-left">
         <caption className="sr-only">Tasks for {event.name}</caption>

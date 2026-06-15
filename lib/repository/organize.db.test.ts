@@ -3,7 +3,7 @@ import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "@/lib/db";
 import { resetDb } from "@/test/db";
 import {
-  createEvent, listEvents, setEventStatus, getEventGrid,
+  createEvent, listEvents, setEventStatus, deleteEvent, getEventGrid,
   upsertTaskWithAudit, deleteTaskWithAudit, renumberTasks,
 } from "@/lib/repository/organize";
 import type { ParsedTaskFields } from "@/lib/domain/gridRow";
@@ -38,6 +38,21 @@ describe("events", () => {
     const e = await createEvent("A", new Date(), new Date());
     expect(await setEventStatus(e.id, "published")).toBe(true);
     expect((await prisma.event.findUnique({ where: { id: e.id } }))!.status).toBe("published");
+  });
+  test("setEventStatus can archive an event", async () => {
+    const e = await createEvent("A", new Date(), new Date());
+    expect(await setEventStatus(e.id, "archived")).toBe(true);
+    expect((await prisma.event.findUnique({ where: { id: e.id } }))!.status).toBe("archived");
+  });
+  test("deleteEvent removes the event and its tasks", async () => {
+    const e = await createEvent("Doomed", new Date(), new Date());
+    await prisma.task.create({ data: { eventId: e.id, title: "T", position: 1024 } });
+    expect(await deleteEvent(e.id)).toBe(true);
+    expect(await prisma.event.findUnique({ where: { id: e.id } })).toBeNull();
+    expect(await prisma.task.count({ where: { eventId: e.id } })).toBe(0);
+  });
+  test("deleteEvent on a missing event reports failure", async () => {
+    expect(await deleteEvent("not-real")).toBe(false);
   });
   test("setEventStatus on a missing event reports failure instead of throwing", async () => {
     expect(await setEventStatus("nope-not-real", "published")).toBe(false);

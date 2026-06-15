@@ -15,7 +15,7 @@ import { prisma } from "@/lib/db";
 import { resetDb } from "@/test/db";
 import { sessionToken, SESSION_COOKIE } from "@/lib/security/session";
 import {
-  signIn, signOut, createEventAction, setEventStatusAction, saveTask, deleteTask, reorderTasks,
+  signIn, signOut, createEventAction, setEventStatusAction, deleteEventAction, saveTask, deleteTask, reorderTasks,
 } from "@/app/actions/organize";
 import { emptyCells } from "@/lib/domain/gridRow";
 
@@ -92,6 +92,30 @@ describe("createEventAction + setEventStatusAction", () => {
     authenticate();
     const r = await createEventAction(fd({ name: "Backwards", startDate: "9/27/2026", endDate: "9/25/2026" }));
     expect(r).toEqual({ ok: false, field: "endDate", error: "The last day can't be before the first." });
+  });
+  test("can archive an event", async () => {
+    authenticate();
+    const e = await prisma.event.create({ data: { name: "E", startDate: new Date(), endDate: new Date() } });
+    expect(await setEventStatusAction(e.id, "archived")).toEqual({ ok: true });
+    expect((await prisma.event.findUnique({ where: { id: e.id } }))!.status).toBe("archived");
+  });
+});
+
+describe("deleteEventAction", () => {
+  test("refuses without a session", async () => {
+    const e = await prisma.event.create({ data: { name: "E", startDate: new Date(), endDate: new Date() } });
+    expect(await deleteEventAction(e.id)).toEqual({ ok: false, error: "Please sign in." });
+    expect(await prisma.event.count()).toBe(1); // untouched
+  });
+  test("permanently deletes when signed in", async () => {
+    authenticate();
+    const e = await prisma.event.create({ data: { name: "E", startDate: new Date(), endDate: new Date() } });
+    expect(await deleteEventAction(e.id)).toEqual({ ok: true });
+    expect(await prisma.event.count()).toBe(0);
+  });
+  test("reports a vanished event", async () => {
+    authenticate();
+    expect(await deleteEventAction("nope")).toEqual({ ok: false, error: "That event no longer exists." });
   });
 });
 

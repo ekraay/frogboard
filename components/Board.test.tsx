@@ -21,3 +21,9 @@ test("renders the event name and a dated day-group heading", () => {
   // groupTasksByDay labels 2026-07-25 (UTC) as a readable day.
   expect(screen.getByRole("heading", { level: 2, name: /Jul 25/ })).toBeInTheDocument();
 });
+
+test("explains what a frog is", () => {
+  render(<Board eventName="Ginza Bazaar" tasks={[task({})]} />);
+  expect(screen.getByText(/what's a frog/i)).toBeInTheDocument();
+  expect(screen.getByText(/one-off thing that needs doing/i)).toBeInTheDocument();
+});
