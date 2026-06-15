@@ -32,6 +32,7 @@ enum AuditAction {
 enum EventStatus {
   draft
   published
+  archived
 }
 
 model Event {

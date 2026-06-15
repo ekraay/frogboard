@@ -1,10 +1,10 @@
 import { cookies } from "next/headers";
-import Link from "next/link";
 import { isValidSession, SESSION_COOKIE } from "@/lib/security/session";
 import { listEvents } from "@/lib/repository/organize";
 import { signOutAction } from "@/app/actions/organize";
 import { SignInForm } from "@/components/organize/SignInForm";
 import { NewEventForm } from "@/components/organize/NewEventForm";
+import { EventList } from "@/components/organize/EventList";
 
 export const dynamic = "force-dynamic";
 
@@ -24,23 +24,7 @@ export default async function OrganizePage() {
           </button>
         </form>
       </div>
-      <ul className="mb-8 space-y-3">
-        {events.map((e) => (
-          <li key={e.id}>
-            <Link href={`/organize/${e.id}`}
-              className="flex items-center justify-between rounded-2xl border border-lily-line bg-white p-4 shadow-sm transition hover:border-reed">
-              <span className="font-bold text-ink">{e.name}</span>
-              <span className="flex items-center gap-3 text-sm">
-                <span className="text-ink-soft">{e.taskCount} tasks</span>
-                {e.status === "published"
-                  ? <span className="rounded-full bg-amber/20 px-3 py-1 font-bold text-lantern">🏮 Sign-ups open</span>
-                  : <span className="rounded-full bg-lily px-3 py-1 font-bold text-ink-soft">🌱 Draft</span>}
-              </span>
-            </Link>
-          </li>
-        ))}
-        {events.length === 0 && <li className="text-ink-soft">No events yet — create the first one below.</li>}
-      </ul>
+      <EventList events={events} />
       <NewEventForm />
     </main>
   );

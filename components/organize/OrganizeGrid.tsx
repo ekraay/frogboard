@@ -11,7 +11,7 @@ import { GridRow, GRID_COLUMNS, type RowState } from "@/components/organize/Grid
 import { PasteTasksDialog } from "@/components/organize/PasteTasksDialog";
 
 interface GridEvent {
-  id: string; name: string; status: "draft" | "published"; startDate: Date; endDate: Date;
+  id: string; name: string; status: "draft" | "published" | "archived"; startDate: Date; endDate: Date;
 }
 
 function toParts(d: Date) {

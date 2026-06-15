@@ -29,6 +29,12 @@ export async function setEventStatus(eventId: string, status: EventStatus): Prom
   return result.count > 0;
 }
 
+/** Permanently delete an event and (by cascade) its tasks, signups, and audit. */
+export async function deleteEvent(eventId: string): Promise<boolean> {
+  const result = await prisma.event.deleteMany({ where: { id: eventId } });
+  return result.count > 0;
+}
+
 export interface GridTask {
   id: string; kind: "shift" | "frog"; title: string;
   category: string | null; requestedGroup: string | null; neededCount: number;
