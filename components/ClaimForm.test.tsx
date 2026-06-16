@@ -62,3 +62,34 @@ test("does not double-submit when Add me is tapped twice quickly", async () => {
   expect(addMe).toBeDisabled();
   resolve({ ok: true, signupId: "s1", claimToken: "tok-1" });
 });
+
+test("forwards optional email and phone when provided", async () => {
+  claimSlot.mockResolvedValue({ ok: true, signupId: "s1", claimToken: "tok-1" });
+  const user = userEvent.setup();
+  render(<ClaimForm taskId="t1" />);
+
+  await user.click(screen.getByRole("button", { name: /grab a frog/i }));
+  await user.type(screen.getByLabelText(/your name/i), "Kenji");
+  await user.type(screen.getByLabelText(/email/i), "kenji@example.com");
+  await user.type(screen.getByLabelText(/phone/i), "555-1234");
+  await user.click(screen.getByRole("button", { name: /^add me$/i }));
+
+  const fd = claimSlot.mock.calls[0][0] as FormData;
+  expect(fd.get("email")).toBe("kenji@example.com");
+  expect(fd.get("phone")).toBe("555-1234");
+});
+
+test("email and phone are optional — submitting blank still works", async () => {
+  claimSlot.mockResolvedValue({ ok: true, signupId: "s1", claimToken: "tok-1" });
+  const user = userEvent.setup();
+  render(<ClaimForm taskId="t1" />);
+
+  await user.click(screen.getByRole("button", { name: /grab a frog/i }));
+  await user.type(screen.getByLabelText(/your name/i), "Kenji");
+  await user.click(screen.getByRole("button", { name: /^add me$/i }));
+
+  expect(claimSlot).toHaveBeenCalledOnce();
+  const fd = claimSlot.mock.calls[0][0] as FormData;
+  expect(fd.get("email")).toBe("");
+  expect(fd.get("phone")).toBe("");
+});

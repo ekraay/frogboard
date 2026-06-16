@@ -72,6 +72,28 @@ export function ClaimForm({ taskId }: { taskId: string }) {
           className="mt-1 w-full rounded-xl border border-lily-line bg-white px-3 py-2.5 text-ink outline-none transition focus:border-reed focus:ring-2 focus:ring-reed/30"
         />
       </label>
+      <label className="block text-sm font-medium text-ink-soft">
+        Email <span className="font-normal">(optional)</span>
+        <input
+          name="email"
+          type="email"
+          maxLength={120}
+          autoComplete="email"
+          placeholder="you@example.com"
+          className="mt-1 w-full rounded-xl border border-lily-line bg-white px-3 py-2.5 text-ink outline-none transition focus:border-reed focus:ring-2 focus:ring-reed/30"
+        />
+      </label>
+      <label className="block text-sm font-medium text-ink-soft">
+        Phone <span className="font-normal">(optional)</span>
+        <input
+          name="phone"
+          type="tel"
+          maxLength={30}
+          autoComplete="tel"
+          placeholder="(555) 555-1234"
+          className="mt-1 w-full rounded-xl border border-lily-line bg-white px-3 py-2.5 text-ink outline-none transition focus:border-reed focus:ring-2 focus:ring-reed/30"
+        />
+      </label>
       <label className="flex items-center gap-2 text-sm text-ink-soft">
         <input type="checkbox" name="minor" className="h-4 w-4 accent-reed" /> Under 18
       </label>
