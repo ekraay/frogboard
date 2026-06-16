@@ -9,6 +9,7 @@ import type { GridTask } from "@/lib/repository/organize";
 import { parseTsv, applyPaste } from "@/lib/domain/paste";
 import { GridRow, GRID_COLUMNS, type RowState } from "@/components/organize/GridRow";
 import { PasteTasksDialog } from "@/components/organize/PasteTasksDialog";
+import { HelpPopover } from "@/components/organize/HelpPopover";
 
 interface GridEvent {
   id: string; name: string; status: "draft" | "published" | "archived"; startDate: Date; endDate: Date;
@@ -313,9 +314,16 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
         </div>
       </div>
 
-      <div className="mb-1.5 flex flex-wrap gap-2 text-sm">
-        <button type="button" onClick={() => setPasting(true)}
-          className="rounded-lg bg-reed/10 px-3 py-1.5 font-semibold text-reed-deep transition hover:bg-reed/20">📋 Paste a list</button>
+      <div className="mb-2.5 flex flex-wrap items-center gap-2 text-sm">
+        <span className="inline-flex items-center gap-1">
+          <button type="button" onClick={() => setPasting(true)}
+            className="rounded-lg bg-reed/10 px-3 py-1.5 font-semibold text-reed-deep transition hover:bg-reed/20">📋 Paste a list</button>
+          <HelpPopover label="How “Paste a list” works">
+            Each line becomes a task. To bring a column from your sheet, copy it, click the
+            matching column here, and paste. Open <span className="font-semibold">Details</span> on
+            a row for description, contact, and what “done” looks like.
+          </HelpPopover>
+        </span>
         <button type="button" onClick={addRow}
           className="rounded-lg border border-lily-line bg-white px-3 py-1.5 transition hover:border-reed">+ Add row</button>
         <button type="button" onClick={duplicateRow}
@@ -325,14 +333,6 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
             className="ml-auto rounded-lg border border-lily-line bg-white px-3 py-1.5 text-ink-soft transition hover:border-lantern-deep hover:text-lantern-deep">🧹 Clear all</button>
         )}
       </div>
-      <p className="mb-2 text-xs text-ink-soft">
-        <span className="font-semibold text-ink">Paste a list</span> drops one task per line. To bring a column from your sheet,
-        copy it, click the matching column here, and paste. Open <span className="font-semibold text-ink">Details</span> for
-        description, contact, and what “done” looks like.
-        <br />
-        <span className="font-semibold text-ink">Kind:</span> a <em>Shift</em> is a scheduled time slot;
-        a <em>🐸 Frog</em> is a one-off need volunteers grab (it can have a “by” deadline instead of a time).
-      </p>
 
       {pasting && <PasteTasksDialog onAdd={addManyTasks} onClose={() => setPasting(false)} />}
 
@@ -356,7 +356,18 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
           <tr className="bg-lily text-xs font-bold uppercase tracking-wide text-ink">
             <th scope="col" className="w-6 rounded-tl-2xl p-2"><span className="sr-only">Reorder</span></th>
             <th scope="col" className="p-2">Details</th>
-            {GRID_COLUMNS.map((c) => <th key={c.field} scope="col" className="p-2">{c.label}</th>)}
+            {GRID_COLUMNS.map((c) => (
+              <th key={c.field} scope="col" className="p-2">
+                {c.label}
+                {c.field === "kind" && (
+                  <> <HelpPopover label="Shift vs Frog">
+                    A <span className="font-semibold">Shift</span> is a scheduled time slot. A{" "}
+                    <span className="font-semibold">🐸 Frog</span> is a one-off need volunteers grab —
+                    it can take a “by” deadline instead of a time.
+                  </HelpPopover></>
+                )}
+              </th>
+            ))}
             <th scope="col" className="p-2"><span className="sr-only">Signups</span></th>
             <th scope="col" className="rounded-tr-2xl p-2"><span className="sr-only">Delete</span></th>
           </tr>

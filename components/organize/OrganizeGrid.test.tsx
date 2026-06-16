@@ -115,7 +115,7 @@ test("a single-column paste into Time fills Time without disturbing Title", asyn
 test("pasting inside the Paste-a-list modal does not leak into the grid", async () => {
   const user = userEvent.setup();
   render(<OrganizeGrid event={event} initialTasks={[]} />);
-  await user.click(screen.getByRole("button", { name: /paste a list/i }));
+  await user.click(screen.getByRole("button", { name: "📋 Paste a list" }));
   const box = screen.getByLabelText(/tasks, one per line/i);
   await user.click(box);
   await user.paste("Setup\nCleanup");
@@ -275,4 +275,18 @@ test("a thrown saveTask lands the row in an attention state, not a stuck spinner
   await user.click(document.body);
   expect(await screen.findByText(/needs attention/i)).toBeInTheDocument();
   expect(screen.getByText(/couldn't save|server error|retry/i)).toBeInTheDocument();
+});
+
+test("explanations are tucked behind ? popovers, not shown as a wall of text", async () => {
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[]} />);
+  // nothing explanatory is shown until asked
+  expect(screen.queryByText(/each line becomes a task/i)).toBeNull();
+  expect(screen.queryByText(/one-off need/i)).toBeNull();
+  // Paste-a-list help opens on demand
+  await user.click(screen.getByRole("button", { name: /how .*paste a list/i }));
+  expect(screen.getByText(/each line becomes a task/i)).toBeInTheDocument();
+  // Kind help explains Shift vs Frog
+  await user.click(screen.getByRole("button", { name: /shift vs frog/i }));
+  expect(screen.getByText(/one-off need/i)).toBeInTheDocument();
 });
