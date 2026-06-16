@@ -164,39 +164,38 @@ test("Clear all asks before wiping; declining keeps the rows", () => {
   confirmSpy.mockRestore();
 });
 
-test("Clear all empties the grid (deferred) and Undo brings every row back", () => {
-  vi.useFakeTimers();
+test("Clear all shows a persistent inline banner and Undo restores every row", async () => {
   const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+  const user = userEvent.setup();
   render(<OrganizeGrid event={event} initialTasks={[
     gridTask({ id: "t1", title: "First", position: 1024 }),
     gridTask({ id: "t2", title: "Second", position: 2048 }),
   ]} />);
-  fireEvent.click(screen.getByRole("button", { name: /clear all/i }));
+  await user.click(screen.getByRole("button", { name: /clear all/i }));
   expect(screen.queryByLabelText("Title, row 1")).toBeNull();
+  expect(screen.getByText(/cleared 2 tasks/i)).toBeInTheDocument(); // persistent banner, no fading toast
   expect(clearTasksAction).not.toHaveBeenCalled(); // deferred — nothing destroyed yet
-  fireEvent.click(screen.getByRole("button", { name: /undo/i }));
+  await user.click(screen.getByRole("button", { name: /^undo$/i }));
   expect(screen.getByLabelText("Title, row 1")).toHaveValue("First");
   expect(screen.getByLabelText("Title, row 2")).toHaveValue("Second");
-  act(() => { vi.runOnlyPendingTimers(); });
-  expect(clearTasksAction).not.toHaveBeenCalled(); // undo cancelled the timer
+  expect(clearTasksAction).not.toHaveBeenCalled();
   confirmSpy.mockRestore();
-  vi.useRealTimers();
 });
 
-test("without undo, Clear all commits one batched delete of every task id", () => {
-  vi.useFakeTimers();
-  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+test("Clear all commits the batched delete when you next add a row", async () => {
   clearTasksAction.mockResolvedValue({ ok: true, count: 2 });
+  saveTask.mockResolvedValue({ ok: true, taskId: "t-new" });
+  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+  const user = userEvent.setup();
   render(<OrganizeGrid event={event} initialTasks={[
     gridTask({ id: "t1", title: "First", position: 1024 }),
     gridTask({ id: "t2", title: "Second", position: 2048 }),
   ]} />);
-  fireEvent.click(screen.getByRole("button", { name: /clear all/i }));
-  expect(clearTasksAction).not.toHaveBeenCalled();
-  act(() => { vi.advanceTimersByTime(10_000); });
+  await user.click(screen.getByRole("button", { name: /clear all/i }));
+  expect(clearTasksAction).not.toHaveBeenCalled(); // still deferred while the banner shows
+  await user.click(screen.getByRole("button", { name: /add row/i })); // next action commits it
   expect(clearTasksAction).toHaveBeenCalledWith("e1", ["t1", "t2"]);
   confirmSpy.mockRestore();
-  vi.useRealTimers();
 });
 
 test("valid pasted rows persist immediately; unparseable ones wait flagged", async () => {

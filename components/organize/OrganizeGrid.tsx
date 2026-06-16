@@ -16,7 +16,9 @@ interface GridEvent {
 
 type Pending =
   | { kind: "row"; row: RowState; index: number; timer: ReturnType<typeof setTimeout> }
-  | { kind: "clear"; rows: RowState[]; taskIds: string[]; timer: ReturnType<typeof setTimeout> };
+  // A "clear" has no auto-dismiss timer: its inline banner persists until you
+  // Undo or take the next grid action (add/paste), which commits the delete.
+  | { kind: "clear"; rows: RowState[]; taskIds: string[] };
 
 function toParts(d: Date) {
   return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() };
@@ -44,9 +46,9 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
   const rowsRef = useRef<RowState[]>([]);
   useEffect(() => { rowsRef.current = rows; });
 
-  // Cancel a pending delete-timer if the grid unmounts mid-undo-window.
+  // Cancel a pending row-delete timer if the grid unmounts mid-undo-window.
   useEffect(() => {
-    return () => { if (pending) clearTimeout(pending.timer); };
+    return () => { if (pending?.kind === "row") clearTimeout(pending.timer); };
   }, [pending]);
 
   const update = (key: string, fn: (r: RowState) => RowState) =>
@@ -100,6 +102,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
   }
 
   function addRow() {
+    flushPending(); // adding a row is the "next action" that commits a pending Clear-all
     setRows((rs) => [...rs, {
       key: crypto.randomUUID(), taskId: null, cells: emptyCells(),
       signupCount: 0, state: "dirty", problem: null, expanded: false,
@@ -107,6 +110,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
   }
 
   function duplicateRow() {
+    flushPending();
     setRows((rs) => {
       const last = rs[rs.length - 1];
       if (!last) return rs;
@@ -120,6 +124,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
   // "Paste a list" modal: each pasted task (name + detected time/count/…) is
   // appended and saved.
   function addManyTasks(cells: RawCells[]) {
+    flushPending();
     const newRows: RowState[] = cells.map((c) => ({
       key: crypto.randomUUID(), taskId: null, cells: c,
       signupCount: 0, state: "dirty", problem: null, expanded: false,
@@ -155,7 +160,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
   /** A prior pending delete commits now — one undo window at a time. */
   function flushPending() {
     setPending((p) => {
-      if (p) { clearTimeout(p.timer); commitPending(p); }
+      if (p) { if (p.kind === "row") clearTimeout(p.timer); commitPending(p); }
       return null;
     });
   }
@@ -181,27 +186,26 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     setPending({ kind: "row", row, index, timer });
   }
 
-  /** "Start over": wipe every row, deferred + undoable, like a single delete. */
+  /** "Start over": wipe every row. The delete is DEFERRED and undoable — a
+   *  persistent inline banner offers Undo, and the actual delete commits only
+   *  when you take the next grid action (add/paste) or delete again. Leaving the
+   *  page without acting never fires it (the safe failure). */
   function onClearAll() {
     const snapshot = rows;
     const n = snapshot.length;
     if (n === 0) return;
-    if (!window.confirm(`Clear all ${n} task${n === 1 ? "" : "s"}? You can undo for 10 seconds.`)) return;
+    if (!window.confirm(`Clear all ${n} task${n === 1 ? "" : "s"}? You can undo afterward.`)) return;
     flushPending();
     const taskIds = snapshot.map((r) => r.taskId).filter((id): id is string => id !== null);
     setRows([]);
-    const timer = setTimeout(() => {
-      if (taskIds.length) void clearTasks(event.id, taskIds);
-      setPending(null);
-    }, 10_000);
-    setPending({ kind: "clear", rows: snapshot, taskIds, timer });
+    setPending({ kind: "clear", rows: snapshot, taskIds });
   }
 
   function onUndo() {
     setPending((p) => {
       if (!p) return null;
-      clearTimeout(p.timer);
       if (p.kind === "row") {
+        clearTimeout(p.timer);
         setRows((rs) => {
           const copy = [...rs];
           copy.splice(Math.min(p.index, copy.length), 0, p.row);
@@ -239,6 +243,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     // A lone value (no rows/columns) types into the focused cell normally.
     if (!text.includes("\t") && !text.includes("\n")) return;
     e.preventDefault();
+    flushPending(); // a grid paste is a "next action" that commits a pending Clear-all
 
     // Anchor at the focused cell so the paste lands where the organizer is
     // (column-aware): "copy the times column → click Time → paste".
@@ -331,6 +336,20 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
 
       {pasting && <PasteTasksDialog onAdd={addManyTasks} onClose={() => setPasting(false)} />}
 
+      {pending?.kind === "clear" && (
+        <div role="status"
+          className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-amber/60 bg-amber/15 px-4 py-3">
+          <span className="text-sm font-medium text-ink">
+            🧹 Cleared {pending.rows.length} task{pending.rows.length === 1 ? "" : "s"}. They’re off the board —
+            bring them back if that wasn’t right.
+          </span>
+          <button type="button" onClick={onUndo}
+            className="shrink-0 rounded-xl bg-reed px-4 py-2 text-sm font-bold text-white transition hover:bg-reed-deep">
+            Undo
+          </button>
+        </div>
+      )}
+
       <table className="w-full border-separate border-spacing-0 rounded-2xl border border-lily-line bg-white text-left">
         <caption className="sr-only">Tasks for {event.name}</caption>
         <thead>
@@ -356,12 +375,10 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
         </tbody>
       </table>
 
-      {pending && (
+      {pending?.kind === "row" && (
         <div role="status"
           className="fixed bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-xl bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {pending.kind === "clear"
-            ? `All ${pending.rows.length} task${pending.rows.length === 1 ? "" : "s"} cleared —`
-            : "Row deleted —"}
+          Row deleted —
           <button type="button" onClick={onUndo} className="font-bold text-reed underline-offset-2 hover:underline">
             Undo
           </button>
