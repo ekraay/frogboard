@@ -15,7 +15,8 @@ import { prisma } from "@/lib/db";
 import { resetDb } from "@/test/db";
 import { sessionToken, SESSION_COOKIE } from "@/lib/security/session";
 import {
-  signIn, signOut, createEventAction, setEventStatusAction, deleteEventAction, saveTask, deleteTask, reorderTasks,
+  signIn, signOut, createEventAction, setEventStatusAction, deleteEventAction,
+  saveTask, deleteTask, clearTasks, reorderTasks,
 } from "@/app/actions/organize";
 import { emptyCells } from "@/lib/domain/gridRow";
 
@@ -144,6 +145,31 @@ describe("saveTask", () => {
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.field).toBe("need");
+  });
+});
+
+describe("clearTasks", () => {
+  test("refuses without a session and leaves the tasks", async () => {
+    const e = await prisma.event.create({ data: { name: "E", startDate: new Date(), endDate: new Date() } });
+    const t = await prisma.task.create({ data: { eventId: e.id, title: "T", position: 1024 } });
+    expect(await clearTasks(e.id, [t.id])).toEqual({ ok: false, error: "Please sign in." });
+    expect(await prisma.task.count()).toBe(1);
+  });
+  test("clears the listed tasks when signed in and reports the count", async () => {
+    authenticate();
+    const e = await prisma.event.create({ data: { name: "E", startDate: new Date(), endDate: new Date() } });
+    const a = await prisma.task.create({ data: { eventId: e.id, title: "A", position: 1024 } });
+    const b = await prisma.task.create({ data: { eventId: e.id, title: "B", position: 2048 } });
+    expect(await clearTasks(e.id, [a.id, b.id])).toEqual({ ok: true, count: 2 });
+    expect(await prisma.task.count({ where: { eventId: e.id } })).toBe(0);
+  });
+  test("never reaches across events", async () => {
+    authenticate();
+    const e1 = await prisma.event.create({ data: { name: "One", startDate: new Date(), endDate: new Date() } });
+    const e2 = await prisma.event.create({ data: { name: "Two", startDate: new Date(), endDate: new Date() } });
+    const theirs = await prisma.task.create({ data: { eventId: e2.id, title: "Theirs", position: 1024 } });
+    expect(await clearTasks(e1.id, [theirs.id])).toEqual({ ok: true, count: 0 });
+    expect(await prisma.task.findUnique({ where: { id: theirs.id } })).not.toBeNull();
   });
 });
 
