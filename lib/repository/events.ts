@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import type { BoardTask } from "@/lib/domain/types";
+import { boardDisplayName } from "@/lib/domain/displayName";
 
 /** Most-recently-created event plus its tasks, mapped to BoardTask. */
 export async function getActiveEventBoard(): Promise<
@@ -14,7 +15,7 @@ export async function getActiveEventBoard(): Promise<
         include: {
           signups: {
             orderBy: { createdAt: "asc" },
-            select: { id: true, name: true, group: true },
+            select: { id: true, name: true, group: true, minor: true },
           },
         },
       },
@@ -30,7 +31,9 @@ export async function getActiveEventBoard(): Promise<
       startAt: t.startAt, endAt: t.endAt, dueBy: t.dueBy,
       pointOfContact: t.pointOfContact, location: t.location,
       definitionOfDone: t.definitionOfDone, position: t.position, status: t.status,
-      waiting: t.waiting, signups: t.signups,
+      waiting: t.waiting, signups: t.signups.map((s) => ({
+        id: s.id, name: boardDisplayName(s.name, s.minor), group: s.group,
+      })),
     })),
   };
 }
