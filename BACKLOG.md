@@ -6,21 +6,17 @@ Pull a card up when it's ready; design only the ones that need it.
 
 ---
 
-## In flight
-
-- **Undo banner for "Clear all"** — replace the fading bottom-corner toast with a
-  persistent inline banner that stays until you Undo or take the next action
-  (add/paste commits the delete). Code done on branch `clear-undo-banner`, tests
-  written, not yet committed.
-
 ## Next (quick, no design)
 
-- **Help "?" popovers** — hide the verbose grid-toolbar tip behind tap/click
-  popovers next to "Paste a list" and "Kind". Mobile-first → click, not hover.
-- **Fill-down** for Location / Group / etc. — extend the grid's existing
-  fill-down to more columns.
+- _(cleared — see Shipped)_
 
 ## Explore / design first
+
+- **Full undo/redo history** — v1 ships single-level undo (last delete/clear via
+  ⟲ button + Cmd/Ctrl+Z). A bigger card: multi-step history, **redo** (↷ /
+  Cmd+Shift+Z), and undo of **cell edits** and **row reorders**. Hard because the
+  grid autosaves to the server, so each step needs a compensating server action.
+  (The "Phase 4: session Ctrl+Z" item.)
 
 - **Need = range (2–3) + "TBD"** — `Task.neededCount` is a single int today.
   Ranges and an unknown state change the data model *and* the board's
@@ -56,3 +52,8 @@ Pull a card up when it's ready; design only the ones that need it.
   redesign (live in prod).
 - **Clear all tasks** (undoable) and **Minor privacy + optional email/phone**
   (pushed to prod 2026-06-16). See git history / memory for detail.
+- **Organizer-grid polish batch** (branch `clear-undo-banner`): persistent
+  Clear-all **undo banner**; **help "?" popovers** (Paste a list, Kind);
+  **fill-down fills only empty cells** below (non-destructive, ⤓ handle);
+  **undo v1** (⟲ toolbar + Cmd/Ctrl+Z for last delete/clear); fixed a StrictMode
+  duplicate-key bug in undo.
