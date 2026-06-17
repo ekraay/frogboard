@@ -137,18 +137,25 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     })().catch(() => {});
   }
 
-  /** Spreadsheet "fill down": copy this cell's value into every row below it in
-   *  the same column, then save those rows (they won't each get blurred). */
+  /** Spreadsheet "fill down": copy this cell's value into the EMPTY cells below
+   *  it in the same column — never overwriting one that already has a value, so
+   *  there's nothing to undo. Saves just the rows it actually fills. */
   function onFillDown(key: string, field: keyof RawCells) {
     const i = rows.findIndex((r) => r.key === key);
     if (i < 0) return;
     const value = rows[i].cells[field];
-    const updated = rows.map((r, j) =>
-      j > i ? { ...r, cells: { ...r.cells, [field]: value }, state: "dirty" as const, problem: null } : r,
-    );
+    if (value.trim() === "") return; // nothing to fill from
+    const filled: RowState[] = [];
+    const updated = rows.map((r, j) => {
+      if (j > i && r.cells[field].trim() === "") {
+        const next = { ...r, cells: { ...r.cells, [field]: value }, state: "dirty" as const, problem: null };
+        filled.push(next);
+        return next;
+      }
+      return r;
+    });
     setRows(updated);
-    const below = updated.slice(i + 1);
-    (async () => { for (const r of below) await persistRow(r); })().catch(() => {});
+    (async () => { for (const r of filled) await persistRow(r); })().catch(() => {});
   }
 
   /** Fire the deferred server delete for whatever's pending (row or clear). */

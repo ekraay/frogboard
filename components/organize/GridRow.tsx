@@ -52,14 +52,13 @@ export function GridRow({
     row.cells.pointOfContact.trim()
   );
 
-  function onKeyDown(e: React.KeyboardEvent, field: keyof RawCells) {
+  function onKeyDown(e: React.KeyboardEvent) {
     if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
       e.preventDefault();
       onMove(row.key, e.key === "ArrowUp" ? -1 : 1);
-    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d") {
-      e.preventDefault();
-      onFillDown(row.key, field);
     }
+    // Fill-down is the ⤓ handle now — no Ctrl/Cmd+D (it clashes with the
+    // browser's bookmark shortcut).
   }
 
   return (
@@ -114,7 +113,7 @@ export function GridRow({
                 aria-label={`${label}, row ${index + 1}`}
                 value={row.cells.kind}
                 onChange={(e) => onCell(row.key, "kind", e.target.value)}
-                onKeyDown={(e) => onKeyDown(e, field)}
+                onKeyDown={onKeyDown}
                 className={cellInput}
               >
                 <option value="shift">Shift</option>
@@ -133,7 +132,7 @@ export function GridRow({
                   placeholder={placeholder}
                   value={row.cells[field]}
                   onChange={(e) => onCell(row.key, field, e.target.value)}
-                  onKeyDown={(e) => onKeyDown(e, field)}
+                  onKeyDown={onKeyDown}
                   className={`${cellInput} pr-5 ${invalid(field) ? "border-b-2 border-amber" : ""}`}
                 />
                 {/* Spreadsheet fill-down: copy this value into every row below.
