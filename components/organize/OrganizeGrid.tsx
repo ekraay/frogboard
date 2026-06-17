@@ -52,6 +52,22 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     return () => { if (pending?.kind === "row") clearTimeout(pending.timer); };
   }, [pending]);
 
+  // Cmd/Ctrl+Z reverses the last delete/clear — but only when you're NOT editing
+  // a cell, where the browser's own text-undo should win. A ref keeps the latest
+  // onUndo so the listener can mount once.
+  const undoRef = useRef<() => void>(() => {});
+  useEffect(() => { undoRef.current = onUndo; });
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.key.toLowerCase() !== "z") return;
+      const tag = (document.activeElement as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      undoRef.current();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const update = (key: string, fn: (r: RowState) => RowState) =>
     setRows((rs) => rs.map((r) => (r.key === key ? fn(r) : r)));
 
@@ -337,6 +353,10 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
           className="rounded-lg border border-lily-line bg-white px-3 py-1.5 transition hover:border-reed">+ Add row</button>
         <button type="button" onClick={duplicateRow}
           className="rounded-lg border border-lily-line bg-white px-3 py-1.5 transition hover:border-reed">⧉ Duplicate last</button>
+        {pending && (
+          <button type="button" onClick={onUndo} aria-label="Undo last change" title="Undo last change (⌘Z)"
+            className="rounded-lg border border-reed/40 bg-reed/5 px-3 py-1.5 font-semibold text-reed-deep transition hover:bg-reed/15">⟲ Undo</button>
+        )}
         {rows.length > 0 && (
           <button type="button" onClick={onClearAll}
             className="ml-auto rounded-lg border border-lily-line bg-white px-3 py-1.5 text-ink-soft transition hover:border-lantern-deep hover:text-lantern-deep">🧹 Clear all</button>

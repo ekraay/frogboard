@@ -132,7 +132,7 @@ test("delete is deferred; undo cancels it and restores the row intact (signups i
   fireEvent.click(screen.getByRole("button", { name: /delete, row 1/i }));
   expect(screen.queryByLabelText("Title, row 1")).toBeNull();
   expect(deleteTaskAction).not.toHaveBeenCalled(); // deferred — nothing destroyed yet
-  fireEvent.click(screen.getByRole("button", { name: /undo/i }));
+  fireEvent.click(screen.getByRole("button", { name: /^undo$/i }));
   expect(screen.getByLabelText("Title, row 1")).toHaveValue("Games");
   expect(saveTask).not.toHaveBeenCalled(); // same task id — no re-create needed
   act(() => { vi.runOnlyPendingTimers(); });
@@ -330,4 +330,48 @@ test("undo after Clear all restores each row exactly once (StrictMode-safe, no d
   expect(screen.getByLabelText("Title, row 1")).toHaveValue("First");
   expect(screen.getByLabelText("Title, row 2")).toHaveValue("Second");
   confirmSpy.mockRestore();
+});
+
+test("a toolbar Undo control appears only when there's something to undo, and reverses it", async () => {
+  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[gridTask({ id: "t1", title: "First" })]} />);
+  expect(screen.queryByRole("button", { name: /undo last change/i })).toBeNull(); // nothing pending
+  await user.click(screen.getByRole("button", { name: /clear all/i }));
+  await user.click(screen.getByRole("button", { name: /undo last change/i }));
+  expect(screen.getByLabelText("Title, row 1")).toHaveValue("First");
+  confirmSpy.mockRestore();
+});
+
+test("Cmd+Z undoes the last action when focus is not in a cell", async () => {
+  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[
+    gridTask({ id: "t1", title: "First", position: 1024 }),
+    gridTask({ id: "t2", title: "Second", position: 2048 }),
+  ]} />);
+  await user.click(screen.getByRole("button", { name: /clear all/i }));
+  expect(screen.queryByLabelText("Title, row 1")).toBeNull();
+  (document.activeElement as HTMLElement | null)?.blur();
+  await user.keyboard("{Meta>}z{/Meta}");
+  expect(screen.getByLabelText("Title, row 1")).toHaveValue("First");
+  expect(screen.getByLabelText("Title, row 2")).toHaveValue("Second");
+  confirmSpy.mockRestore();
+});
+
+test("Cmd+Z while editing a cell is left to the browser (no grid undo)", async () => {
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[
+    gridTask({ id: "t1", title: "First", position: 1024 }),
+    gridTask({ id: "t2", title: "Second", position: 2048 }),
+  ]} />);
+  fireEvent.click(screen.getByRole("button", { name: /delete, row 1/i })); // pending undo exists
+  const cell = screen.getByLabelText("Title, row 1"); // "Second" is now row 1
+  cell.focus();
+  await user.keyboard("{Meta>}z{/Meta}");
+  // grid undo did NOT fire — still one row, the deleted "First" was not restored
+  // (jsdom inserts the literal "z" into the focused input; a real browser would
+  // run its own text-undo instead — either way our grid undo stayed out of it).
+  expect(screen.getAllByLabelText(/^Title, row/)).toHaveLength(1);
+  expect(screen.queryByDisplayValue(/^First$/)).toBeNull();
 });
