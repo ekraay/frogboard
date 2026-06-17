@@ -65,12 +65,15 @@ so design them together.
 
 ## In flight
 
-- **Event history viewer + soft identity** (branch `event-history`). Read-only
-  "who did what, when" view per event, built on the `AuditLog`. v1 = soft
-  identity: organizers enter a name at sign-in, stamped to audit (`actorName`);
-  `actorId` is reserved for real accounts (C). Revert is a later step. Schema +
-  actor stamping done; remaining: getEventHistory query, sign-in name capture,
-  the viewer page. Tracked in tasks #57-#59.
+(nothing right now)
+
+## Explore / design first (continued)
+
+- **Revert from history (step 2 of the history feature).** The viewer now shows
+  who changed what; the next step is a guarded "undo this change" per audit row.
+  Each action needs a compensating write (recreate a deleted task from its
+  snapshot, restore a prior edit, re-add a released signup). Shares the
+  full-undo/redo concerns above. Soft identity already records the actor.
 
 ## Explore later (epic)
 
@@ -111,6 +114,12 @@ so design them together.
 
 ## Shipped
 
+- **Event history viewer + soft identity** (branch `event-history`, built +
+  green, not yet merged). Read-only `/organize/[eventId]/history` shows who
+  changed what, when, newest first, built on the `AuditLog`. Organizers enter a
+  name at sign-in; it stamps `actorName` on every audit row (`actorId` reserved
+  for real accounts, C). Linked from the grid header. Revert is a separate card
+  above.
 - **Phase 1** public board; **Phase 2** organizer grid + "Matsuri at Dusk"
   redesign (live in prod).
 - **Clear all tasks** (undoable) and **Minor privacy + optional email/phone**
