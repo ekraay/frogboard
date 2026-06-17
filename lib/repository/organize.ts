@@ -80,6 +80,7 @@ export async function upsertTaskWithAudit(
   eventId: string,
   taskId: string | null,
   fields: ParsedTaskFields,
+  actorName: string | null = null,
 ): Promise<UpsertResult> {
   return prisma.$transaction(async (tx) => {
     if (taskId === null) {
@@ -90,7 +91,7 @@ export async function upsertTaskWithAudit(
       const task = await tx.task.create({ data: { eventId, position, ...fields } });
       await tx.auditLog.create({
         data: {
-          eventId, taskId: task.id, action: "create",
+          eventId, taskId: task.id, action: "create", actorName,
           details: JSON.parse(JSON.stringify({ after: { ...fields, position } })),
         },
       });
@@ -123,7 +124,7 @@ export async function upsertTaskWithAudit(
     await tx.task.update({ where: { id: taskId }, data: { ...fields } });
     await tx.auditLog.create({
       data: {
-        eventId, taskId, action: "edit",
+        eventId, taskId, action: "edit", actorName,
         details: JSON.parse(JSON.stringify({
           before: {
             title: before.title, kind: before.kind, category: before.category,
@@ -140,7 +141,7 @@ export async function upsertTaskWithAudit(
   });
 }
 
-export async function deleteTaskWithAudit(taskId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function deleteTaskWithAudit(taskId: string, actorName: string | null = null): Promise<{ ok: true } | { ok: false; error: string }> {
   return prisma.$transaction(async (tx) => {
     // Lock so a concurrent claim can't add a signup between our snapshot and
     // the cascade delete (it would vanish unrecorded). Post-lock claims see
@@ -154,7 +155,7 @@ export async function deleteTaskWithAudit(taskId: string): Promise<{ ok: true } 
     if (!task) return { ok: false as const, error: "That task is already gone." };
     await tx.auditLog.create({
       data: {
-        eventId: task.eventId, taskId, action: "delete",
+        eventId: task.eventId, taskId, action: "delete", actorName,
         details: JSON.parse(JSON.stringify({
           task: {
             title: task.title, kind: task.kind, category: task.category,
@@ -191,6 +192,7 @@ export async function deleteTasks(eventId: string, taskIds: string[]): Promise<n
 export async function renumberTasks(
   eventId: string,
   orderedIds: string[],
+  actorName: string | null = null,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   return prisma.$transaction(async (tx) => {
     const tasks = await tx.task.findMany({ where: { eventId }, select: { id: true, position: true } });
@@ -204,7 +206,7 @@ export async function renumberTasks(
       if (known.get(id) !== position) {
         await tx.task.update({ where: { id }, data: { position } });
         await tx.auditLog.create({
-          data: { eventId, taskId: id, action: "move", details: { from: known.get(id), to: position } },
+          data: { eventId, taskId: id, action: "move", actorName, details: { from: known.get(id), to: position } },
         });
       }
     }

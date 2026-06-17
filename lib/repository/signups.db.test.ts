@@ -84,3 +84,17 @@ describe("deleteSignupWithAudit", () => {
     expect(await prisma.signup.count({ where: { taskId } })).toBe(1);
   });
 });
+
+describe("audit actor (volunteer's own name)", () => {
+  test("claim and release stamp the volunteer's name as the actor", async () => {
+    const taskId = await makeTaskNeeding(2);
+    const created = await createSignupWithAudit(taskId, { name: "Kenji", group: "Scouts" });
+    if (!created.ok) throw new Error("setup");
+    const claim = await prisma.auditLog.findFirst({ where: { taskId, action: "claim" } });
+    expect(claim!.actorName).toBe("Kenji");
+
+    await deleteSignupWithAudit(created.signupId, created.claimToken);
+    const release = await prisma.auditLog.findFirst({ where: { taskId, action: "release" } });
+    expect(release!.actorName).toBe("Kenji");
+  });
+});

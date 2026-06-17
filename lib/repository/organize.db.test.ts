@@ -164,6 +164,34 @@ describe("deleteTasks", () => {
   });
 });
 
+describe("audit actor (soft identity)", () => {
+  test("create/edit/delete stamp the organizer's name on the audit row", async () => {
+    const e = await createEvent("A", new Date(), new Date());
+    const r = await upsertTaskWithAudit(e.id, null, fields({ title: "T" }), "Aya");
+    if (!r.ok) throw new Error("setup");
+    expect((await prisma.auditLog.findFirst({ where: { action: "create" } }))!.actorName).toBe("Aya");
+
+    await upsertTaskWithAudit(e.id, r.taskId, fields({ title: "T2" }), "Aya");
+    expect((await prisma.auditLog.findFirst({ where: { action: "edit" } }))!.actorName).toBe("Aya");
+
+    await deleteTaskWithAudit(r.taskId, "Kenji");
+    expect((await prisma.auditLog.findFirst({ where: { action: "delete" } }))!.actorName).toBe("Kenji");
+  });
+  test("reorder stamps the organizer's name on move rows", async () => {
+    const e = await createEvent("A", new Date(), new Date());
+    const a = await prisma.task.create({ data: { eventId: e.id, title: "A", position: 1024 } });
+    const b = await prisma.task.create({ data: { eventId: e.id, title: "B", position: 2048 } });
+    await renumberTasks(e.id, [b.id, a.id], "Aya");
+    expect((await prisma.auditLog.findFirst({ where: { action: "move" } }))!.actorName).toBe("Aya");
+  });
+  test("actor name is optional and defaults to null", async () => {
+    const e = await createEvent("A", new Date(), new Date());
+    const r = await upsertTaskWithAudit(e.id, null, fields({ title: "T" }));
+    if (!r.ok) throw new Error("setup");
+    expect((await prisma.auditLog.findFirst({ where: { action: "create" } }))!.actorName).toBeNull();
+  });
+});
+
 describe("renumberTasks", () => {
   test("applies the given order as 1024-spaced positions and logs moves", async () => {
     const e = await createEvent("A", new Date(), new Date());

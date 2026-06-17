@@ -63,8 +63,26 @@ so design them together.
     the org wants to move *away* from rigid shifts toward flexible, pick-up frogs
     that flow to where the need is — which lowers the priority of Need=range/TBD.
 
+## In flight
+
+- **Event history viewer + soft identity** (branch `event-history`). Read-only
+  "who did what, when" view per event, built on the `AuditLog`. v1 = soft
+  identity: organizers enter a name at sign-in, stamped to audit (`actorName`);
+  `actorId` is reserved for real accounts (C). Revert is a later step. Schema +
+  actor stamping done; remaining: getEventHistory query, sign-in name capture,
+  the viewer page. Tracked in tasks #57-#59.
+
 ## Explore later (epic)
 
+- **In-app feedback** — a lightweight way for volunteers and organizers to send
+  feedback from inside the app (a "Tell us what's confusing" link to a form or
+  mailto), so we capture reactions while testing instead of chasing replies.
+- **AI agents for organizers** — explore agents that draft a task list from a
+  plain description, suggest where help is needed, or write reminder messages.
+  Intent is still loose; define the first concrete job before building.
+- **Avatars** — show people's avatars on the board and in history once real
+  accounts exist (depends on the accounts/identity work; not possible with the
+  current no-account, name-only model).
 - **Generalized facet filters** — extend the `?group=` board filter to
   `?location=`, `?category=`, `?date=` and combinations (and faceted "chips" UI).
   Same mechanism as the group filter; build when more than one facet is wanted.

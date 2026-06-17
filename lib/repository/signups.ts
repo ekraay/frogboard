@@ -46,6 +46,7 @@ export async function createSignupWithAudit(
         eventId,
         taskId,
         action: "claim",
+        actorName: check.value.name,
         details: claimAuditDetails({
           signupId: signup.id, name: check.value.name, group: check.value.group,
         }),
@@ -74,6 +75,7 @@ export async function deleteSignupWithAudit(
         eventId: signup.task.eventId,
         taskId: signup.taskId,
         action: "release",
+        actorName: signup.name,
         details: releaseAuditDetails({
           signupId: signup.id, name: signup.name, group: signup.group,
           email: signup.email, phone: signup.phone, minor: signup.minor,

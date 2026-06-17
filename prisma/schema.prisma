@@ -98,6 +98,8 @@ model AuditLog {
   task      Task?       @relation(fields: [taskId], references: [id], onDelete: SetNull)
   action    AuditAction
   details   Json
+  actorName String?     // who did it, by display name (soft identity)
+  actorId   String?     // reserved for real organizer accounts (Phase C)
   createdAt DateTime    @default(now())
 
   @@index([eventId, createdAt])
