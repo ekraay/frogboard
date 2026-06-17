@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { AuditAction } from "@prisma/client";
 import { summarizeAuditEntry } from "@/lib/domain/history";
+import { HistoryTime } from "@/components/organize/HistoryTime";
 
 export interface HistoryEntryView {
   id: string;
@@ -15,10 +16,6 @@ interface Props {
   eventId: string;
   entries: HistoryEntryView[];
 }
-
-const when = new Intl.DateTimeFormat("en-US", {
-  month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
-});
 
 export function EventHistory({ eventName, eventId, entries }: Props) {
   return (
@@ -38,7 +35,7 @@ export function EventHistory({ eventName, eventId, entries }: Props) {
             <li key={e.id} className="flex items-baseline justify-between gap-4 rounded-2xl border border-lily-line bg-white px-4 py-3">
               <span className="font-medium text-ink">{summarizeAuditEntry(e)}</span>
               <span className="shrink-0 text-sm text-ink/60">
-                by {e.actorName ?? "an organizer"} · {when.format(e.createdAt)}
+                by {e.actorName ?? "an organizer"} · <HistoryTime iso={e.createdAt.toISOString()} />
               </span>
             </li>
           ))}
