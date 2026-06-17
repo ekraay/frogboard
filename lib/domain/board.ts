@@ -6,6 +6,20 @@ export function getSlotInfo(task: BoardTask): SlotInfo {
   return { filled, needed, isFull: filled >= needed };
 }
 
+/** Tasks asked of one group (case- and space-insensitive on `requestedGroup`).
+ *  A blank group is treated as "no filter" and returns everything. */
+export function filterTasksByGroup(tasks: BoardTask[], group: string): BoardTask[] {
+  const g = group.trim().toLowerCase();
+  if (g === "") return tasks;
+  return tasks.filter((t) => (t.requestedGroup ?? "").trim().toLowerCase() === g);
+}
+
+/** How many of these tasks are fully staffed, out of the total — the headline a
+ *  group organizer reports back ("Scouts — 7 of 9 covered"). */
+export function coverageFor(tasks: BoardTask[]): { covered: number; total: number } {
+  return { covered: tasks.filter((t) => getSlotInfo(t).isFull).length, total: tasks.length };
+}
+
 /**
  * ISO date (YYYY-MM-DD) for a date field stored as UTC midnight.
  * The `date` field represents a pure calendar day — no timezone conversion.

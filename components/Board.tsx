@@ -3,7 +3,13 @@ import { groupTasksByDay } from "@/lib/domain/board";
 import type { BoardTask } from "@/lib/domain/types";
 import { TaskCard } from "@/components/TaskCard";
 
-export function Board({ eventName, tasks }: { eventName: string; tasks: BoardTask[] }) {
+export function Board({
+  eventName, tasks, filter,
+}: {
+  eventName: string;
+  tasks: BoardTask[];
+  filter?: { group: string; covered: number; total: number };
+}) {
   const groups = groupTasksByDay(tasks);
   let cardIndex = 0; // running count for a board-wide staggered reveal
 
@@ -36,6 +42,23 @@ export function Board({ eventName, tasks }: { eventName: string; tasks: BoardTas
           </p>
         </details>
       </header>
+
+      {filter && (
+        <div className="mx-auto mb-8 max-w-sm rounded-2xl border border-amber/50 bg-amber/10 px-4 py-3 text-center">
+          <p className="text-sm font-bold text-lantern-deep">
+            {`Showing ${filter.group} tasks — ${filter.covered} of ${filter.total} covered`}
+          </p>
+          <Link href="/" className="mt-1 inline-block text-xs font-semibold text-pond underline-offset-4 hover:underline">
+            See the whole event →
+          </Link>
+        </div>
+      )}
+
+      {filter && tasks.length === 0 && (
+        <p className="mx-auto max-w-sm text-center text-sm text-ink-soft">
+          {`No ${filter.group} tasks yet — check back, or see the whole event above.`}
+        </p>
+      )}
 
       {groups.map((g) => (
         <section key={g.key} className="mb-10">

@@ -27,3 +27,25 @@ test("explains what a frog is", () => {
   expect(screen.getByText(/what's a frog/i)).toBeInTheDocument();
   expect(screen.getByText(/one-off thing that needs doing/i)).toBeInTheDocument();
 });
+
+test("a group filter shows a coverage header and a link back to the whole event", () => {
+  render(
+    <Board eventName="Ginza Bazaar" tasks={[task({ requestedGroup: "Scouts" })]}
+      filter={{ group: "Scouts", covered: 7, total: 9 }} />,
+  );
+  expect(screen.getByText(/showing scouts tasks/i)).toBeInTheDocument();
+  expect(screen.getByText(/7 of 9 covered/i)).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: /whole event/i })).toHaveAttribute("href", "/");
+});
+
+test("without a filter there is no coverage header", () => {
+  render(<Board eventName="Ginza Bazaar" tasks={[task({})]} />);
+  expect(screen.queryByText(/covered/i)).toBeNull();
+});
+
+test("a group filter with no matching tasks shows a friendly empty state", () => {
+  render(
+    <Board eventName="Ginza Bazaar" tasks={[]} filter={{ group: "Scouts", covered: 0, total: 0 }} />,
+  );
+  expect(screen.getByText(/no scouts tasks/i)).toBeInTheDocument();
+});

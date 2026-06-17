@@ -6,9 +6,19 @@ Pull a card up when it's ready; design only the ones that need it.
 
 ---
 
-## Next (quick, no design)
+## Next (active)
 
-- _(cleared — see Shipped)_
+- **Group-filtered shareable board link** (group-organizer's #1 job; testable
+  before the Bon Odori hand-off). A scoutmaster tags tasks with a **Group** in the
+  grid (`requestedGroup`, already exists), then shares a link showing **only that
+  group's tasks** so their people sign up; the organizer sees coverage and reports
+  back. Thin build, no login / rosters / email:
+  - Board reads **`?group=Scouts`** (query param, case-insensitive) → shows only
+    that group's tasks + a "see the whole event" escape link.
+  - **Coverage header**: "Scouts — 7 of 9 covered."
+  - Query-param (not a bespoke route) so it generalizes for free later to
+    `?location=`, `?category=`, `?date=`, and combinations. Pretty `/g/scouts`
+    alias is an optional later nicety.
 
 ## Explore / design first
 
@@ -22,12 +32,33 @@ Pull a card up when it's ready; design only the ones that need it.
   Ranges and an unknown state change the data model *and* the board's
   "X of N filled / full" + claim/full logic. (Absorbs the earlier "count = TBD".)
 - **Time = TBD** — explicit "time TBD" label on the board for tasks with no clock.
-- **Drag-handle reorder + multi-column sort** (date/time/category/group/location)
-  — replaces the up/down arrows. ⚠️ Reverses Phase 2's deliberate "no pointer
-  drag-and-drop" choice (made for mobile + a11y), so weigh that first.
+- **Kanban "flex to the need" board (Phase 3 — now the lead direction).** Replace
+  the flat list with Trello-style **cards** so the biggest gaps are obvious and
+  volunteers flow to them instead of camping on the comfortable task. Two lenses
+  on the same cards ("renderings of the same data"):
+  - **Volunteer "flex" lens** — columns by urgency/time (**Now / Next / Later**,
+    or by day/time block). Unclaimed/understaffed cards float to the top; urgent
+    ones get a **red decoration**; a **"Needed by"** badge can also auto-bucket
+    cards. This is the behavior-changing view.
+  - **Organizer tracking lens** — **To Do / WIP / Done** (existing
+    `TaskStatus = todo|in_progress|review|done`).
+  - **Drag/drop** to promote a card up / across columns (writes `position` /
+    status). ⚠️ Touch DnD is the hard part — Phase 2 deliberately avoided pointer
+    DnD for mobile/a11y; needs a tap-to-move fallback, not drag-only.
+  - Supersedes the old "drag-handle reorder + multi-column sort" card. Insight:
+    the org wants to move *away* from rigid shifts toward flexible, pick-up frogs
+    that flow to where the need is — which lowers the priority of Need=range/TBD.
 
 ## Explore later (epic)
 
+- **Generalized facet filters** — extend the `?group=` board filter to
+  `?location=`, `?category=`, `?date=` and combinations (and faceted "chips" UI).
+  Same mechanism as the group filter; build when more than one facet is wanted.
+- **Normalized Group entity + group-organizer role** — promote free-text
+  `requestedGroup` to a real Group (patrol / troop / YAO / church group) with a
+  controlled vocabulary, and a logged-in **group-organizer** with a special view
+  (their group's coverage, manage their roster). Accounts + permissions → part of
+  the roster/RSVP epic below. Free-text Group is enough until then.
 - **Group organizer view + rosters + RSVP + social proof.** Let a *group*
   organizer (Scouts, YAO, BWA…) see the events/tasks requested of their group,
   share a filtered link, and drive sign-ups from their own roster.

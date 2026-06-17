@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { getSlotInfo, groupTasksByDay } from "@/lib/domain/board";
+import { getSlotInfo, groupTasksByDay, filterTasksByGroup, coverageFor } from "@/lib/domain/board";
 import type { BoardTask } from "@/lib/domain/types";
 
 function task(overrides: Partial<BoardTask>): BoardTask {
@@ -63,5 +63,36 @@ describe("groupTasksByDay", () => {
       task({ id: "second", position: 2048, startAt: null }),
     ]);
     expect(group.tasks.map((t) => t.id)).toEqual(["first", "second", "third"]);
+  });
+});
+
+describe("filterTasksByGroup", () => {
+  test("keeps only tasks whose requestedGroup matches, case- and space-insensitively", () => {
+    const tasks = [
+      task({ id: "a", requestedGroup: "Scouts" }),
+      task({ id: "b", requestedGroup: "YAO" }),
+      task({ id: "c", requestedGroup: " scouts " }),
+      task({ id: "d", requestedGroup: null }),
+    ];
+    expect(filterTasksByGroup(tasks, "scouts").map((t) => t.id)).toEqual(["a", "c"]);
+  });
+  test("a blank filter returns everything (no filtering)", () => {
+    const tasks = [task({ id: "a", requestedGroup: "Scouts" }), task({ id: "b", requestedGroup: null })];
+    expect(filterTasksByGroup(tasks, "").map((t) => t.id)).toEqual(["a", "b"]);
+    expect(filterTasksByGroup(tasks, "   ").map((t) => t.id)).toEqual(["a", "b"]);
+  });
+});
+
+describe("coverageFor", () => {
+  test("counts the fully-staffed tasks out of the total", () => {
+    const tasks = [
+      task({ id: "a", neededCount: 1, signups: [{ id: "s1", name: "Ann", group: null }] }), // full
+      task({ id: "b", neededCount: 2, signups: [{ id: "s2", name: "Bo", group: null }] }),   // 1 of 2
+      task({ id: "c", neededCount: 1, signups: [] }),                                         // 0 of 1
+    ];
+    expect(coverageFor(tasks)).toEqual({ covered: 1, total: 3 });
+  });
+  test("an empty list is zero of zero", () => {
+    expect(coverageFor([])).toEqual({ covered: 0, total: 0 });
   });
 });
