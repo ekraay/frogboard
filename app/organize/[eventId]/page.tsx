@@ -22,9 +22,14 @@ export default async function OrganizeEventPage({
     <main className="mx-auto max-w-6xl px-4 pb-16 pt-8">
       <div className="mb-4 flex items-baseline justify-between">
         <h1 className="font-display text-2xl font-extrabold text-ink">🐸 {grid.name}</h1>
-        <Link href="/organize" className="text-sm font-medium text-pond underline-offset-2 hover:underline">
-          ← All events
-        </Link>
+        <div className="flex items-baseline gap-4">
+          <Link href={`/organize/${grid.id}/history`} className="text-sm font-medium text-pond underline-offset-2 hover:underline">
+            History
+          </Link>
+          <Link href="/organize" className="text-sm font-medium text-pond underline-offset-2 hover:underline">
+            ← All events
+          </Link>
+        </div>
       </div>
       <OrganizeGrid
         event={{ id: grid.id, name: grid.name, status: grid.status, startDate: grid.startDate, endDate: grid.endDate }}
