@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
@@ -309,4 +310,24 @@ test("fill-down fills only the empty cells below — it never overwrites", async
   const ids = saveTask.mock.calls.map((c) => (c[0] as { taskId: string }).taskId);
   expect(ids).toContain("c");
   expect(ids).not.toContain("b");
+});
+
+test("undo after Clear all restores each row exactly once (StrictMode-safe, no duplicate keys)", async () => {
+  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+  const user = userEvent.setup();
+  render(
+    <StrictMode>
+      <OrganizeGrid event={event} initialTasks={[
+        gridTask({ id: "t1", title: "First", position: 1024 }),
+        gridTask({ id: "t2", title: "Second", position: 2048 }),
+      ]} />
+    </StrictMode>,
+  );
+  await user.click(screen.getByRole("button", { name: /clear all/i }));
+  await user.click(screen.getByRole("button", { name: /^undo$/i }));
+  // exactly the two originals come back — not duplicated by a double-invoked updater
+  expect(screen.getAllByLabelText(/^Title, row/)).toHaveLength(2);
+  expect(screen.getByLabelText("Title, row 1")).toHaveValue("First");
+  expect(screen.getByLabelText("Title, row 2")).toHaveValue("Second");
+  confirmSpy.mockRestore();
 });

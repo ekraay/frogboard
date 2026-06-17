@@ -170,10 +170,10 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
 
   /** A prior pending delete commits now — one undo window at a time. */
   function flushPending() {
-    setPending((p) => {
-      if (p) { if (p.kind === "row") clearTimeout(p.timer); commitPending(p); }
-      return null;
-    });
+    if (!pending) return;
+    if (pending.kind === "row") clearTimeout(pending.timer);
+    commitPending(pending);
+    setPending(null);
   }
 
   function onDelete(key: string) {
@@ -213,21 +213,20 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
   }
 
   function onUndo() {
-    setPending((p) => {
-      if (!p) return null;
-      if (p.kind === "row") {
-        clearTimeout(p.timer);
-        setRows((rs) => {
-          const copy = [...rs];
-          copy.splice(Math.min(p.index, copy.length), 0, p.row);
-          return copy;
-        });
-      } else {
-        // Restore the cleared rows ahead of anything added during the window.
-        setRows((rs) => [...p.rows, ...rs]);
-      }
-      return null;
-    });
+    const p = pending;
+    if (!p) return;
+    if (p.kind === "row") {
+      clearTimeout(p.timer);
+      setRows((rs) => {
+        const copy = [...rs];
+        copy.splice(Math.min(p.index, copy.length), 0, p.row);
+        return copy;
+      });
+    } else {
+      // Restore the cleared rows ahead of anything added during the window.
+      setRows((rs) => [...p.rows, ...rs]);
+    }
+    setPending(null);
   }
 
   function onMove(key: string, delta: -1 | 1) {
