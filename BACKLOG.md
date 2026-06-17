@@ -6,19 +6,33 @@ Pull a card up when it's ready; design only the ones that need it.
 
 ---
 
-## Next (active)
+## Lead priority — the value drivers (next, needs design)
 
-- **Group-filtered shareable board link** (group-organizer's #1 job; testable
-  before the Bon Odori hand-off). A scoutmaster tags tasks with a **Group** in the
-  grid (`requestedGroup`, already exists), then shares a link showing **only that
-  group's tasks** so their people sign up; the organizer sees coverage and reports
-  back. Thin build, no login / rosters / email:
-  - Board reads **`?group=Scouts`** (query param, case-insensitive) → shows only
-    that group's tasks + a "see the whole event" escape link.
-  - **Coverage header**: "Scouts — 7 of 9 covered."
-  - Query-param (not a bespoke route) so it generalizes for free later to
-    `?location=`, `?category=`, `?date=`, and combinations. Pretty `/g/scouts`
-    alias is an optional later nicety.
+Strategic read (2026-06-16): we've already won the hard adoption feature
+(**no-account signup**, now with captured email) and most "refinements"
+(self-enforcing slot caps, edit-your-own via claim tokens, coordinator grid).
+The thing that turns this from "just a form" into a product the coordinator keeps
+using is the **reminder loop** — and the thing that beats the incumbents is
+**cross-event volunteer history**. Both ride the same email-as-identity plumbing,
+so design them together.
+
+- **1. Reminder loop (THE value driver).** Once a slot/frog is claimed, the app
+  automatically emails the volunteer reminders before the shift — the coordinator
+  never chases anyone. "Offloading the nagging is the real product."
+  - Already have: no-account signup, **captured email**, device-local claim
+    tokens, and the schedule data (`date` / `startAt` / `dueBy`).
+  - Needs (the work): email infra (**Resend**), a **scheduler** (cron/queue),
+    templates, unsubscribe + deliverability, and **minor safety** — remind the
+    **parent**, not the kid (we already hide minors' last names).
+  - Highest value AND highest effort; wants a real design pass.
+
+- **2. Cross-event volunteer history (the moat).** Identify a volunteer across
+  events (email-as-identity; `Signup.userId` is reserved for this) and answer
+  *"who has and hasn't helped this year?"* across Ginza Bazaar, Bon Odori, and
+  troop events. Incumbents (SignUpGenius) handle recurring/rotating needs and
+  cross-event history poorly — this fits BCSF's reality exactly. Shares the
+  email-as-identity plumbing with the reminder loop. Privacy: cross-event tracking
+  of people (esp. minors) needs care.
 
 ## Explore / design first
 
@@ -88,3 +102,8 @@ Pull a card up when it's ready; design only the ones that need it.
   **fill-down fills only empty cells** below (non-destructive, ⤓ handle);
   **undo v1** (⟲ toolbar + Cmd/Ctrl+Z for last delete/clear); fixed a StrictMode
   duplicate-key bug in undo.
+- **Group-filtered shareable board** (branch `group-filter`, built + green, not
+  yet merged): `/?group=Scouts` shows only that group's tasks + a coverage header
+  ("Showing Scouts tasks — 7 of 9 covered") + "see the whole event" link.
+  `filterTasksByGroup` / `coverageFor` in `lib/domain/board.ts`. Query-param so it
+  generalizes to other facets later (see Explore-later "Generalized facet filters").
