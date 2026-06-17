@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import {
-  passwordMatches, sessionToken, isValidSession, SESSION_COOKIE, SESSION_MAX_AGE,
+  passwordMatches, sessionToken, isValidSession,
+  SESSION_COOKIE, NAME_COOKIE, SESSION_MAX_AGE,
 } from "@/lib/security/session";
 import {
   createEvent, setEventStatus, deleteEvent,
@@ -23,19 +24,30 @@ async function requireOrganizer(): Promise<Ok | Err> {
   return { ok: true };
 }
 
+/** The signed-in organizer's display name, or null. Stamped onto audit rows. */
+async function organizerName(): Promise<string | null> {
+  const name = (await cookies()).get(NAME_COOKIE)?.value?.trim();
+  return name ? name : null;
+}
+
 export async function signIn(formData: FormData): Promise<Ok | Err> {
   const password = String(formData.get("password") ?? "");
   if (!passwordMatches(password)) return { ok: false, error: "That password doesn't match." };
   const jar = await cookies();
-  jar.set(SESSION_COOKIE, sessionToken(), {
-    httpOnly: true, sameSite: "lax", path: "/",
+  const cookieOpts = {
+    httpOnly: true, sameSite: "lax" as const, path: "/",
     maxAge: SESSION_MAX_AGE, secure: process.env.NODE_ENV === "production",
-  });
+  };
+  jar.set(SESSION_COOKIE, sessionToken(), cookieOpts);
+  const name = String(formData.get("name") ?? "").trim();
+  if (name) jar.set(NAME_COOKIE, name, cookieOpts);
   return { ok: true };
 }
 
 export async function signOut(): Promise<Ok> {
-  (await cookies()).delete(SESSION_COOKIE);
+  const jar = await cookies();
+  jar.delete(SESSION_COOKIE);
+  jar.delete(NAME_COOKIE);
   return { ok: true };
 }
 
@@ -106,7 +118,7 @@ export async function saveTask(input: SaveTaskInput): Promise<SaveTaskResult> {
   if (!ctx) return { ok: false, error: "That event no longer exists." };
   const parsed = parseRow(input.cells, ctx);
   if (!parsed.ok) return { ok: false, error: parsed.error, field: parsed.field };
-  const result = await upsertTaskWithAudit(input.eventId, input.taskId, parsed.value);
+  const result = await upsertTaskWithAudit(input.eventId, input.taskId, parsed.value, await organizerName());
   if (!result.ok) return { ok: false, error: result.error, field: result.field };
   revalidatePath("/");
   return { ok: true, taskId: result.taskId };
@@ -115,7 +127,7 @@ export async function saveTask(input: SaveTaskInput): Promise<SaveTaskResult> {
 export async function deleteTask(taskId: string): Promise<Ok | Err> {
   const gate = await requireOrganizer();
   if (!gate.ok) return gate;
-  const result = await deleteTaskWithAudit(taskId);
+  const result = await deleteTaskWithAudit(taskId, await organizerName());
   if (!result.ok) return result;
   revalidatePath("/");
   return { ok: true };
@@ -137,7 +149,7 @@ export async function clearTasks(
 export async function reorderTasks(eventId: string, orderedIds: string[]): Promise<Ok | Err> {
   const gate = await requireOrganizer();
   if (!gate.ok) return gate;
-  const result = await renumberTasks(eventId, orderedIds);
+  const result = await renumberTasks(eventId, orderedIds, await organizerName());
   if (!result.ok) return result;
   revalidatePath("/");
   return { ok: true };

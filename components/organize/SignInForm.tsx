@@ -22,6 +22,14 @@ export function SignInForm() {
     <form action={onSubmit} className="mx-auto mt-16 max-w-sm space-y-4 rounded-3xl border border-lily-line bg-white p-6 shadow-sm">
       <h1 className="font-display text-2xl font-bold text-ink">🐸 Organizers</h1>
       <label className="block text-sm font-bold text-ink">
+        Your name
+        <input
+          type="text" name="name" autoComplete="name"
+          className="mt-1 w-full rounded-xl border border-lily-line bg-white px-3 py-2.5 text-ink outline-none transition focus:border-reed focus:ring-2 focus:ring-reed/30"
+        />
+        <span className="mt-1 block text-xs font-normal text-ink/60">Shown in the event history next to your changes.</span>
+      </label>
+      <label className="block text-sm font-bold text-ink">
         Password
         <input
           type="password" name="password" autoComplete="current-password"

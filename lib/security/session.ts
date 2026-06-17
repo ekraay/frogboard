@@ -34,4 +34,7 @@ export function isValidSession(token: string | undefined): boolean {
 }
 
 export const SESSION_COOKIE = "frog_organizer";
+// Soft identity: the organizer's display name, stamped onto audit rows.
+// Not a security boundary; SESSION_COOKIE alone gates access.
+export const NAME_COOKIE = "frog_organizer_name";
 export const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days

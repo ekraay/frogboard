@@ -173,6 +173,50 @@ describe("clearTasks", () => {
   });
 });
 
+describe("organizer name (soft identity)", () => {
+  async function eventWithDates() {
+    return prisma.event.create({
+      data: { name: "E", startDate: new Date("2026-07-24"), endDate: new Date("2026-07-26") },
+    });
+  }
+  test("signIn captures the name and stamps it on a created task's audit", async () => {
+    expect(await signIn(fd({ password: "lily-pad-42", name: "Aya" }))).toEqual({ ok: true });
+    const e = await eventWithDates();
+    const s = await saveTask({ eventId: e.id, taskId: null, cells: { ...emptyCells(), title: "Games" } });
+    if (!s.ok) throw new Error("setup");
+    const audit = await prisma.auditLog.findFirst({ where: { taskId: s.taskId, action: "create" } });
+    expect(audit!.actorName).toBe("Aya");
+  });
+  test("delete and reorder also carry the organizer's name", async () => {
+    await signIn(fd({ password: "lily-pad-42", name: "Kenji" }));
+    const e = await eventWithDates();
+    const a = await saveTask({ eventId: e.id, taskId: null, cells: { ...emptyCells(), title: "A" } });
+    const b = await saveTask({ eventId: e.id, taskId: null, cells: { ...emptyCells(), title: "B" } });
+    if (!a.ok || !b.ok) throw new Error("setup");
+    await reorderTasks(e.id, [b.taskId, a.taskId]);
+    await deleteTask(a.taskId);
+    expect((await prisma.auditLog.findFirst({ where: { action: "move" } }))!.actorName).toBe("Kenji");
+    expect((await prisma.auditLog.findFirst({ where: { action: "delete" } }))!.actorName).toBe("Kenji");
+  });
+  test("a missing name leaves the actor null and still works", async () => {
+    await signIn(fd({ password: "lily-pad-42" }));
+    const e = await eventWithDates();
+    const s = await saveTask({ eventId: e.id, taskId: null, cells: { ...emptyCells(), title: "Games" } });
+    if (!s.ok) throw new Error("setup");
+    expect((await prisma.auditLog.findFirst({ where: { action: "create" } }))!.actorName).toBeNull();
+  });
+  test("signOut clears the captured name", async () => {
+    await signIn(fd({ password: "lily-pad-42", name: "Aya" }));
+    await signOut();
+    const e = await eventWithDates();
+    // re-auth without a name; the prior name must not linger
+    cookieJar.set(SESSION_COOKIE, sessionToken());
+    const s = await saveTask({ eventId: e.id, taskId: null, cells: { ...emptyCells(), title: "Games" } });
+    if (!s.ok) throw new Error("setup");
+    expect((await prisma.auditLog.findFirst({ where: { action: "create" } }))!.actorName).toBeNull();
+  });
+});
+
 describe("deleteTask + reorderTasks", () => {
   test("full lifecycle", async () => {
     authenticate();
