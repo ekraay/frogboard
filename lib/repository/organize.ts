@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import type { Event, EventStatus } from "@prisma/client";
+import type { Event, EventStatus, AuditAction, Prisma } from "@prisma/client";
 import type { ParsedTaskFields } from "@/lib/domain/gridRow";
 
 export async function createEvent(name: string, startDate: Date, endDate: Date): Promise<Event> {
@@ -187,6 +187,25 @@ export async function deleteTasks(eventId: string, taskIds: string[]): Promise<n
   if (taskIds.length === 0) return 0;
   const result = await prisma.task.deleteMany({ where: { eventId, id: { in: taskIds } } });
   return result.count;
+}
+
+export interface HistoryEntry {
+  id: string;
+  action: AuditAction;
+  actorName: string | null;
+  details: Prisma.JsonValue;
+  createdAt: Date;
+}
+
+/** Audit trail for one event, newest first. Rows survive their task's deletion. */
+export async function getEventHistory(eventId: string): Promise<HistoryEntry[]> {
+  const rows = await prisma.auditLog.findMany({
+    where: { eventId },
+    // id tiebreak keeps order deterministic for same-instant rows
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: { id: true, action: true, actorName: true, details: true, createdAt: true },
+  });
+  return rows;
 }
 
 export async function renumberTasks(

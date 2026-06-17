@@ -5,6 +5,7 @@ import { resetDb } from "@/test/db";
 import {
   createEvent, listEvents, setEventStatus, deleteEvent, getEventGrid,
   upsertTaskWithAudit, deleteTaskWithAudit, deleteTasks, renumberTasks,
+  getEventHistory,
 } from "@/lib/repository/organize";
 import type { ParsedTaskFields } from "@/lib/domain/gridRow";
 
@@ -189,6 +190,35 @@ describe("audit actor (soft identity)", () => {
     const r = await upsertTaskWithAudit(e.id, null, fields({ title: "T" }));
     if (!r.ok) throw new Error("setup");
     expect((await prisma.auditLog.findFirst({ where: { action: "create" } }))!.actorName).toBeNull();
+  });
+});
+
+describe("getEventHistory", () => {
+  test("returns this event's audit rows newest first with who/what/when/details", async () => {
+    const e = await createEvent("A", new Date(), new Date());
+    const r = await upsertTaskWithAudit(e.id, null, fields({ title: "T" }), "Aya");
+    if (!r.ok) throw new Error("setup");
+    await deleteTaskWithAudit(r.taskId, "Kenji");
+
+    const history = await getEventHistory(e.id);
+    expect(history.map((h) => h.action)).toEqual(["delete", "create"]);
+    const [del, create] = history;
+    expect(del.actorName).toBe("Kenji");
+    expect(create.actorName).toBe("Aya");
+    expect(del.createdAt.getTime()).toBeGreaterThanOrEqual(create.createdAt.getTime());
+    expect((create.details as { after: { title: string } }).after.title).toBe("T");
+  });
+  test("scopes to one event and survives the task's deletion", async () => {
+    const e1 = await createEvent("One", new Date(), new Date());
+    const e2 = await createEvent("Two", new Date(), new Date());
+    const r = await upsertTaskWithAudit(e1.id, null, fields({ title: "Mine" }), "Aya");
+    if (!r.ok) throw new Error("setup");
+    await upsertTaskWithAudit(e2.id, null, fields({ title: "Theirs" }), "Bo");
+    await deleteTaskWithAudit(r.taskId, "Aya");
+
+    const history = await getEventHistory(e1.id);
+    expect(history.map((h) => h.action).sort()).toEqual(["create", "delete"]);
+    expect(history.every((h) => h.actorName === "Aya")).toBe(true);
   });
 });
 
