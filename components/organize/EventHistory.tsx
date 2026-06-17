@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { AuditAction } from "@prisma/client";
-import { summarizeAuditEntry } from "@/lib/domain/history";
+import { summarizeAuditEntry, isRevertible } from "@/lib/domain/history";
 import { HistoryTime } from "@/components/organize/HistoryTime";
+import { RevertButton } from "@/components/organize/RevertButton";
 
 export interface HistoryEntryView {
   id: string;
@@ -34,8 +35,9 @@ export function EventHistory({ eventName, eventId, entries }: Props) {
           {entries.map((e) => (
             <li key={e.id} className="flex items-baseline justify-between gap-4 rounded-2xl border border-lily-line bg-white px-4 py-3">
               <span className="font-medium text-ink">{summarizeAuditEntry(e)}</span>
-              <span className="shrink-0 text-sm text-ink/60">
-                by {e.actorName ?? "an organizer"} · <HistoryTime iso={e.createdAt.toISOString()} />
+              <span className="flex shrink-0 items-baseline gap-3 text-sm text-ink/60">
+                <span>by {e.actorName ?? "an organizer"} · <HistoryTime iso={e.createdAt.toISOString()} /></span>
+                {isRevertible(e.action) && <RevertButton auditId={e.id} label={summarizeAuditEntry(e)} />}
               </span>
             </li>
           ))}

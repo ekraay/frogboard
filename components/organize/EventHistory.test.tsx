@@ -5,6 +5,8 @@ vi.mock("next/link", () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) =>
     <a href={href}>{children}</a>,
 }));
+vi.mock("@/app/actions/organize", () => ({ revertChange: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 import { EventHistory } from "@/components/organize/EventHistory";
 
@@ -23,6 +25,15 @@ test("lists each change with what happened and who did it", () => {
   expect(screen.getByText(/Aya/)).toBeInTheDocument();
   expect(screen.getByText("Deleted: Old")).toBeInTheDocument();
   expect(screen.getByText(/Kenji/)).toBeInTheDocument();
+});
+
+test("offers Revert on delete and edit rows, but not on a sign-up", () => {
+  render(<EventHistory eventName="Ginza" eventId="e1" entries={[
+    entry({ id: "1", action: "delete", details: { task: { title: "Gone" } } }),
+    entry({ id: "2", action: "edit", details: { after: { title: "Tweaked" } } }),
+    entry({ id: "3", action: "claim", actorName: "Kenji", details: { summary: "Kenji claimed a slot" } }),
+  ]} />);
+  expect(screen.getAllByRole("button", { name: /revert/i })).toHaveLength(2);
 });
 
 test("credits an unnamed actor as an organizer", () => {

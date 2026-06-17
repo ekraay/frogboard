@@ -5,7 +5,7 @@ import { resetDb } from "@/test/db";
 import {
   createEvent, listEvents, setEventStatus, deleteEvent, getEventGrid,
   upsertTaskWithAudit, deleteTaskWithAudit, deleteTasks, renumberTasks,
-  getEventHistory,
+  getEventHistory, revertAuditEntry,
 } from "@/lib/repository/organize";
 import type { ParsedTaskFields } from "@/lib/domain/gridRow";
 
@@ -119,6 +119,16 @@ describe("deleteTaskWithAudit", () => {
     expect(details.task.title).toBe("Doomed");
     expect(details.signups.map((s) => s.name)).toEqual(["Kenji"]);
   });
+  test("snapshots each signup's claim token so revert can restore ownership", async () => {
+    const e = await createEvent("A", new Date(), new Date());
+    const r = await upsertTaskWithAudit(e.id, null, fields({ title: "Doomed" }));
+    if (!r.ok) throw new Error("setup");
+    await prisma.signup.create({ data: { taskId: r.taskId, name: "Kenji", claimToken: "tok-123" } });
+    await deleteTaskWithAudit(r.taskId);
+    const log = await prisma.auditLog.findFirst({ where: { action: "delete" } });
+    const details = log!.details as { signups: { name: string; claimToken: string }[] };
+    expect(details.signups[0]).toMatchObject({ name: "Kenji", claimToken: "tok-123" });
+  });
   test("the delete audit row outlives the task (SetNull, not Cascade)", async () => {
     const e = await createEvent("A", new Date(), new Date());
     const r = await upsertTaskWithAudit(e.id, null, fields({ title: "Doomed" }));
@@ -219,6 +229,63 @@ describe("getEventHistory", () => {
     const history = await getEventHistory(e1.id);
     expect(history.map((h) => h.action).sort()).toEqual(["create", "delete"]);
     expect(history.every((h) => h.actorName === "Aya")).toBe(true);
+  });
+});
+
+describe("revertAuditEntry", () => {
+  test("reverting a delete recreates the task and its signups with their tokens", async () => {
+    const e = await createEvent("A", new Date(), new Date());
+    const r = await upsertTaskWithAudit(e.id, null, fields({ title: "Doomed", neededCount: 3 }), "Bo");
+    if (!r.ok) throw new Error("setup");
+    await prisma.signup.create({ data: { taskId: r.taskId, name: "Kenji", group: "Scouts", claimToken: "tok-1" } });
+    await deleteTaskWithAudit(r.taskId, "Bo");
+    const delLog = (await prisma.auditLog.findFirst({ where: { action: "delete" } }))!;
+
+    const rev = await revertAuditEntry(delLog.id, "Aya");
+    expect(rev.ok).toBe(true);
+    if (!rev.ok) return;
+    const task = await prisma.task.findUnique({ where: { id: rev.taskId }, include: { signups: true } });
+    expect(task!.title).toBe("Doomed");
+    expect(task!.neededCount).toBe(3);
+    expect(task!.signups[0]).toMatchObject({ name: "Kenji", group: "Scouts", claimToken: "tok-1" });
+    // the revert is itself recorded, as a create, by whoever did it
+    const created = await prisma.auditLog.findFirst({ where: { taskId: rev.taskId, action: "create" } });
+    expect(created!.actorName).toBe("Aya");
+  });
+  test("reverting an edit restores the prior field values and logs the revert", async () => {
+    const e = await createEvent("A", new Date(), new Date());
+    const r = await upsertTaskWithAudit(e.id, null, fields({ title: "Original", location: "Tent" }), "Bo");
+    if (!r.ok) throw new Error("setup");
+    await upsertTaskWithAudit(e.id, r.taskId, fields({ title: "Changed", location: "Stage" }), "Bo");
+    const editLog = (await prisma.auditLog.findFirst({ where: { action: "edit" } }))!;
+
+    const rev = await revertAuditEntry(editLog.id, "Aya");
+    expect(rev).toEqual({ ok: true, taskId: r.taskId });
+    const task = await prisma.task.findUnique({ where: { id: r.taskId } });
+    expect(task!.title).toBe("Original");
+    expect(task!.location).toBe("Tent");
+    expect(await prisma.auditLog.count({ where: { taskId: r.taskId, action: "edit" } })).toBe(2);
+  });
+  test("refuses to revert a reorder (not supported yet)", async () => {
+    const e = await createEvent("A", new Date(), new Date());
+    const a = await prisma.task.create({ data: { eventId: e.id, title: "A", position: 1024 } });
+    const b = await prisma.task.create({ data: { eventId: e.id, title: "B", position: 2048 } });
+    await renumberTasks(e.id, [b.id, a.id], "Bo");
+    const moveLog = (await prisma.auditLog.findFirst({ where: { action: "move" } }))!;
+    expect(await revertAuditEntry(moveLog.id, "Aya"))
+      .toEqual({ ok: false, error: "That kind of change can't be reverted yet." });
+  });
+  test("reverting an edit whose task was later deleted fails cleanly", async () => {
+    const e = await createEvent("A", new Date(), new Date());
+    const r = await upsertTaskWithAudit(e.id, null, fields({ title: "X" }), "Bo");
+    if (!r.ok) throw new Error("setup");
+    await upsertTaskWithAudit(e.id, r.taskId, fields({ title: "Y" }), "Bo");
+    const editLog = (await prisma.auditLog.findFirst({ where: { action: "edit" } }))!;
+    await deleteTaskWithAudit(r.taskId, "Bo");
+    expect(await revertAuditEntry(editLog.id, "Aya")).toEqual({ ok: false, error: "That task is gone." });
+  });
+  test("a missing audit id reports failure", async () => {
+    expect(await revertAuditEntry("nope", "Aya")).toEqual({ ok: false, error: "That change is no longer here." });
   });
 });
 

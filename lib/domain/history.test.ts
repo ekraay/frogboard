@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { summarizeAuditEntry } from "@/lib/domain/history";
+import { summarizeAuditEntry, isRevertible } from "@/lib/domain/history";
 
 describe("summarizeAuditEntry", () => {
   test("names the task for create, edit, and delete", () => {
@@ -23,5 +23,17 @@ describe("summarizeAuditEntry", () => {
   test("falls back gracefully when details lack a title", () => {
     expect(summarizeAuditEntry({ action: "create", details: {} })).toBe("Added a task");
     expect(summarizeAuditEntry({ action: "claim", details: {} })).toBe("Signed up");
+  });
+});
+
+describe("isRevertible", () => {
+  test("delete and edit can be reverted", () => {
+    expect(isRevertible("delete")).toBe(true);
+    expect(isRevertible("edit")).toBe(true);
+  });
+  test("other actions cannot (yet)", () => {
+    for (const a of ["create", "move", "claim", "release", "flag"] as const) {
+      expect(isRevertible(a)).toBe(false);
+    }
   });
 });

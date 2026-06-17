@@ -16,7 +16,7 @@ import { resetDb } from "@/test/db";
 import { sessionToken, SESSION_COOKIE } from "@/lib/security/session";
 import {
   signIn, signOut, createEventAction, setEventStatusAction, deleteEventAction,
-  saveTask, deleteTask, clearTasks, reorderTasks,
+  saveTask, deleteTask, clearTasks, reorderTasks, revertChange,
 } from "@/app/actions/organize";
 import { emptyCells } from "@/lib/domain/gridRow";
 
@@ -214,6 +214,33 @@ describe("organizer name (soft identity)", () => {
     const s = await saveTask({ eventId: e.id, taskId: null, cells: { ...emptyCells(), title: "Games" } });
     if (!s.ok) throw new Error("setup");
     expect((await prisma.auditLog.findFirst({ where: { action: "create" } }))!.actorName).toBeNull();
+  });
+});
+
+describe("revertChange", () => {
+  test("refuses without a session", async () => {
+    expect(await revertChange("whatever")).toEqual({ ok: false, error: "Please sign in." });
+  });
+  test("brings back a deleted task when signed in", async () => {
+    await signIn(fd({ password: "lily-pad-42", name: "Aya" }));
+    const e = await prisma.event.create({
+      data: { name: "E", startDate: new Date("2026-07-24"), endDate: new Date("2026-07-26") },
+    });
+    const s = await saveTask({ eventId: e.id, taskId: null, cells: { ...emptyCells(), title: "Games" } });
+    if (!s.ok) throw new Error("setup");
+    await deleteTask(s.taskId);
+    expect(await prisma.task.count({ where: { eventId: e.id } })).toBe(0);
+    const delLog = (await prisma.auditLog.findFirst({ where: { action: "delete" } }))!;
+
+    expect(await revertChange(delLog.id)).toEqual({ ok: true });
+    const tasks = await prisma.task.findMany({ where: { eventId: e.id } });
+    expect(tasks.map((t) => t.title)).toEqual(["Games"]);
+    // original create plus the revert's create
+    expect(await prisma.auditLog.count({ where: { action: "create" } })).toBe(2);
+  });
+  test("reports a vanished audit row", async () => {
+    await signIn(fd({ password: "lily-pad-42", name: "Aya" }));
+    expect(await revertChange("nope")).toEqual({ ok: false, error: "That change is no longer here." });
   });
 });
 

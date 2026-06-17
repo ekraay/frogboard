@@ -6,6 +6,11 @@ export interface AuditEntryView {
   details: unknown;
 }
 
+/** Which logged actions the history view can undo. Delete and edit, for now. */
+export function isRevertible(action: AuditAction): boolean {
+  return action === "delete" || action === "edit";
+}
+
 type Details = Record<string, unknown>;
 
 function titleOf(d: Details): string | null {

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
-import type { Event, EventStatus, AuditAction, Prisma } from "@prisma/client";
+import type { Event, EventStatus, AuditAction, TaskKind, Prisma } from "@prisma/client";
 import type { ParsedTaskFields } from "@/lib/domain/gridRow";
+import { newClaimToken } from "@/lib/security/tokens";
 
 export async function createEvent(name: string, startDate: Date, endDate: Date): Promise<Event> {
   return prisma.event.create({ data: { name, startDate, endDate } });
@@ -167,6 +168,8 @@ export async function deleteTaskWithAudit(taskId: string, actorName: string | nu
           },
           signups: task.signups.map((s) => ({
             name: s.name, email: s.email, phone: s.phone, group: s.group, minor: s.minor,
+            // captured so a revert restores the volunteer's self-edit ownership
+            claimToken: s.claimToken,
           })),
         })),
       },
@@ -206,6 +209,94 @@ export async function getEventHistory(eventId: string): Promise<HistoryEntry[]> 
     select: { id: true, action: true, actorName: true, details: true, createdAt: true },
   });
   return rows;
+}
+
+// Audit snapshots survive JSON, so dates arrive as ISO strings. Prisma accepts
+// ISO strings for DateTime fields, so we feed them straight back.
+interface TaskSnapshot {
+  title: string; kind: TaskKind; category: string | null; requestedGroup: string | null;
+  neededCount: number; date: string | null; startAt: string | null; endAt: string | null;
+  dueBy: string | null; location: string | null; description: string | null;
+  definitionOfDone: string | null; pointOfContact: string | null;
+}
+interface SignupSnapshot {
+  name: string; email: string | null; phone: string | null;
+  group: string | null; minor: boolean | null; claimToken?: string;
+}
+
+/** The editable scalar fields, lifted from a snapshot. Position is reassigned, never restored. */
+function taskScalarsFrom(s: TaskSnapshot) {
+  return {
+    title: s.title, kind: s.kind, category: s.category, requestedGroup: s.requestedGroup,
+    neededCount: s.neededCount, date: s.date, startAt: s.startAt, endAt: s.endAt, dueBy: s.dueBy,
+    location: s.location, description: s.description,
+    definitionOfDone: s.definitionOfDone, pointOfContact: s.pointOfContact,
+  };
+}
+
+/**
+ * Undo one audit entry, recording the undo as a fresh audit row (history stays
+ * append-only). Reverts delete (recreate the task and its signups, tokens and
+ * all) and edit (restore the prior field values). Other actions aren't revertible yet.
+ */
+export async function revertAuditEntry(
+  auditId: string,
+  actorName: string | null = null,
+): Promise<{ ok: true; taskId: string } | { ok: false; error: string }> {
+  return prisma.$transaction(async (tx) => {
+    const entry = await tx.auditLog.findUnique({ where: { id: auditId } });
+    if (!entry) return { ok: false as const, error: "That change is no longer here." };
+
+    if (entry.action === "delete") {
+      const d = entry.details as unknown as { task: TaskSnapshot; signups: SignupSnapshot[] };
+      const last = await tx.task.aggregate({ where: { eventId: entry.eventId }, _max: { position: true } });
+      const position = (last._max.position ?? 0) + POSITION_GAP;
+      const scalars = taskScalarsFrom(d.task);
+      const task = await tx.task.create({ data: { eventId: entry.eventId, position, ...scalars } });
+      if (Array.isArray(d.signups) && d.signups.length > 0) {
+        await tx.signup.createMany({
+          data: d.signups.map((s) => ({
+            taskId: task.id, name: s.name, email: s.email, phone: s.phone,
+            group: s.group, minor: s.minor, claimToken: s.claimToken ?? newClaimToken(),
+          })),
+        });
+      }
+      await tx.auditLog.create({
+        data: {
+          eventId: entry.eventId, taskId: task.id, action: "create", actorName,
+          details: JSON.parse(JSON.stringify({ after: { ...scalars, position }, revertedFrom: auditId })),
+        },
+      });
+      return { ok: true as const, taskId: task.id };
+    }
+
+    if (entry.action === "edit") {
+      if (!entry.taskId) return { ok: false as const, error: "That task is gone." };
+      const current = await tx.task.findUnique({ where: { id: entry.taskId } });
+      if (!current) return { ok: false as const, error: "That task is gone." };
+      const d = entry.details as unknown as { before: TaskSnapshot };
+      const scalars = taskScalarsFrom(d.before);
+      await tx.task.update({ where: { id: entry.taskId }, data: { ...scalars } });
+      await tx.auditLog.create({
+        data: {
+          eventId: entry.eventId, taskId: entry.taskId, action: "edit", actorName,
+          details: JSON.parse(JSON.stringify({
+            before: {
+              title: current.title, kind: current.kind, category: current.category,
+              requestedGroup: current.requestedGroup, neededCount: current.neededCount,
+              date: current.date, startAt: current.startAt, endAt: current.endAt, dueBy: current.dueBy,
+              location: current.location, description: current.description,
+              definitionOfDone: current.definitionOfDone, pointOfContact: current.pointOfContact,
+            },
+            after: scalars, revertedFrom: auditId,
+          })),
+        },
+      });
+      return { ok: true as const, taskId: entry.taskId };
+    }
+
+    return { ok: false as const, error: "That kind of change can't be reverted yet." };
+  });
 }
 
 export async function renumberTasks(

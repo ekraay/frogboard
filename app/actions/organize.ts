@@ -8,7 +8,7 @@ import {
 } from "@/lib/security/session";
 import {
   createEvent, setEventStatus, deleteEvent,
-  upsertTaskWithAudit, deleteTaskWithAudit, deleteTasks, renumberTasks,
+  upsertTaskWithAudit, deleteTaskWithAudit, deleteTasks, renumberTasks, revertAuditEntry,
 } from "@/lib/repository/organize";
 import { prisma } from "@/lib/db";
 import { parseRow, type RawCells } from "@/lib/domain/gridRow";
@@ -144,6 +144,16 @@ export async function clearTasks(
   const count = await deleteTasks(eventId, taskIds);
   revalidatePath("/");
   return { ok: true, count };
+}
+
+/** Undo one logged change from the history view. Records the undo, stamped to the organizer. */
+export async function revertChange(auditId: string): Promise<Ok | Err> {
+  const gate = await requireOrganizer();
+  if (!gate.ok) return gate;
+  const result = await revertAuditEntry(auditId, await organizerName());
+  if (!result.ok) return { ok: false, error: result.error };
+  revalidatePath("/");
+  return { ok: true };
 }
 
 export async function reorderTasks(eventId: string, orderedIds: string[]): Promise<Ok | Err> {
