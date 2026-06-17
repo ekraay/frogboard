@@ -290,3 +290,22 @@ test("explanations are tucked behind ? popovers, not shown as a wall of text", a
   await user.click(screen.getByRole("button", { name: /shift vs frog/i }));
   expect(screen.getByText(/one-off need/i)).toBeInTheDocument();
 });
+
+test("fill-down copies a cell's value to every row below it and saves them", async () => {
+  saveTask.mockResolvedValue({ ok: true, taskId: "t-x" });
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[
+    gridTask({ id: "a", title: "Booth A", location: "Gym" }),
+    gridTask({ id: "b", title: "Booth B", location: null }),
+    gridTask({ id: "c", title: "Booth C", location: null }),
+  ]} />);
+  await user.click(screen.getByLabelText("Location, row 1"));
+  await user.click(screen.getByRole("button", { name: /fill location down.*row 1/i }));
+  expect(screen.getByLabelText("Location, row 1")).toHaveValue("Gym"); // unchanged
+  expect(screen.getByLabelText("Location, row 2")).toHaveValue("Gym");
+  expect(screen.getByLabelText("Location, row 3")).toHaveValue("Gym");
+  // the rows below were persisted with the filled value
+  await screen.findByText(/saved/i);
+  const ids = saveTask.mock.calls.map((c) => (c[0] as { taskId: string }).taskId);
+  expect(ids).toEqual(expect.arrayContaining(["b", "c"]));
+});

@@ -137,15 +137,18 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     })().catch(() => {});
   }
 
+  /** Spreadsheet "fill down": copy this cell's value into every row below it in
+   *  the same column, then save those rows (they won't each get blurred). */
   function onFillDown(key: string, field: keyof RawCells) {
-    setRows((rs) => {
-      const i = rs.findIndex((r) => r.key === key);
-      if (i < 1) return rs;
-      const above = rs[i - 1].cells[field];
-      return rs.map((r, j) =>
-        j === i ? { ...r, cells: { ...r.cells, [field]: above }, state: "dirty", problem: null } : r,
-      );
-    });
+    const i = rows.findIndex((r) => r.key === key);
+    if (i < 0) return;
+    const value = rows[i].cells[field];
+    const updated = rows.map((r, j) =>
+      j > i ? { ...r, cells: { ...r.cells, [field]: value }, state: "dirty" as const, problem: null } : r,
+    );
+    setRows(updated);
+    const below = updated.slice(i + 1);
+    (async () => { for (const r of below) await persistRow(r); })().catch(() => {});
   }
 
   /** Fire the deferred server delete for whatever's pending (row or clear). */

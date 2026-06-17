@@ -123,18 +123,31 @@ export function GridRow({
             </td>
           ) : (
             <td key={field} className={width}>
-              <input
-                data-rowkey={row.key}
-                data-field={field}
-                aria-label={`${label}, row ${index + 1}`}
-                aria-invalid={invalid(field) || undefined}
-                aria-describedby={invalid(field) ? `row-problem-${row.key}` : undefined}
-                placeholder={placeholder}
-                value={row.cells[field]}
-                onChange={(e) => onCell(row.key, field, e.target.value)}
-                onKeyDown={(e) => onKeyDown(e, field)}
-                className={`${cellInput} ${invalid(field) ? "border-b-2 border-amber" : ""}`}
-              />
+              <div className="group relative">
+                <input
+                  data-rowkey={row.key}
+                  data-field={field}
+                  aria-label={`${label}, row ${index + 1}`}
+                  aria-invalid={invalid(field) || undefined}
+                  aria-describedby={invalid(field) ? `row-problem-${row.key}` : undefined}
+                  placeholder={placeholder}
+                  value={row.cells[field]}
+                  onChange={(e) => onCell(row.key, field, e.target.value)}
+                  onKeyDown={(e) => onKeyDown(e, field)}
+                  className={`${cellInput} pr-5 ${invalid(field) ? "border-b-2 border-amber" : ""}`}
+                />
+                {/* Spreadsheet fill-down: copy this value into every row below.
+                    Revealed on hover/focus; Ctrl/Cmd+D does the same from the keyboard. */}
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  aria-label={`Fill ${label} down to the rows below, row ${index + 1}`}
+                  title={`Fill ${label} down`}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => onFillDown(row.key, field)}
+                  className="absolute right-0.5 top-1/2 hidden -translate-y-1/2 rounded px-1 text-xs leading-none text-ink-soft transition hover:text-reed-deep group-hover:block group-focus-within:block"
+                >⤓</button>
+              </div>
             </td>
           ),
         )}
