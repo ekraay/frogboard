@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Frog Board — Reminder Loop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@500;600;700;800&family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --font-display: "Shippori Mincho B1", Georgia, serif;
+    --font-sans: "Zen Maru Gothic", ui-sans-serif, system-ui, sans-serif;
+    --washi: #faf3e3;
+    --washi-deep: #f1e4c8;
+    --ink: #15302b;
+    --ink-soft: #46685f;
+    --pond: #0c7a70;
+    --pond-deep: #0a4a45;
+    --lily: #ebfaf2;
+    --lily-line: #b6e3cf;
+    --reed: #0e5e36;
+    --reed-deep: #083d22;
+    --lantern: #e25325;
+    --lantern-deep: #b23a16;
+    --amber: #f0a429;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    background-color: #07221f;
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E"),
+      repeating-radial-gradient(circle at 50% 120%, transparent 0 60px, rgba(12,122,112,0.10) 60px 63px),
+      radial-gradient(140% 90% at 50% 118%, rgba(12,122,112,0.45), transparent 60%),
+      radial-gradient(120% 80% at 50% -8%, rgba(240,164,41,0.30), transparent 55%);
+    background-attachment: fixed;
+    background-blend-mode: soft-light, normal, normal, normal;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: clamp(28px, 5vw, 68px) clamp(18px, 4vw, 40px) 80px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: clamp(34px, 5vw, 60px);
+  }
+  @media (min-width: 980px) {
+    .wrap { grid-template-columns: 1.05fr 0.95fr; align-items: start; }
+    .phone-col { position: sticky; top: 40px; }
+  }
+
+  /* ---------- Editorial rail ---------- */
+  .eyebrow {
+    font-family: var(--font-sans);
+    font-weight: 700;
+    letter-spacing: 0.34em;
+    text-transform: uppercase;
+    font-size: 12px;
+    color: var(--amber);
+  }
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 800;
+    line-height: 1.02;
+    font-size: clamp(40px, 7vw, 74px);
+    margin: 14px 0 0;
+    color: #fdf6e6;
+    letter-spacing: -0.01em;
+  }
+  h1 .ji { color: var(--lantern); }
+  .dek {
+    color: #cfe6dc;
+    font-size: clamp(16px, 1.6vw, 19px);
+    line-height: 1.6;
+    max-width: 46ch;
+    margin: 20px 0 0;
+  }
+  .dek b { color: #fff; font-weight: 700; }
+
+  .moves { margin: 38px 0 0; display: grid; gap: 14px; }
+  .move {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 18px;
+    align-items: start;
+    padding: 20px 22px;
+    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
+    border: 1px solid rgba(182,227,207,0.18);
+    backdrop-filter: blur(2px);
+  }
+  .move .no {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 22px;
+    width: 44px; height: 44px;
+    display: grid; place-items: center;
+    border-radius: 50%;
+    color: #2a1206;
+    background: radial-gradient(120% 90% at 35% 30%, #ffe9b8, transparent 55%), linear-gradient(180deg, var(--amber), var(--lantern));
+    box-shadow: 0 0 22px 1px rgba(240,164,41,0.45), inset 0 -4px 7px rgba(168,50,20,0.45);
+  }
+  .move h3 { margin: 4px 0 4px; font-family: var(--font-display); font-size: 19px; color: #fdf6e6; font-weight: 700; }
+  .move p { margin: 0; color: #b9d6cb; font-size: 14.5px; line-height: 1.55; }
+  .move p em { color: var(--amber); font-style: normal; font-weight: 700; }
+
+  .footnote { margin: 30px 2px 0; color: #8fb3a7; font-size: 13px; line-height: 1.6; }
+  .footnote code { color: #d8efe6; background: rgba(255,255,255,0.06); padding: 1px 6px; border-radius: 6px; font-size: 12px; }
+
+  /* ---------- Segmented control ---------- */
+  .seg {
+    display: inline-flex;
+    gap: 4px;
+    padding: 5px;
+    border-radius: 999px;
+    background: rgba(8,34,31,0.55);
+    border: 1px solid rgba(182,227,207,0.22);
+    margin: 0 auto 20px;
+  }
+  .seg button {
+    appearance: none; border: 0; cursor: pointer;
+    font-family: var(--font-sans); font-weight: 700; font-size: 13px;
+    padding: 9px 16px; border-radius: 999px;
+    color: #bfe0d4; background: transparent; transition: all .25s ease;
+  }
+  .seg button[aria-selected="true"] {
+    color: #2a1206;
+    background: linear-gradient(180deg, #ffd98a, var(--amber));
+    box-shadow: 0 4px 16px rgba(240,164,41,0.35);
+  }
+
+  .phone-col { display: flex; flex-direction: column; align-items: center; }
+
+  /* ---------- Phone device ---------- */
+  .phone {
+    width: 390px; max-width: 92vw;
+    border-radius: 46px;
+    padding: 13px;
+    background: linear-gradient(160deg, #20140c, #0c0907);
+    box-shadow:
+      0 2px 0 1px rgba(255,255,255,0.06) inset,
+      0 50px 80px -30px rgba(0,0,0,0.8),
+      0 0 0 2px rgba(0,0,0,0.4);
+    position: relative;
+  }
+  .screen {
+    position: relative;
+    border-radius: 34px;
+    overflow: hidden;
+    background: var(--washi);
+    height: 740px;
+    display: flex;
+    flex-direction: column;
+  }
+  .notch {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 132px; height: 26px; border-radius: 0 0 16px 16px;
+    background: #0c0907; z-index: 30;
+  }
+  .statusbar {
+    position: relative; z-index: 20;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 11px 26px 6px; font-size: 12.5px; font-weight: 700; color: var(--ink);
+    flex: 0 0 auto;
+  }
+  .scroll { flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .scroll::-webkit-scrollbar { width: 0; }
+
+  /* ---------- Views ---------- */
+  .view { display: none; }
+  .view.active { display: block; }
+  @media (prefers-reduced-motion: no-preference) {
+    .view.active .reveal { animation: rise .6s cubic-bezier(.22,1,.36,1) both; }
+    .view.active .reveal:nth-child(2) { animation-delay: .05s; }
+    .view.active .reveal:nth-child(3) { animation-delay: .1s; }
+    .view.active .reveal:nth-child(4) { animation-delay: .15s; }
+    .view.active .reveal:nth-child(5) { animation-delay: .2s; }
+    .view.active .reveal:nth-child(6) { animation-delay: .25s; }
+  }
+  @keyframes rise { from { opacity:0; transform: translateY(12px);} to {opacity:1; transform:none;} }
+
+  /* mail client chrome */
+  .mailbar {
+    display: flex; align-items: center; gap: 11px;
+    padding: 8px 18px 14px; border-bottom: 1px solid var(--washi-deep);
+  }
+  .avatar {
+    width: 38px; height: 38px; border-radius: 50%; flex: 0 0 auto;
+    display: grid; place-items: center; font-size: 20px;
+    background: radial-gradient(120% 90% at 35% 28%, #ffe9b8, transparent 55%), linear-gradient(160deg, #1aa597, var(--pond));
+    box-shadow: inset 0 -3px 6px rgba(10,74,69,0.5);
+  }
+  .mailfrom { line-height: 1.25; }
+  .mailfrom b { font-size: 14.5px; }
+  .mailfrom span { display:block; font-size: 12px; color: var(--ink-soft); }
+  .mailtime { margin-left:auto; font-size: 12px; color: var(--ink-soft); }
+
+  .subject {
+    font-family: var(--font-display); font-weight: 700;
+    font-size: 18px; padding: 16px 22px 4px; line-height: 1.3;
+  }
+
+  .body { padding: 6px 22px 30px; }
+
+  .minigarland { display:flex; justify-content:center; gap: 20px; height: 30px; margin: 8px 0 2px; position: relative; }
+  .minigarland::before {
+    content:""; position:absolute; top:4px; left:14%; right:14%; height:2px; border-radius:2px;
+    background: linear-gradient(90deg, transparent, rgba(21,48,43,.3) 14%, rgba(21,48,43,.3) 86%, transparent);
+  }
+  .ml {
+    width: 13px; height: 19px; border-radius: 60% 60% 55% 55% / 45% 45% 55% 55%;
+    background: radial-gradient(120% 90% at 35% 30%, rgba(255,240,200,.95), transparent 55%), linear-gradient(180deg, var(--amber), var(--lantern));
+    box-shadow: 0 0 14px 1px rgba(240,164,41,.55), inset 0 -3px 4px rgba(168,50,20,.4);
+    transform-origin: top center; animation: sway 4s ease-in-out infinite;
+  }
+  .ml:nth-child(odd){ animation-delay:-2s; height: 22px; }
+  @keyframes sway { 0%,100%{transform:rotate(-6deg);} 50%{transform:rotate(6deg);} }
+
+  .hello { font-family: var(--font-display); font-weight:700; font-size: 27px; margin: 14px 0 2px; }
+  .lead { font-size: 16px; line-height: 1.6; color: var(--ink); margin: 0 0 4px; }
+  .lead .accent { color: var(--lantern-deep); font-weight: 700; }
+
+  /* lantern countdown */
+  .countdown {
+    margin: 20px 0; padding: 16px; border-radius: 18px;
+    background: linear-gradient(180deg, #fff8ec, #fbeed3);
+    border: 1px solid var(--washi-deep);
+    display: flex; align-items: center; gap: 16px;
+  }
+  .lanterns { display: flex; gap: 12px; }
+  .big-lantern {
+    width: 26px; height: 38px; border-radius: 60% 60% 55% 55% / 45% 45% 55% 55%;
+    background: radial-gradient(120% 90% at 35% 28%, #fff1cf, transparent 55%), linear-gradient(180deg, var(--amber), var(--lantern));
+    box-shadow: 0 0 20px 2px rgba(240,164,41,.6), inset 0 -5px 7px rgba(168,50,20,.45);
+    animation: glow 4s ease-in-out infinite;
+  }
+  .big-lantern.dim { filter: grayscale(.6) brightness(.78); box-shadow: none; opacity:.5; }
+  @keyframes glow { 0%,100%{filter:drop-shadow(0 0 0 transparent);} 50%{filter:drop-shadow(0 2px 12px rgba(240,164,41,.5));} }
+  .countdown .ctext b { font-family: var(--font-display); font-size: 21px; display:block; line-height:1.1; }
+  .countdown .ctext span { font-size: 13.5px; color: var(--ink-soft); }
+
+  /* lily-pad detail card */
+  .pad {
+    margin: 18px 0; border-radius: 20px; overflow:hidden;
+    background: var(--lily); border: 1px solid var(--lily-line);
+    box-shadow: 0 16px 30px -22px rgba(10,74,69,.7);
+  }
+  .pad .padhead {
+    padding: 13px 18px; font-family: var(--font-display); font-weight: 700; font-size: 17px;
+    background: linear-gradient(90deg, var(--pond), var(--pond-deep)); color: #eafff8;
+    display:flex; align-items:center; gap: 8px;
+  }
+  .pad dl { margin:0; padding: 6px 18px 14px; }
+  .pad .row { display: grid; grid-template-columns: 78px 1fr; gap: 8px; padding: 9px 0; border-bottom: 1px dashed var(--lily-line); }
+  .pad .row:last-child { border-bottom: 0; }
+  .pad dt { color: var(--pond-deep); font-weight: 700; font-size: 12.5px; letter-spacing: .02em; padding-top: 1px; }
+  .pad dd { margin: 0; font-size: 14.5px; color: var(--ink); font-weight: 500; }
+
+  /* CTA buttons */
+  .tap-note { text-align:center; font-size: 13px; color: var(--ink-soft); margin: 4px 0 10px; }
+  .cta-yes, .cta-no, .ghost-wide {
+    display:flex; align-items:center; justify-content:center; gap: 9px;
+    width: 100%; border: 0; cursor: pointer; text-decoration: none;
+    font-family: var(--font-sans); font-weight: 700; border-radius: 15px;
+    transition: transform .12s ease, box-shadow .2s ease, background .2s ease;
+  }
+  .cta-yes {
+    padding: 16px; font-size: 17px; color: #f2fff6;
+    background: linear-gradient(180deg, #137a45, var(--reed));
+    box-shadow: 0 14px 26px -12px rgba(14,94,54,.8), inset 0 1px 0 rgba(255,255,255,.18);
+  }
+  .cta-yes:hover { transform: translateY(-2px); box-shadow: 0 20px 34px -12px rgba(14,94,54,.85); }
+  .cta-yes:active { transform: translateY(0); }
+  .cta-no {
+    margin-top: 10px; padding: 13px; font-size: 14.5px; color: var(--ink-soft);
+    background: transparent; border: 1.5px solid var(--lily-line);
+  }
+  .cta-no:hover { background: #fff; color: var(--ink); }
+
+  .mailfoot {
+    margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--washi-deep);
+    font-size: 12px; color: var(--ink-soft); line-height: 1.7;
+  }
+  .mailfoot a { color: var(--pond); font-weight: 600; }
+  .shield {
+    display:flex; gap:10px; align-items:flex-start; margin: 16px 0 4px;
+    padding: 12px 14px; border-radius: 14px;
+    background: rgba(12,122,112,.07); border: 1px solid var(--lily-line);
+    font-size: 12.5px; color: var(--pond-deep); line-height: 1.5;
+  }
+  .shield b { color: var(--reed); }
+
+  /* ---------- Landing pages ---------- */
+  .landing { padding: 30px 24px 40px; text-align:center; min-height: 100%; }
+  .crest {
+    width: 96px; height: 96px; margin: 8px auto 6px; border-radius: 50%;
+    display:grid; place-items:center; font-size: 44px; position: relative;
+    background: radial-gradient(120% 90% at 38% 30%, #fff3d2, transparent 55%), linear-gradient(160deg, var(--amber), var(--lantern));
+    box-shadow: 0 0 0 10px rgba(240,164,41,.14), 0 0 36px 4px rgba(240,164,41,.5);
+  }
+  .crest.cool {
+    background: radial-gradient(120% 90% at 38% 30%, #d6fff4, transparent 55%), linear-gradient(160deg, #19a89a, var(--pond));
+    box-shadow: 0 0 0 10px rgba(12,122,112,.12), 0 0 36px 4px rgba(12,122,112,.4);
+  }
+  .view.active .crest { animation: pop .6s cubic-bezier(.2,1.3,.5,1) both; }
+  @keyframes pop { from{ transform: scale(.4); opacity:0;} to{ transform:scale(1); opacity:1;} }
+
+  /* ripple rings under the confirm crest */
+  .ripple { position: relative; height: 0; }
+  .view.active .ripple::before, .view.active .ripple::after {
+    content:""; position:absolute; left:50%; top:-58px; width: 120px; height: 120px;
+    border-radius:50%; border: 2px solid rgba(12,122,112,.4); transform: translate(-50%,-50%) scale(.4);
+    animation: ring 2.4s ease-out infinite;
+  }
+  .view.active .ripple::after { animation-delay: 1.1s; border-color: rgba(240,164,41,.4); }
+  @keyframes ring { 0%{opacity:.7; transform:translate(-50%,-50%) scale(.4);} 100%{opacity:0; transform:translate(-50%,-50%) scale(1.5);} }
+
+  .landing h2 { font-family: var(--font-display); font-weight: 800; font-size: 30px; margin: 14px 0 6px; line-height:1.12; }
+  .landing .sub { font-size: 16px; color: var(--ink-soft); line-height: 1.6; margin: 0 auto 18px; max-width: 30ch; }
+  .landing .sub b { color: var(--ink); }
+
+  .recap {
+    text-align:left; margin: 8px auto 18px; max-width: 300px;
+    border-radius: 16px; background: var(--lily); border:1px solid var(--lily-line); padding: 14px 16px;
+    font-size: 14px; line-height: 1.7;
+  }
+  .recap b { color: var(--pond-deep); }
+
+  .reopen-chip {
+    display:inline-flex; align-items:center; gap: 8px; margin: 4px 0 18px;
+    padding: 9px 16px; border-radius: 999px; font-weight: 700; font-size: 13.5px;
+    color: var(--lantern-deep); background: rgba(226,83,37,.1); border: 1px solid rgba(226,83,37,.3);
+  }
+  .reopen-chip .dot { width:8px;height:8px;border-radius:50%;background:var(--lantern); box-shadow:0 0 0 4px rgba(226,83,37,.18); animation: blink 1.6s infinite; }
+  @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:.3;} }
+
+  .landing .actions { display:grid; gap: 10px; max-width: 300px; margin: 6px auto 0; }
+  .pill {
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    padding: 14px; border-radius: 14px; font-weight:700; font-size: 15px; cursor:pointer; border:0; text-decoration:none;
+    font-family: var(--font-sans);
+  }
+  .pill.solid { color:#f2fff6; background: linear-gradient(180deg,#137a45,var(--reed)); box-shadow: 0 12px 22px -12px rgba(14,94,54,.8); }
+  .pill.solid.cool { background: linear-gradient(180deg, #1497c9, var(--pond)); box-shadow: 0 12px 22px -12px rgba(12,122,112,.8); }
+  .pill.quiet { color: var(--ink-soft); background:#fff; border:1.5px solid var(--lily-line); }
+  .pill.quiet:hover { color: var(--ink); }
+
+  .back {
+    position:absolute; z-index: 25; top: 44px; left: 16px;
+    width: 36px; height: 36px; border-radius: 50%; cursor:pointer; border:0;
+    display:grid; place-items:center; font-size: 18px; color: var(--ink);
+    background: rgba(255,255,255,.7); backdrop-filter: blur(6px);
+    box-shadow: 0 4px 12px -6px rgba(0,0,0,.4);
+  }
+
+  .caption { margin-top: 18px; color:#9bbcb0; font-size: 13px; text-align:center; max-width: 360px; line-height:1.6; }
+  .caption b { color: #d8efe6; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <!-- ============ Editorial rail ============ -->
+    <section class="rail">
+      <p class="eyebrow">Frog Board · Reminder Loop</p>
+      <h1>Offload the<br><span class="ji">nagging.</span></h1>
+      <p class="dek">A coordinator's real job isn't the spreadsheet, it's chasing people. The reminder loop does the chasing, in the festival's own voice, so <b>nobody gets a guilt text</b> and <b>every gap heals itself</b>.</p>
+
+      <div class="moves">
+        <article class="move">
+          <div class="no">一</div>
+          <div>
+            <h3>A ladder, not a loop</h3>
+            <p>Three touches, three jobs: <em>confirm</em> a week out, <em>prepare</em> two nights before, <em>nudge</em> the morning of. Each email earns its place. None repeats.</p>
+          </div>
+        </article>
+        <article class="move">
+          <div class="no">二</div>
+          <div>
+            <h3>One tap to keep or release</h3>
+            <p>Every reminder carries <em>I'll be there</em> and <em>I can't make it</em>. A decline reopens the slot on the board and pings the organizer. The nag becomes self-healing coverage.</p>
+          </div>
+        </article>
+        <article class="move">
+          <div class="no">三</div>
+          <div>
+            <h3>The right inbox, no logins for anyone</h3>
+            <p>Older scouts get reminded <em>themselves</em>; for the youngest, it goes to a <em>parent</em>, addressed about their kid. Either way the last name stays private and a tap is identity. No app, no password.</p>
+          </div>
+        </article>
+      </div>
+
+      <p class="footnote">Prototype, not wired in. It rides the existing pieces: captured <code>email</code>, device <code>claimToken</code>, and the schedule (<code>date</code> / <code>startAt</code> / <code>dueBy</code>). The build adds Resend, a scheduler, and an unsubscribe. Tap the buttons in the phone to walk the loop.</p>
+    </section>
+
+    <!-- ============ Phone ============ -->
+    <section class="phone-col">
+      <div class="seg" role="tablist" aria-label="Reminder variants">
+        <button role="tab" aria-selected="true" data-go="email2">Two nights out</button>
+        <button role="tab" aria-selected="false" data-go="emailFinal">Final nudge</button>
+        <button role="tab" aria-selected="false" data-go="emailParent">Parent version</button>
+      </div>
+
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="statusbar"><span>9:41</span><span>▦ ▢ 􀛨</span></div>
+          <div class="scroll" id="scroll">
+
+            <!-- ----- Email 2: two nights out ----- -->
+            <section class="view active" id="email2">
+              <div class="mailbar reveal">
+                <div class="avatar">🐸</div>
+                <div class="mailfrom"><b>Frog Board</b><span>for Ginza Bazaar</span></div>
+                <div class="mailtime">Thu 6:02 PM</div>
+              </div>
+              <h2 class="subject reveal">Two nights to Ginza Bazaar 🏮</h2>
+              <div class="body">
+                <div class="minigarland reveal"><i class="ml"></i><i class="ml"></i><i class="ml"></i><i class="ml"></i><i class="ml"></i></div>
+                <p class="hello reveal">Aya,</p>
+                <p class="lead reveal">Two nights until the pond lights up, and you're on the list for the <span class="accent">Games booth</span>.</p>
+
+                <div class="countdown reveal">
+                  <div class="lanterns"><i class="big-lantern"></i><i class="big-lantern"></i></div>
+                  <div class="ctext"><b>2 nights</b><span>Saturday, July 25 · dusk</span></div>
+                </div>
+
+                <div class="pad reveal">
+                  <div class="padhead">🎏 Games booth</div>
+                  <dl>
+                    <div class="row"><dt>When</dt><dd>Sat Jul 25, 5:00–8:00 PM</dd></div>
+                    <div class="row"><dt>Where</dt><dd>Pavilion lawn, table 3</dd></div>
+                    <div class="row"><dt>With</dt><dd>Kenji + 2 others</dd></div>
+                    <div class="row"><dt>Bring</dt><dd>A hat and a water bottle</dd></div>
+                  </dl>
+                </div>
+
+                <p class="tap-note reveal">Still good? One tap. No app, no password.</p>
+                <div class="reveal">
+                  <button class="cta-yes" data-go="confirmYes">🪷 I'll be there</button>
+                  <button class="cta-no" data-go="confirmNo">I can't make it</button>
+                </div>
+
+                <div class="mailfoot reveal">
+                  You're getting this because you signed up for <b>Ginza Bazaar</b>.
+                  Questions? Just reply, it reaches Kenji. · <a href="#">Stop reminders for this shift</a>
+                </div>
+              </div>
+            </section>
+
+            <!-- ----- Final nudge: morning of ----- -->
+            <section class="view" id="emailFinal">
+              <div class="mailbar reveal">
+                <div class="avatar">🐸</div>
+                <div class="mailfrom"><b>Frog Board</b><span>for Ginza Bazaar</span></div>
+                <div class="mailtime">Sat 9:10 AM</div>
+              </div>
+              <h2 class="subject reveal">Tonight at the pond 🏮 — see you at 5?</h2>
+              <div class="body">
+                <p class="hello reveal">It's tonight, Aya.</p>
+                <p class="lead reveal">The lanterns go up at five. You've got the <span class="accent">Games booth</span> with Kenji.</p>
+
+                <div class="countdown reveal">
+                  <div class="lanterns"><i class="big-lantern"></i></div>
+                  <div class="ctext"><b>Tonight</b><span>5:00 PM · Pavilion lawn, table 3</span></div>
+                </div>
+
+                <p class="tap-note reveal">A quick tap tells the team you're set.</p>
+                <div class="reveal">
+                  <button class="cta-yes" data-go="confirmYes">🪷 I'm coming — see you at 5</button>
+                  <button class="cta-no" data-go="confirmNo">Something came up</button>
+                </div>
+
+                <div class="mailfoot reveal">
+                  Running late is fine, just come. Need the spot freed? Tap above and we'll handle it.
+                  · <a href="#">Stop reminders</a>
+                </div>
+              </div>
+            </section>
+
+            <!-- ----- Parent version (minor) ----- -->
+            <section class="view" id="emailParent">
+              <div class="mailbar reveal">
+                <div class="avatar">🐸</div>
+                <div class="mailfrom"><b>Frog Board</b><span>for Ginza Bazaar</span></div>
+                <div class="mailtime">Thu 6:02 PM</div>
+              </div>
+              <h2 class="subject reveal">Tomas is signed up — a quick heads-up 🏮</h2>
+              <div class="body">
+                <p class="hello reveal">Hi Maria,</p>
+                <p class="lead reveal">Your son <b>Tomas</b> signed up to help at <span class="accent">Ginza Bazaar</span> this Saturday. Here's the plan, so you can get him there.</p>
+
+                <div class="pad reveal">
+                  <div class="padhead">🎏 Games booth · Tomas</div>
+                  <dl>
+                    <div class="row"><dt>When</dt><dd>Sat Jul 25, 5:00–8:00 PM</dd></div>
+                    <div class="row"><dt>Drop-off</dt><dd>Pavilion lawn, table 3</dd></div>
+                    <div class="row"><dt>Lead</dt><dd>Kenji (adult) runs the booth</dd></div>
+                    <div class="row"><dt>Bring</dt><dd>A hat and a water bottle</dd></div>
+                  </dl>
+                </div>
+
+                <p class="tap-note reveal">Can he make it?</p>
+                <div class="reveal">
+                  <button class="cta-yes" data-go="confirmYes">🪷 He'll be there</button>
+                  <button class="cta-no" data-go="confirmNo">He can't make it</button>
+                </div>
+
+                <div class="shield reveal">
+                  <span>🛡️</span>
+                  <span><b>This came to you, not Tomas.</b> Scouts 13 and up can get their own reminders; Tomas is younger, so a parent is the contact. Either way his last name stays private — he shows on the booth as “Tomas R.”</span>
+                </div>
+
+                <div class="mailfoot reveal">
+                  You're the contact Tomas gave for Ginza Bazaar. · <a href="#">Stop reminders</a>
+                </div>
+              </div>
+            </section>
+
+            <!-- ----- Landing: confirmed ----- -->
+            <section class="view" id="confirmYes">
+              <button class="back" data-back aria-label="Back">‹</button>
+              <div class="landing">
+                <div class="ripple"></div>
+                <div class="crest cool">🪷</div>
+                <h2>See you at dusk.</h2>
+                <p class="sub">You're locked in for the <b>Games booth</b>. Kenji's been told. Nothing else to do.</p>
+                <div class="recap">
+                  <b>Sat Jul 25</b> · 5:00–8:00 PM<br>
+                  Pavilion lawn, table 3<br>
+                  Bring a hat and water
+                </div>
+                <div class="actions">
+                  <a class="pill solid cool" href="#">📅 Add to my calendar</a>
+                  <a class="pill quiet" href="#">See the whole festival board</a>
+                </div>
+              </div>
+            </section>
+
+            <!-- ----- Landing: released ----- -->
+            <section class="view" id="confirmNo">
+              <button class="back" data-back aria-label="Back">‹</button>
+              <div class="landing">
+                <div class="crest">🏮</div>
+                <h2>Thanks for the heads-up.</h2>
+                <p class="sub">No worries at all. We'd rather know now than wonder Saturday night.</p>
+                <div class="reopen-chip"><span class="dot"></span> Games booth — back on the board</div>
+                <p class="sub" style="margin-top:0">Your spot is open again, and Kenji can see the gap. We'll find another pair of hands.</p>
+                <div class="actions">
+                  <button class="pill solid" data-go="confirmYes">Actually, I can make it</button>
+                  <a class="pill quiet" href="#">Find a shift that fits better</a>
+                </div>
+              </div>
+            </section>
+
+          </div><!-- /scroll -->
+        </div><!-- /screen -->
+      </div><!-- /phone -->
+
+      <p class="caption">Tap <b>I'll be there</b> or <b>I can't make it</b> in any email to walk the loop. A decline reopens the slot and tells the organizer — the part that makes the chasing disappear.</p>
+    </section>
+  </div>
+
+<script>
+  const views = [...document.querySelectorAll('.view')];
+  const tabs = [...document.querySelectorAll('.seg button')];
+  const scroll = document.getElementById('scroll');
+  let lastEmail = 'email2';
+
+  function show(id) {
+    views.forEach(v => v.classList.toggle('active', v.id === id));
+    if (id.startsWith('email')) {
+      lastEmail = id;
+      tabs.forEach(t => t.setAttribute('aria-selected', String(t.dataset.go === id)));
+    }
+    scroll.scrollTop = 0;
+  }
+
+  document.addEventListener('click', (e) => {
+    const goEl = e.target.closest('[data-go]');
+    if (goEl) { show(goEl.dataset.go); return; }
+    if (e.target.closest('[data-back]')) { show(lastEmail); }
+  });
+</script>
+</body>
+</html>
