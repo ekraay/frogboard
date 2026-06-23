@@ -126,8 +126,11 @@ so design them together.
   **fill-down fills only empty cells** below (non-destructive, ⤓ handle);
   **undo v1** (⟲ toolbar + Cmd/Ctrl+Z for last delete/clear); fixed a StrictMode
   duplicate-key bug in undo.
-- **Group-filtered shareable board** (branch `group-filter`, built + green, not
-  yet merged): `/?group=Scouts` shows only that group's tasks + a coverage header
+- **Group-filtered shareable board** (live in prod, commit `4e84da4`):
+  `/?group=Scouts` shows only that group's tasks + a coverage header
   ("Showing Scouts tasks — 7 of 9 covered") + "see the whole event" link.
-  `filterTasksByGroup` / `coverageFor` in `lib/domain/board.ts`. Query-param so it
+  `filterTasksByGroup` / `coverageFor` in `lib/domain/board.ts`. This is the
+  public **recruit / self-sign-up** front door per group. It shows counts, not
+  names (public, so minor-safe). The private named-roster view for an appointed
+  lead is the delegate report (see the delegate-per-group spec). Query-param so it
   generalizes to other facets later (see Explore-later "Generalized facet filters").
