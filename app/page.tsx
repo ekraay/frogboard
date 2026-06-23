@@ -1,8 +1,7 @@
-import { getActiveEventBoard } from "@/lib/repository/events";
-import { Board } from "@/components/Board";
-import { filterTasksByGroup, coverageFor } from "@/lib/domain/board";
+import { redirect } from "next/navigation";
+import { listPublishedEvents } from "@/lib/repository/events";
+import { EventChooser } from "@/components/EventChooser";
 
-// The board reflects live signups; always render fresh.
 export const dynamic = "force-dynamic";
 
 export default async function Home({
@@ -10,9 +9,9 @@ export default async function Home({
 }: {
   searchParams: Promise<{ group?: string | string[] }>;
 }) {
-  const board = await getActiveEventBoard();
+  const events = await listPublishedEvents();
 
-  if (!board) {
+  if (events.length === 0) {
     return (
       <main className="mx-auto max-w-2xl px-4 py-16 text-center text-ink-soft">
         <p className="text-4xl" aria-hidden>🐸</p>
@@ -24,17 +23,12 @@ export default async function Home({
     );
   }
 
-  // ?group=Scouts → a shareable, group-filtered board with a coverage header.
-  const raw = (await searchParams).group;
-  const group = (Array.isArray(raw) ? raw[0] : raw)?.trim() ?? "";
-  if (group) {
-    const tasks = filterTasksByGroup(board.tasks, group);
-    const displayGroup = tasks[0]?.requestedGroup ?? group; // canonical casing when known
-    return (
-      <Board eventName={board.name} tasks={tasks}
-        filter={{ group: displayGroup, ...coverageFor(tasks) }} />
-    );
+  // One event: skip the chooser, go straight to its board (carry any ?group=).
+  if (events.length === 1) {
+    const raw = (await searchParams).group;
+    const group = (Array.isArray(raw) ? raw[0] : raw)?.trim() ?? "";
+    redirect(`/e/${events[0].id}${group ? `?group=${encodeURIComponent(group)}` : ""}`);
   }
 
-  return <Board eventName={board.name} tasks={board.tasks} />;
+  return <EventChooser events={events} />;
 }
