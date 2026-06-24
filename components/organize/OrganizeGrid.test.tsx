@@ -375,3 +375,41 @@ test("Cmd+Z while editing a cell is left to the browser (no grid undo)", async (
   expect(screen.getAllByLabelText(/^Title, row/)).toHaveLength(1);
   expect(screen.queryByDisplayValue(/^First$/)).toBeNull();
 });
+
+// --- Sortable column headers ---
+
+const baseTask = (over: Partial<GridTask>): GridTask => ({
+  id: over.id ?? "t", kind: "shift", title: "T", category: null, requestedGroup: null,
+  neededCount: 1, date: null, startAt: null, endAt: null, dueBy: null, location: null,
+  description: null, definitionOfDone: null, pointOfContact: null,
+  position: over.position ?? 1024, signupCount: 0, ...over,
+});
+const sortEvent = {
+  id: "e1", name: "E", status: "draft" as const,
+  startDate: new Date("2026-07-24"), endDate: new Date("2026-07-26"),
+};
+function titlesInOrder(): string[] {
+  return screen.getAllByLabelText(/^Title, row/i).map((el) => (el as HTMLInputElement).value);
+}
+
+test("clicking a column header sorts the rows; Manual order restores them", async () => {
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={sortEvent} initialTasks={[
+    baseTask({ id: "a", title: "Setup", position: 1024 }),
+    baseTask({ id: "b", title: "Bingo", position: 2048 }),
+  ]} />);
+  expect(titlesInOrder()).toEqual(["Setup", "Bingo"]);
+  await user.click(screen.getByRole("button", { name: /sort by title/i }));
+  expect(titlesInOrder()).toEqual(["Bingo", "Setup"]);
+  await user.click(screen.getByRole("button", { name: /manual order/i }));
+  expect(titlesInOrder()).toEqual(["Setup", "Bingo"]);
+});
+
+test("reorder buttons disable while sorted", async () => {
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={sortEvent} initialTasks={[
+    baseTask({ id: "a", title: "Setup" }), baseTask({ id: "b", title: "Bingo", position: 2048 }),
+  ]} />);
+  await user.click(screen.getByRole("button", { name: /sort by title/i }));
+  expect(screen.getAllByRole("button", { name: /move up/i })[0]).toBeDisabled();
+});

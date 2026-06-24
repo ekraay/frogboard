@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveTask, deleteTask, clearTasks, reorderTasks, setEventStatusAction } from "@/app/actions/organize";
 import { parseRow, taskToCells, emptyCells, type RawCells } from "@/lib/domain/gridRow";
+import { sortRowKeys, type SortColumn } from "@/lib/domain/gridSort";
 import type { EventCtx } from "@/lib/domain/cells";
 import type { GridTask } from "@/lib/repository/organize";
 import { parseTsv, applyPaste } from "@/lib/domain/paste";
@@ -42,6 +43,8 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
   // "Clear all". The server delete is DEFERRED for both, so Undo restores the
   // rows intact (no delete fired yet).
   const [pending, setPending] = useState<Pending | null>(null);
+  const [sort, setSort] = useState<{ column: SortColumn; dir: 1 | -1 } | null>(null);
+  const [sortedKeys, setSortedKeys] = useState<string[] | null>(null);
   const router = useRouter();
   // Always-current rows for async callbacks (order reconciliation after saves).
   const rowsRef = useRef<RowState[]>([]);
@@ -52,7 +55,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     return () => { if (pending?.kind === "row") clearTimeout(pending.timer); };
   }, [pending]);
 
-  // Cmd/Ctrl+Z reverses the last delete/clear — but only when you're NOT editing
+  // Cmd/Ctrl+Z reverses the last delete/clear -- but only when you're NOT editing
   // a cell, where the browser's own text-undo should win. A ref keeps the latest
   // onUndo so the listener can mount once.
   const undoRef = useRef<() => void>(() => {});
@@ -70,6 +73,17 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
 
   const update = (key: string, fn: (r: RowState) => RowState) =>
     setRows((rs) => rs.map((r) => (r.key === key ? fn(r) : r)));
+
+  function onSort(column: SortColumn) {
+    const dir: 1 | -1 = sort && sort.column === column ? (sort.dir === 1 ? -1 : 1) : 1;
+    setSort({ column, dir });
+    setSortedKeys(sortRowKeys(rows.map((r) => ({ key: r.key, cells: r.cells })), column, dir, ctx));
+  }
+  function toManual() { setSort(null); setSortedKeys(null); }
+
+  const displayedRows = sortedKeys
+    ? sortedKeys.map((k) => rows.find((r) => r.key === k)).filter((r): r is RowState => !!r)
+    : rows;
 
   function onCell(key: string, field: keyof RawCells, value: string) {
     update(key, (r) => ({ ...r, cells: { ...r.cells, [field]: value }, state: "dirty", problem: null }));
@@ -108,7 +122,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     } catch {
       update(row.key, (r) => ({
         ...r, state: "error",
-        problem: { field: "title" as keyof RawCells, error: "Couldn't save — please retry." },
+        problem: { field: "title" as keyof RawCells, error: "Couldn't save -- please retry." },
       }));
     }
   }
@@ -119,6 +133,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
   }
 
   function addRow() {
+    toManual();
     flushPending(); // adding a row is the "next action" that commits a pending Clear-all
     setRows((rs) => [...rs, {
       key: crypto.randomUUID(), taskId: null, cells: emptyCells(),
@@ -127,6 +142,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
   }
 
   function duplicateRow() {
+    toManual();
     flushPending();
     setRows((rs) => {
       const last = rs[rs.length - 1];
@@ -138,9 +154,10 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     });
   }
 
-  // "Paste a list" modal: each pasted task (name + detected time/count/…) is
+  // "Paste a list" modal: each pasted task (name + detected time/count/...) is
   // appended and saved.
   function addManyTasks(cells: RawCells[]) {
+    toManual();
     flushPending();
     const newRows: RowState[] = cells.map((c) => ({
       key: crypto.randomUUID(), taskId: null, cells: c,
@@ -154,7 +171,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
   }
 
   /** Spreadsheet "fill down": copy this cell's value into the EMPTY cells below
-   *  it in the same column — never overwriting one that already has a value, so
+   *  it in the same column -- never overwriting one that already has a value, so
    *  there's nothing to undo. Saves just the rows it actually fills. */
   function onFillDown(key: string, field: keyof RawCells) {
     const i = rows.findIndex((r) => r.key === key);
@@ -179,12 +196,12 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     if (p.kind === "row") {
       if (p.row.taskId) void deleteTask(p.row.taskId);
     } else if (p.taskIds.length) {
-      // Delete only the captured ids — rows added during the window are safe.
+      // Delete only the captured ids -- rows added during the window are safe.
       void clearTasks(event.id, p.taskIds);
     }
   }
 
-  /** A prior pending delete commits now — one undo window at a time. */
+  /** A prior pending delete commits now -- one undo window at a time. */
   function flushPending() {
     if (!pending) return;
     if (pending.kind === "row") clearTimeout(pending.timer);
@@ -203,9 +220,9 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     flushPending();
     setRows((rs) => rs.filter((r) => r.key !== key));
     // The server delete is DEFERRED until the undo window closes, so Undo can
-    // restore the row intact — task id, signups, claim tokens, everything.
+    // restore the row intact -- task id, signups, claim tokens, everything.
     // (If the tab closes mid-window the delete never fires; the task survives
-    // on reload — the safe failure.)
+    // on reload -- the safe failure.)
     const timer = setTimeout(() => {
       if (row.taskId) void deleteTask(row.taskId);
       setPending(null);
@@ -213,7 +230,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     setPending({ kind: "row", row, index, timer });
   }
 
-  /** "Start over": wipe every row. The delete is DEFERRED and undoable — a
+  /** "Start over": wipe every row. The delete is DEFERRED and undoable -- a
    *  persistent inline banner offers Undo, and the actual delete commits only
    *  when you take the next grid action (add/paste) or delete again. Leaving the
    *  page without acting never fires it (the safe failure). */
@@ -246,6 +263,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
   }
 
   function onMove(key: string, delta: -1 | 1) {
+    if (sortedKeys !== null) return;
     const i = rows.findIndex((r) => r.key === key);
     const j = i + delta;
     if (i < 0 || j < 0 || j >= rows.length) return;
@@ -257,9 +275,9 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
   }
 
   function onPaste(e: React.ClipboardEvent) {
-    // Only intercept a paste that landed in a grid CELL. Anything else — most
+    // Only intercept a paste that landed in a grid CELL. Anything else -- most
     // importantly the "Paste a list" modal's textarea, which renders inside
-    // this wrapper — handles its own paste natively.
+    // this wrapper -- handles its own paste natively.
     const el = e.target as HTMLElement;
     const anchorField = el?.dataset?.field as keyof RawCells | undefined;
     const anchorKey = el?.dataset?.rowkey;
@@ -272,7 +290,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     flushPending(); // a grid paste is a "next action" that commits a pending Clear-all
 
     // Anchor at the focused cell so the paste lands where the organizer is
-    // (column-aware): "copy the times column → click Time → paste".
+    // (column-aware): "copy the times column -> click Time -> paste".
     const order = GRID_COLUMNS.map((c) => c.field);
     const anchorRow = Math.max(0, rows.findIndex((r) => r.key === anchorKey));
     const anchorCol = Math.max(0, order.indexOf(anchorField));
@@ -316,7 +334,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
 
   const saving = rows.some((r) => r.state === "saving");
   const attention = rows.filter((r) => r.state === "invalid" || r.state === "error").length;
-  const chip = saving ? "Saving…" : attention > 0
+  const chip = saving ? "Saving..." : attention > 0
     ? `${attention} row${attention > 1 ? "s" : ""} need${attention === 1 ? "s" : ""} attention`
     : "Saved ✓";
 
@@ -327,8 +345,8 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
       }`}>
         <p className="text-sm text-ink">
           {status === "published"
-            ? <><strong>🏮 Live</strong> — volunteers see changes as you make them.</>
-            : <><strong>🌱 Draft</strong> — only organizers can see this.</>}
+            ? <><strong>&#x1F3EE; Live</strong> &mdash; volunteers see changes as you make them.</>
+            : <><strong>&#x1F331; Draft</strong> &mdash; only organizers can see this.</>}
         </p>
         <div className="flex items-center gap-3">
           <span aria-live="polite" className="text-sm text-ink-soft">{chip}</span>
@@ -342,24 +360,30 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
       <div className="mb-2.5 flex flex-wrap items-center gap-2 text-sm">
         <span className="inline-flex items-center gap-1">
           <button type="button" onClick={() => setPasting(true)}
-            className="rounded-lg bg-reed/10 px-3 py-1.5 font-semibold text-reed-deep transition hover:bg-reed/20">📋 Paste a list</button>
-          <HelpPopover label="How “Paste a list” works">
+            className="rounded-lg bg-reed/10 px-3 py-1.5 font-semibold text-reed-deep transition hover:bg-reed/20">&#x1F4CB; Paste a list</button>
+          <HelpPopover label={`How “Paste a list” works`}>
             Each line becomes a task. To bring a column from your sheet, copy it, click the
             matching column here, and paste. Open <span className="font-semibold">Details</span> on
-            a row for description, contact, and what “done” looks like.
+            a row for description, contact, and what &ldquo;done&rdquo; looks like.
           </HelpPopover>
         </span>
         <button type="button" onClick={addRow}
           className="rounded-lg border border-lily-line bg-white px-3 py-1.5 transition hover:border-reed">+ Add row</button>
         <button type="button" onClick={duplicateRow}
-          className="rounded-lg border border-lily-line bg-white px-3 py-1.5 transition hover:border-reed">⧉ Duplicate last</button>
+          className="rounded-lg border border-lily-line bg-white px-3 py-1.5 transition hover:border-reed">&#x29C9; Duplicate last</button>
+        {sortedKeys && (
+          <button type="button" onClick={toManual}
+            className="rounded-lg border border-reed/40 bg-reed/5 px-3 py-1.5 font-semibold text-reed-deep transition hover:bg-reed/15">
+            &#x2195; Manual order
+          </button>
+        )}
         {pending && (
           <button type="button" onClick={onUndo} aria-label="Undo last change" title="Undo last change (⌘Z)"
-            className="rounded-lg border border-reed/40 bg-reed/5 px-3 py-1.5 font-semibold text-reed-deep transition hover:bg-reed/15">⟲ Undo</button>
+            className="rounded-lg border border-reed/40 bg-reed/5 px-3 py-1.5 font-semibold text-reed-deep transition hover:bg-reed/15">&#x27F2; Undo</button>
         )}
         {rows.length > 0 && (
           <button type="button" onClick={onClearAll}
-            className="ml-auto rounded-lg border border-lily-line bg-white px-3 py-1.5 text-ink-soft transition hover:border-lantern-deep hover:text-lantern-deep">🧹 Clear all</button>
+            className="ml-auto rounded-lg border border-lily-line bg-white px-3 py-1.5 text-ink-soft transition hover:border-lantern-deep hover:text-lantern-deep">&#x1F9F9; Clear all</button>
         )}
       </div>
 
@@ -369,8 +393,8 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
         <div role="status"
           className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-amber/60 bg-amber/15 px-4 py-3">
           <span className="text-sm font-medium text-ink">
-            🧹 Cleared {pending.rows.length} task{pending.rows.length === 1 ? "" : "s"}. They’re off the board —
-            bring them back if that wasn’t right.
+            &#x1F9F9; Cleared {pending.rows.length} task{pending.rows.length === 1 ? "" : "s"}. They&rsquo;re off the board &mdash;
+            bring them back if that wasn&rsquo;t right.
           </span>
           <button type="button" onClick={onUndo}
             className="shrink-0 rounded-xl bg-reed px-4 py-2 text-sm font-bold text-white transition hover:bg-reed-deep">
@@ -385,31 +409,43 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
           <tr className="bg-lily text-xs font-bold uppercase tracking-wide text-ink">
             <th scope="col" className="w-6 rounded-tl-2xl p-2"><span className="sr-only">Reorder</span></th>
             <th scope="col" className="p-2">Details</th>
-            {GRID_COLUMNS.map((c) => (
-              <th key={c.field} scope="col" className="p-2">
-                {c.label}
-                {c.field === "kind" && (
-                  <> <HelpPopover label="Shift vs Frog">
-                    A <span className="font-semibold">Shift</span> is a scheduled time slot. A{" "}
-                    <span className="font-semibold">🐸 Frog</span> is a one-off need volunteers grab —
-                    it can take a “by” deadline instead of a time.
-                  </HelpPopover></>
-                )}
-              </th>
-            ))}
+            {GRID_COLUMNS.map((c) => {
+              const active = sort?.column === c.field;
+              const ariaSort = active ? (sort!.dir === 1 ? "ascending" : "descending") : "none";
+              return (
+                <th key={c.field} scope="col" className="p-2" aria-sort={ariaSort as "ascending" | "descending" | "none"}>
+                  <button type="button" onClick={() => onSort(c.field as SortColumn)}
+                    className="inline-flex items-center gap-1 hover:text-lantern-deep"
+                    aria-label={`Sort by ${c.label}`}>
+                    {c.label}
+                    <span aria-hidden className={active ? "text-lantern" : "opacity-0"}>
+                      {active && sort!.dir === -1 ? "▼" : "▲"}
+                    </span>
+                  </button>
+                  {c.field === "kind" && (
+                    <> <HelpPopover label="Shift vs Frog">
+                      A <span className="font-semibold">Shift</span> is a scheduled time slot. A{" "}
+                      <span className="font-semibold">&#x1F438; Frog</span> is a one-off need volunteers grab &mdash;
+                      it can take a &ldquo;by&rdquo; deadline instead of a time.
+                    </HelpPopover></>
+                  )}
+                </th>
+              );
+            })}
             <th scope="col" className="p-2"><span className="sr-only">Signups</span></th>
             <th scope="col" className="rounded-tr-2xl p-2"><span className="sr-only">Delete</span></th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, i) => (
+          {displayedRows.map((row, i) => (
             <GridRow key={row.key} row={row} index={i}
               onCell={onCell} onToggle={onToggle} onDelete={onDelete}
-              onMove={onMove} onBlurRow={onBlurRow} onFillDown={onFillDown} />
+              onMove={onMove} onBlurRow={onBlurRow} onFillDown={onFillDown}
+              reorderDisabled={sortedKeys !== null} />
           ))}
           {rows.length === 0 && (
             <tr><td colSpan={12} className="p-6 text-center text-sm text-ink-soft">
-              Add your tasks — type or paste from your sheet.
+              Add your tasks &mdash; type or paste from your sheet.
             </td></tr>
           )}
         </tbody>
@@ -418,7 +454,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
       {pending?.kind === "row" && (
         <div role="status"
           className="fixed bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-xl bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          Row deleted —
+          Row deleted &mdash;
           <button type="button" onClick={onUndo} className="font-bold text-reed underline-offset-2 hover:underline">
             Undo
           </button>
