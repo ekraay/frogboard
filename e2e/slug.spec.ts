@@ -22,3 +22,9 @@ test("an unknown slug returns 404", async ({ page }) => {
   const res = await page.goto("/no-such-event");
   expect(res?.status()).toBe(404);
 });
+
+test("combined facet filter narrows the board and updates coverage", async ({ page }) => {
+  await page.goto("/ginza-2026?date=2026-07-25&group=Scouts");
+  await expect(page.getByText(/showing .*scouts/i)).toBeVisible();
+  await expect(page.locator("article").first()).toBeVisible();
+});
