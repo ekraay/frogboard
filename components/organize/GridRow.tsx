@@ -33,6 +33,7 @@ const PROSE_FIELDS: { field: keyof RawCells; label: string; placeholder: string 
 
 export function GridRow({
   row, index, onCell, onToggle, onDelete, onMove, onBlurRow, onFillDown,
+  reorderDisabled = false,
 }: {
   row: RowState;
   index: number;
@@ -42,6 +43,7 @@ export function GridRow({
   onMove: (key: string, delta: -1 | 1) => void;
   onBlurRow: (key: string) => void;
   onFillDown: (key: string, field: keyof RawCells) => void;
+  reorderDisabled?: boolean;
 }) {
   const cellInput =
     "w-full rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm text-ink outline-none transition placeholder:text-ink-soft focus:border-reed focus:ring-1 focus:ring-reed/40";
@@ -71,11 +73,13 @@ export function GridRow({
       >
         <td className="whitespace-nowrap px-1 text-center align-middle">
           <button type="button" aria-label={`Move up, row ${index + 1}`}
+            disabled={reorderDisabled}
             onClick={() => onMove(row.key, -1)}
-            className="rounded p-0.5 text-ink-soft transition hover:bg-lily">↑</button>
+            className="rounded p-0.5 text-ink-soft transition hover:bg-lily disabled:opacity-40 disabled:cursor-not-allowed">↑</button>
           <button type="button" aria-label={`Move down, row ${index + 1}`}
+            disabled={reorderDisabled}
             onClick={() => onMove(row.key, 1)}
-            className="rounded p-0.5 text-ink-soft transition hover:bg-lily">↓</button>
+            className="rounded p-0.5 text-ink-soft transition hover:bg-lily disabled:opacity-40 disabled:cursor-not-allowed">↓</button>
         </td>
         <td className="px-1 align-middle">
           {/* A labeled, stateful affordance — empty invites ("＋"), filled shows a
