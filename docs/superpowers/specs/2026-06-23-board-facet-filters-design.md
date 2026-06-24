@@ -1,6 +1,6 @@
 # Board Facet Filters — Design Spec
 
-Let the public board filter its tasks by combinable facets (day, group,
+Let the public board filter its tasks by combinable facets (date, group,
 category, location) through an on-page filter bar that drives shareable URL
 params. Generalizes today's single `?group=` filter.
 
@@ -10,25 +10,27 @@ Visual reference: `docs/design/grid-sort-and-filters-review.html`.
 
 A volunteer narrows the board to the shifts that fit them by stacking facets:
 "Saturday + Scouts + Food". The selection lives in the URL, so the link is
-shareable, and the coverage header reflects the filtered set.
+shareable, and the coverage header reflects the filtered set. (The date facet's
+URL param is `date`; the bar still labels the control "Day".)
 
 ## Principles
 
 - **Self-service.** Volunteers pick filters on the page; no organizer needed.
-- **Shareable.** Every filter state is a URL: `/ginza-2026?day=2026-07-25&group=Scouts`.
+- **Shareable.** Every filter state is a URL: `/ginza-2026?date=2026-07-25&group=Scouts`.
 - **Combinable (AND).** Each added facet narrows further.
 - **Mobile-first, non-destructive.** A view over the data; "Clear" resets.
 
 ## Behavior
 
-- Facets: **day** (calendar date), **group** (`requestedGroup`), **category**,
+- Facets: **date** (calendar day), **group** (`requestedGroup`), **category**,
   **location**. Combined with AND.
-- URL params: `?day=YYYY-MM-DD&group=…&category=…&location=…`. The `day` value is
+- URL params: `?date=YYYY-MM-DD&group=…&category=…&location=…`. The `date` value is
   the ISO calendar day (via the existing `tzIsoDate`). **Back-compat:** `?group=`
   keeps working (it is simply the group facet).
-- **Filter bar:** one control per facet. Options are the event's distinct,
-  non-empty values for that facet, derived from its tasks; `day` options carry the
-  friendly weekday label. Each control has an "Any …" unset option. Selecting a
+- **Filter bar:** one control per facet (the date control is labeled "Day").
+  Options are the event's distinct, non-empty values for that facet, derived from
+  its tasks; date options carry the friendly weekday label. Each control has an
+  "Any …" unset option. Selecting a
   value navigates to the updated URL (preserving the other facets); a **Clear
   filters** control resets all. Active facets are visually marked.
 - **Coverage header** reflects the filtered set: "Showing <facet values joined by
@@ -41,15 +43,15 @@ shareable, and the coverage header reflects the filtered set.
 
 ### Domain (pure, unit-tested) — `lib/domain/board.ts`
 ```
-export interface Facets { day?: string; group?: string; category?: string; location?: string }
+export interface Facets { date?: string; group?: string; category?: string; location?: string }
 
 // AND across the provided facets; case/space-insensitive on group/category/location;
-// day matches tzIsoDate(task.date) === facets.day. Absent/blank facet = no constraint.
+// date matches tzIsoDate(task.date) === facets.date. Absent/blank facet = no constraint.
 export function filterTasks(tasks: BoardTask[], facets: Facets): BoardTask[];
 
 // Distinct non-empty values present in the tasks, for building the bar.
 export function facetOptions(tasks: BoardTask[]): {
-  day: { value: string; label: string }[];   // value = ISO day, label = weekday
+  date: { value: string; label: string }[];   // value = ISO day, label = weekday
   group: string[]; category: string[]; location: string[];
 };
 ```
@@ -59,7 +61,7 @@ export function facetOptions(tasks: BoardTask[]): {
   sorted case-insensitively.
 
 ### Page — `app/[slug]/page.tsx`
-- Read `day`, `group`, `category`, `location` from `searchParams` (first value if
+- Read `date`, `group`, `category`, `location` from `searchParams` (first value if
   an array). Build a `Facets`.
 - `const tasks = filterTasks(board.tasks, facets)`,
   `const options = facetOptions(board.tasks)`.
@@ -87,13 +89,13 @@ No schema, repository, or server-action changes.
 ## Testing (TDD)
 
 - **Domain unit (`board.test.ts`):** `filterTasks` AND logic per facet and in
-  combination; case/space-insensitivity on group/category/location; `day` matches
+  combination; case/space-insensitivity on group/category/location; `date` matches
   by calendar day; absent facets pass through. `facetOptions` returns distinct,
   sorted, labeled values; ignores blanks.
 - **Component unit:** `FilterBar` renders options from data, marks active facets,
   navigates with the combined query on change, and Clear removes the params;
   `Board` renders the coverage header for the filtered set and the empty state.
-- **E2E (extend `e2e/slug.spec.ts`):** `/<slug>?day=…&group=Scouts` narrows the
+- **E2E (extend `e2e/slug.spec.ts`):** `/<slug>?date=…&group=Scouts` narrows the
   list and the coverage header reflects it.
 
 ## Out of scope
