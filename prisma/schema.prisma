@@ -38,6 +38,7 @@ enum EventStatus {
 model Event {
   id        String   @id @default(cuid())
   name      String
+  slug      String?  @unique // human-readable URL, e.g. "ginza-2026"; null until set
   startDate DateTime
   endDate   DateTime
   status    EventStatus @default(draft)

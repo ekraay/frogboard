@@ -27,6 +27,10 @@ describe("events", () => {
     expect(e.status).toBe("draft");
     expect(e.name).toBe("Ginza 2027");
   });
+  test("createEvent assigns a slug from the name", async () => {
+    const e = await createEvent("Ginza Bazaar", new Date(), new Date());
+    expect(e.slug).toBe("ginza-bazaar");
+  });
   test("listEvents returns newest first with task counts", async () => {
     const a = await createEvent("A", new Date(), new Date());
     await prisma.task.create({ data: { eventId: a.id, title: "T", position: 1024 } });

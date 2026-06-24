@@ -2,9 +2,11 @@ import { prisma } from "@/lib/db";
 import type { Event, EventStatus, AuditAction, TaskKind, Prisma } from "@prisma/client";
 import type { ParsedTaskFields } from "@/lib/domain/gridRow";
 import { newClaimToken } from "@/lib/security/tokens";
+import { generateUniqueSlug } from "@/lib/repository/events";
 
 export async function createEvent(name: string, startDate: Date, endDate: Date): Promise<Event> {
-  return prisma.event.create({ data: { name, startDate, endDate } });
+  const slug = await generateUniqueSlug(name);
+  return prisma.event.create({ data: { name, slug, startDate, endDate } });
 }
 
 export interface EventListItem {
@@ -46,7 +48,7 @@ export interface GridTask {
 }
 
 export async function getEventGrid(eventId: string): Promise<
-  { id: string; name: string; startDate: Date; endDate: Date; status: EventStatus; tasks: GridTask[] } | null
+  { id: string; name: string; slug: string | null; startDate: Date; endDate: Date; status: EventStatus; tasks: GridTask[] } | null
 > {
   const event = await prisma.event.findUnique({
     where: { id: eventId },
@@ -59,7 +61,7 @@ export async function getEventGrid(eventId: string): Promise<
   });
   if (!event) return null;
   return {
-    id: event.id, name: event.name, startDate: event.startDate, endDate: event.endDate, status: event.status,
+    id: event.id, name: event.name, slug: event.slug, startDate: event.startDate, endDate: event.endDate, status: event.status,
     tasks: event.tasks.map((t) => ({
       id: t.id, kind: t.kind, title: t.title, category: t.category,
       requestedGroup: t.requestedGroup, neededCount: t.neededCount,

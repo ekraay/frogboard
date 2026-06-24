@@ -2,7 +2,10 @@
 import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "@/lib/db";
 import { resetDb } from "@/test/db";
-import { getEventBoard, listPublishedEvents } from "@/lib/repository/events";
+import {
+  getEventBoard, listPublishedEvents,
+  generateUniqueSlug, getEventBoardByParam, getEventParam, updateEventSlug,
+} from "@/lib/repository/events";
 
 beforeEach(async () => { await resetDb(); });
 afterAll(async () => { await prisma.$disconnect(); });
@@ -56,5 +59,68 @@ describe("listPublishedEvents", () => {
     expect(list.map((e) => e.name)).toEqual(["B", "A"]);
     expect(list.find((e) => e.name === "A")).toMatchObject({ covered: 1, total: 2 });
     expect(list.find((e) => e.name === "B")).toMatchObject({ covered: 0, total: 0 });
+  });
+  test("includes each event's slug for building links", async () => {
+    await prisma.event.create({ data: { name: "Ginza", slug: "ginza-2026", status: "published", ...dates } });
+    const list = await listPublishedEvents();
+    expect(list[0].slug).toBe("ginza-2026");
+  });
+});
+
+describe("generateUniqueSlug", () => {
+  test("derives a slug from the name", async () => {
+    expect(await generateUniqueSlug("Ginza Bazaar")).toBe("ginza-bazaar");
+  });
+  test("suffixes to dodge a taken slug", async () => {
+    await prisma.event.create({ data: { name: "X", slug: "ginza-bazaar", ...dates } });
+    expect(await generateUniqueSlug("Ginza Bazaar")).toBe("ginza-bazaar-2");
+  });
+  test("avoids reserved words", async () => {
+    expect(await generateUniqueSlug("Organize")).toBe("organize-2");
+  });
+});
+
+describe("getEventBoardByParam", () => {
+  test("resolves a published event by slug", async () => {
+    const e = await prisma.event.create({ data: { name: "Ginza", slug: "ginza-2026", status: "published", ...dates } });
+    await prisma.task.create({ data: { eventId: e.id, title: "Games", position: 1024 } });
+    const board = await getEventBoardByParam("ginza-2026");
+    expect(board!.name).toBe("Ginza");
+    expect(board!.tasks.map((t) => t.title)).toEqual(["Games"]);
+  });
+  test("also resolves by id (back-compat), and null for drafts or misses", async () => {
+    const e = await prisma.event.create({ data: { name: "Ginza", slug: "ginza-2026", status: "published", ...dates } });
+    expect((await getEventBoardByParam(e.id))!.name).toBe("Ginza");
+    expect(await getEventBoardByParam("nope")).toBeNull();
+    await prisma.event.create({ data: { name: "D", slug: "draft-one", status: "draft", ...dates } });
+    expect(await getEventBoardByParam("draft-one")).toBeNull();
+  });
+});
+
+describe("getEventParam", () => {
+  test("returns the slug for a published event, else the id, else null", async () => {
+    const withSlug = await prisma.event.create({ data: { name: "A", slug: "a-2026", status: "published", ...dates } });
+    expect(await getEventParam(withSlug.id)).toBe("a-2026");
+    const noSlug = await prisma.event.create({ data: { name: "B", status: "published", ...dates } });
+    expect(await getEventParam(noSlug.id)).toBe(noSlug.id);
+    expect(await getEventParam("missing")).toBeNull();
+  });
+});
+
+describe("updateEventSlug", () => {
+  test("sets a normalized, unique slug", async () => {
+    const e = await prisma.event.create({ data: { name: "A", status: "published", ...dates } });
+    expect(await updateEventSlug(e.id, "Ginza 2026")).toEqual({ ok: true, slug: "ginza-2026" });
+    expect((await prisma.event.findUnique({ where: { id: e.id } }))!.slug).toBe("ginza-2026");
+  });
+  test("rejects a reserved or already-taken slug", async () => {
+    await prisma.event.create({ data: { name: "A", slug: "taken", status: "published", ...dates } });
+    const b = await prisma.event.create({ data: { name: "B", status: "published", ...dates } });
+    expect(await updateEventSlug(b.id, "organize")).toEqual({ ok: false, error: expect.stringContaining("reserved") });
+    expect(await updateEventSlug(b.id, "taken")).toEqual({ ok: false, error: expect.stringContaining("taken") });
+  });
+  test("lets an event keep its own slug (no false self-collision)", async () => {
+    const e = await prisma.event.create({ data: { name: "A", slug: "ginza-2026", status: "published", ...dates } });
+    expect(await updateEventSlug(e.id, "ginza-2026")).toEqual({ ok: true, slug: "ginza-2026" });
   });
 });

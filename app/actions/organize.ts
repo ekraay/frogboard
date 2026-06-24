@@ -10,6 +10,7 @@ import {
   createEvent, setEventStatus, deleteEvent,
   upsertTaskWithAudit, deleteTaskWithAudit, deleteTasks, renumberTasks, revertAuditEntry,
 } from "@/lib/repository/organize";
+import { updateEventSlug } from "@/lib/repository/events";
 import { prisma } from "@/lib/db";
 import { parseRow, type RawCells } from "@/lib/domain/gridRow";
 import { parseEventDates } from "@/lib/domain/eventDates";
@@ -86,6 +87,20 @@ export async function setEventStatusAction(
   revalidatePath("/");
   revalidatePath("/organize");
   return { ok: true };
+}
+
+/** Set an event's pretty URL slug. Organizer-gated. */
+export async function updateEventSlugAction(
+  eventId: string,
+  slug: string,
+): Promise<{ ok: true; slug: string } | Err> {
+  const gate = await requireOrganizer();
+  if (!gate.ok) return gate;
+  const result = await updateEventSlug(eventId, slug);
+  if (!result.ok) return { ok: false, error: result.error };
+  revalidatePath("/");
+  revalidatePath(`/organize/${eventId}`);
+  return { ok: true, slug: result.slug };
 }
 
 export async function deleteEventAction(eventId: string): Promise<Ok | Err> {

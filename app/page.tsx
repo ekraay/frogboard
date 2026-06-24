@@ -27,7 +27,8 @@ export default async function Home({
   if (events.length === 1) {
     const raw = (await searchParams).group;
     const group = (Array.isArray(raw) ? raw[0] : raw)?.trim() ?? "";
-    redirect(`/e/${events[0].id}${group ? `?group=${encodeURIComponent(group)}` : ""}`);
+    const param = events[0].slug ?? events[0].id;
+    redirect(`/${param}${group ? `?group=${encodeURIComponent(group)}` : ""}`);
   }
 
   return <EventChooser events={events} />;

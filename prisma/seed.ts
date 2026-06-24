@@ -11,6 +11,7 @@ async function main() {
   const event = await prisma.event.create({
     data: {
       name: "Ginza Bazaar / Bon Odori 2026",
+      slug: "ginza-2026",
       startDate: new Date("2026-07-25T00:00:00Z"),
       endDate: new Date("2026-07-26T00:00:00Z"),
       status: "published",

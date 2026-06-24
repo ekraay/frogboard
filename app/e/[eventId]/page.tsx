@@ -1,12 +1,10 @@
-import { notFound } from "next/navigation";
-import { getEventBoard } from "@/lib/repository/events";
-import { Board } from "@/components/Board";
-import { filterTasksByGroup, coverageFor } from "@/lib/domain/board";
+import { notFound, redirect } from "next/navigation";
+import { getEventParam } from "@/lib/repository/events";
 
-// The board reflects live signups; always render fresh.
 export const dynamic = "force-dynamic";
 
-export default async function EventBoardPage({
+// Back-compat: old /e/<id> links redirect to the canonical pretty URL (/slug).
+export default async function LegacyEventBoardPage({
   params,
   searchParams,
 }: {
@@ -14,20 +12,9 @@ export default async function EventBoardPage({
   searchParams: Promise<{ group?: string | string[] }>;
 }) {
   const { eventId } = await params;
-  const board = await getEventBoard(eventId);
-  if (!board) notFound();
-
-  // ?group=Scouts → a shareable, group-filtered view with a coverage header.
+  const param = await getEventParam(eventId);
+  if (!param) notFound();
   const raw = (await searchParams).group;
   const group = (Array.isArray(raw) ? raw[0] : raw)?.trim() ?? "";
-  if (group) {
-    const tasks = filterTasksByGroup(board.tasks, group);
-    const displayGroup = tasks[0]?.requestedGroup ?? group; // canonical casing when known
-    return (
-      <Board eventName={board.name} tasks={tasks}
-        filter={{ group: displayGroup, ...coverageFor(tasks) }} />
-    );
-  }
-
-  return <Board eventName={board.name} tasks={board.tasks} />;
+  redirect(`/${param}${group ? `?group=${encodeURIComponent(group)}` : ""}`);
 }

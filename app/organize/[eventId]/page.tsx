@@ -4,6 +4,7 @@ import Link from "next/link";
 import { isValidSession, SESSION_COOKIE } from "@/lib/security/session";
 import { getEventGrid } from "@/lib/repository/organize";
 import { OrganizeGrid } from "@/components/organize/OrganizeGrid";
+import { SlugEditor } from "@/components/organize/SlugEditor";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,9 @@ export default async function OrganizeEventPage({
             ← All events
           </Link>
         </div>
+      </div>
+      <div className="mb-4">
+        <SlugEditor eventId={grid.id} slug={grid.slug} />
       </div>
       <OrganizeGrid
         event={{ id: grid.id, name: grid.name, status: grid.status, startDate: grid.startDate, endDate: grid.endDate }}

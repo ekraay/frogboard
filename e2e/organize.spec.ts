@@ -33,11 +33,13 @@ test("organizer sets up an event and opens sign-ups", async ({ page }) => {
   await page.getByRole("button", { name: /open sign-ups/i }).click();
   await expect(page.getByText(/live — volunteers/i)).toBeVisible();
 
+  // Two events are published now (this one + the seeded one), so the root is a
+  // chooser. Open this event's board from it.
   await page.goto("/");
-  await expect(page.getByText("E2E Matsuri")).toBeVisible();
+  await page.getByRole("link", { name: /E2E Matsuri/ }).click();
   await expect(page.getByText("Lantern setup")).toBeVisible();
 
-  // close sign-ups → the board falls back to the seeded published event
+  // close sign-ups → only the seeded event stays published, so / goes there
   await page.goto("/organize");
   await page.getByRole("link", { name: /E2E Matsuri/ }).click();
   await page.getByRole("button", { name: /close sign-ups/i }).click();

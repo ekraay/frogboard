@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 export interface ChooserEvent {
-  id: string; name: string; startDate: Date; endDate: Date;
+  id: string; name: string; slug: string | null; startDate: Date; endDate: Date;
   covered: number; total: number;
 }
 
@@ -29,7 +29,7 @@ export function EventChooser({ events }: { events: ChooserEvent[] }) {
       <ul className="space-y-3">
         {events.map((e) => (
           <li key={e.id}>
-            <Link href={`/e/${e.id}`}
+            <Link href={`/${e.slug ?? e.id}`}
               className="pad-rise flex items-baseline justify-between gap-4 rounded-2xl border border-lily-line bg-white px-5 py-4 shadow-sm transition hover:border-reed hover:shadow-md">
               <span>
                 <span className="font-display text-xl font-bold text-ink">{e.name}</span>

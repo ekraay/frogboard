@@ -16,7 +16,7 @@ import { resetDb } from "@/test/db";
 import { sessionToken, SESSION_COOKIE } from "@/lib/security/session";
 import {
   signIn, signOut, createEventAction, setEventStatusAction, deleteEventAction,
-  saveTask, deleteTask, clearTasks, reorderTasks, revertChange,
+  saveTask, deleteTask, clearTasks, reorderTasks, revertChange, updateEventSlugAction,
 } from "@/app/actions/organize";
 import { emptyCells } from "@/lib/domain/gridRow";
 
@@ -241,6 +241,24 @@ describe("revertChange", () => {
   test("reports a vanished audit row", async () => {
     await signIn(fd({ password: "lily-pad-42", name: "Aya" }));
     expect(await revertChange("nope")).toEqual({ ok: false, error: "That change is no longer here." });
+  });
+});
+
+describe("updateEventSlugAction", () => {
+  test("refuses without a session", async () => {
+    expect(await updateEventSlugAction("x", "y")).toEqual({ ok: false, error: "Please sign in." });
+  });
+  test("sets a normalized slug when signed in", async () => {
+    authenticate();
+    const e = await prisma.event.create({ data: { name: "E", startDate: new Date(), endDate: new Date() } });
+    expect(await updateEventSlugAction(e.id, "Ginza 2026")).toEqual({ ok: true, slug: "ginza-2026" });
+    expect((await prisma.event.findUnique({ where: { id: e.id } }))!.slug).toBe("ginza-2026");
+  });
+  test("reports a taken slug", async () => {
+    authenticate();
+    await prisma.event.create({ data: { name: "A", slug: "taken", startDate: new Date(), endDate: new Date() } });
+    const b = await prisma.event.create({ data: { name: "B", startDate: new Date(), endDate: new Date() } });
+    expect(await updateEventSlugAction(b.id, "taken")).toEqual({ ok: false, error: "That link is already taken." });
   });
 });
 
