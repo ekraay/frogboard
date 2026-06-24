@@ -94,6 +94,7 @@ export function ClaimForm({ taskId }: { taskId: string }) {
           className="mt-1 w-full rounded-xl border border-lily-line bg-white px-3 py-2.5 text-ink outline-none transition focus:border-reed focus:ring-2 focus:ring-reed/30"
         />
       </label>
+      <p className="text-xs text-ink-soft">We only use your email or phone to remind you about your shift.</p>
       <label className="flex items-center gap-2 text-sm text-ink-soft">
         <input type="checkbox" name="minor" className="h-4 w-4 accent-reed" /> Under 18
       </label>

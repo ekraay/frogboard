@@ -32,6 +32,13 @@ test("submits a name, calls the action, and stores the returned token", async ()
   expect(JSON.parse(window.localStorage.getItem("frogboard.claims")!)).toEqual({ s1: "tok-1" });
 });
 
+test("explains that email and phone are for reminders", async () => {
+  const user = userEvent.setup();
+  render(<ClaimForm taskId="t1" />);
+  await user.click(screen.getByRole("button", { name: /grab a frog/i }));
+  expect(screen.getByText(/remind you about your shift/i)).toBeInTheDocument();
+});
+
 test("shows the error message when the action fails", async () => {
   claimSlot.mockResolvedValue({ ok: false, error: "This task is already full." });
   const user = userEvent.setup();
