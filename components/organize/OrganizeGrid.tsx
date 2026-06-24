@@ -345,8 +345,8 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
       }`}>
         <p className="text-sm text-ink">
           {status === "published"
-            ? <><strong>&#x1F3EE; Live</strong> &mdash; volunteers see changes as you make them.</>
-            : <><strong>&#x1F331; Draft</strong> &mdash; only organizers can see this.</>}
+            ? <><strong>🏮 Live</strong> &mdash; volunteers see changes as you make them.</>
+            : <><strong>🌱 Draft</strong> &mdash; only organizers can see this.</>}
         </p>
         <div className="flex items-center gap-3">
           <span aria-live="polite" className="text-sm text-ink-soft">{chip}</span>
@@ -360,7 +360,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
       <div className="mb-2.5 flex flex-wrap items-center gap-2 text-sm">
         <span className="inline-flex items-center gap-1">
           <button type="button" onClick={() => setPasting(true)}
-            className="rounded-lg bg-reed/10 px-3 py-1.5 font-semibold text-reed-deep transition hover:bg-reed/20">&#x1F4CB; Paste a list</button>
+            className="rounded-lg bg-reed/10 px-3 py-1.5 font-semibold text-reed-deep transition hover:bg-reed/20">📋 Paste a list</button>
           <HelpPopover label={`How “Paste a list” works`}>
             Each line becomes a task. To bring a column from your sheet, copy it, click the
             matching column here, and paste. Open <span className="font-semibold">Details</span> on
@@ -370,20 +370,20 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
         <button type="button" onClick={addRow}
           className="rounded-lg border border-lily-line bg-white px-3 py-1.5 transition hover:border-reed">+ Add row</button>
         <button type="button" onClick={duplicateRow}
-          className="rounded-lg border border-lily-line bg-white px-3 py-1.5 transition hover:border-reed">&#x29C9; Duplicate last</button>
+          className="rounded-lg border border-lily-line bg-white px-3 py-1.5 transition hover:border-reed">⧉ Duplicate last</button>
         {sortedKeys && (
           <button type="button" onClick={toManual}
             className="rounded-lg border border-reed/40 bg-reed/5 px-3 py-1.5 font-semibold text-reed-deep transition hover:bg-reed/15">
-            &#x2195; Manual order
+            ↕ Manual order
           </button>
         )}
         {pending && (
           <button type="button" onClick={onUndo} aria-label="Undo last change" title="Undo last change (⌘Z)"
-            className="rounded-lg border border-reed/40 bg-reed/5 px-3 py-1.5 font-semibold text-reed-deep transition hover:bg-reed/15">&#x27F2; Undo</button>
+            className="rounded-lg border border-reed/40 bg-reed/5 px-3 py-1.5 font-semibold text-reed-deep transition hover:bg-reed/15">⟲ Undo</button>
         )}
         {rows.length > 0 && (
           <button type="button" onClick={onClearAll}
-            className="ml-auto rounded-lg border border-lily-line bg-white px-3 py-1.5 text-ink-soft transition hover:border-lantern-deep hover:text-lantern-deep">&#x1F9F9; Clear all</button>
+            className="ml-auto rounded-lg border border-lily-line bg-white px-3 py-1.5 text-ink-soft transition hover:border-lantern-deep hover:text-lantern-deep">🧹 Clear all</button>
         )}
       </div>
 
@@ -393,7 +393,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
         <div role="status"
           className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-amber/60 bg-amber/15 px-4 py-3">
           <span className="text-sm font-medium text-ink">
-            &#x1F9F9; Cleared {pending.rows.length} task{pending.rows.length === 1 ? "" : "s"}. They&rsquo;re off the board &mdash;
+            🧹 Cleared {pending.rows.length} task{pending.rows.length === 1 ? "" : "s"}. They&rsquo;re off the board &mdash;
             bring them back if that wasn&rsquo;t right.
           </span>
           <button type="button" onClick={onUndo}
@@ -425,7 +425,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
                   {c.field === "kind" && (
                     <> <HelpPopover label="Shift vs Frog">
                       A <span className="font-semibold">Shift</span> is a scheduled time slot. A{" "}
-                      <span className="font-semibold">&#x1F438; Frog</span> is a one-off need volunteers grab &mdash;
+                      <span className="font-semibold">🐸 Frog</span> is a one-off need volunteers grab &mdash;
                       it can take a &ldquo;by&rdquo; deadline instead of a time.
                     </HelpPopover></>
                   )}
