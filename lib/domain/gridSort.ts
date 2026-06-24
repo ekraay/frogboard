@@ -29,13 +29,15 @@ export function sortValue(cells: RawCells, column: SortColumn, ctx: EventCtx): s
       const r = parseTimeCell(cells.time);
       if (!r.ok) return null;
       const v = r.value;
+      if (v.kind === "none") return null;
       if (v.kind === "range" || v.kind === "start") return v.start;
-      if (v.kind === "dueBy") return v.time; // may be null
-      return null;
+      return v.time; // dueBy; may be null (a frog with no clock)
     }
   }
 }
 
+// Each SortColumn yields one type for all its non-null values (numbers for
+// "need"/"time", strings elsewhere), so a and b always share a type here.
 function compare(a: string | number, b: string | number): number {
   if (typeof a === "number" && typeof b === "number") return a - b;
   return String(a).localeCompare(String(b));
