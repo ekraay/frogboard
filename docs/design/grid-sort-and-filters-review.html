@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Frog Board — Sort & Filter (design review)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;700;800&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --font-display:"Shippori Mincho B1",Georgia,serif;
+    --font-sans:"Zen Maru Gothic",ui-sans-serif,system-ui,sans-serif;
+    --washi:#faf3e3; --washi-deep:#f1e4c8; --ink:#15302b; --ink-soft:#46685f;
+    --pond:#0c7a70; --pond-deep:#0a4a45; --lily:#ebfaf2; --lily-line:#b6e3cf;
+    --reed:#0e5e36; --reed-deep:#083d22; --lantern:#e25325; --lantern-deep:#b23a16; --amber:#f0a429;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; color:var(--ink); font-family:var(--font-sans); -webkit-font-smoothing:antialiased;
+    background-color:var(--washi);
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E"),
+      radial-gradient(150% 95% at 50% 122%, rgba(12,122,112,0.14), transparent 56%),
+      radial-gradient(120% 75% at 50% -12%, rgba(240,164,41,0.22), transparent 60%);
+    background-attachment:fixed; background-blend-mode:soft-light,normal,normal;
+  }
+  .wrap{max-width:1080px; margin:0 auto; padding:clamp(26px,4vw,56px) clamp(16px,4vw,36px) 80px;}
+  .crumb{font-weight:700; letter-spacing:.32em; text-transform:uppercase; font-size:11px; color:var(--lantern-deep);}
+  h1{font-family:var(--font-display); font-weight:800; font-size:clamp(30px,5vw,46px); margin:10px 0 6px; letter-spacing:-.01em;}
+  .lede{color:var(--ink-soft); font-size:16px; max-width:60ch; line-height:1.6; margin:0;}
+
+  .panel{margin-top:38px; background:rgba(255,255,255,.72); border:1px solid var(--lily-line); border-radius:24px;
+    box-shadow:0 24px 50px -34px rgba(10,74,69,.55); overflow:hidden;}
+  .panel-head{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; padding:18px 22px; border-bottom:1px solid var(--washi-deep);
+    background:linear-gradient(180deg,#fffdf8,rgba(255,255,255,0));}
+  .panel-head h2{font-family:var(--font-display); font-weight:700; font-size:21px; margin:0;}
+  .panel-head .tag{font-size:12.5px; color:var(--ink-soft);}
+  .panel-body{padding:18px 22px 24px;}
+
+  /* ---------- toolbar ---------- */
+  .toolbar{display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap;}
+  .hint{font-size:12.5px; color:var(--ink-soft);}
+  .manual-btn{display:inline-flex; align-items:center; gap:7px; cursor:pointer; border:1px solid var(--lily-line);
+    background:#fff; color:var(--ink); font-family:var(--font-sans); font-weight:700; font-size:13px;
+    padding:8px 13px; border-radius:999px; transition:all .18s ease;}
+  .manual-btn[data-active="true"]{background:var(--reed); color:#fff; border-color:var(--reed);}
+  .manual-btn:not([data-active="true"]):hover{border-color:var(--reed);}
+
+  /* ---------- grid table ---------- */
+  .gridwrap{overflow-x:auto; border-radius:16px; border:1px solid var(--lily-line);}
+  table{border-collapse:separate; border-spacing:0; width:100%; min-width:760px; background:#fff;}
+  thead th{position:sticky; top:0; background:linear-gradient(180deg,#f3fbf6,#e9f7ef);
+    color:var(--pond-deep); font-size:12.5px; font-weight:700; text-align:left; padding:0; white-space:nowrap;
+    border-bottom:1px solid var(--lily-line);}
+  thead th .sortbtn{display:flex; align-items:center; gap:5px; width:100%; cursor:pointer; border:0; background:none;
+    font:inherit; color:inherit; padding:11px 12px; transition:background .15s ease;}
+  thead th .sortbtn:hover{background:rgba(12,122,112,.08);}
+  thead th.handle, thead th.sr{cursor:default;}
+  .arrow{font-size:11px; color:var(--lantern); opacity:0; transition:opacity .15s ease;}
+  th[data-active="true"] .sortbtn{background:rgba(226,83,37,.10); color:var(--lantern-deep);}
+  th[data-active="true"] .arrow{opacity:1;}
+  tbody td{padding:10px 12px; font-size:13.5px; border-bottom:1px solid var(--washi-deep); white-space:nowrap;}
+  tbody tr:last-child td{border-bottom:0;}
+  tbody tr:hover{background:#fbfefc;}
+  .kindpill{display:inline-block; font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px;}
+  .kind-shift{background:var(--lily); color:var(--pond-deep);}
+  .kind-frog{background:rgba(226,83,37,.12); color:var(--lantern-deep);}
+  .muted{color:var(--ink-soft);}
+  .handlecell{width:30px; text-align:center; color:var(--lily-line); cursor:grab; user-select:none;}
+  .sorted .handlecell{opacity:.35; cursor:not-allowed;}
+  .title-strong{font-weight:700;}
+
+  /* ---------- board filter bar ---------- */
+  .board-head{display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:14px;}
+  .coverage{font-family:var(--font-display); font-weight:700; font-size:17px;}
+  .coverage .dot{color:var(--lily-line); margin:0 6px;}
+  .coverage .pondtxt{color:var(--pond-deep);}
+  .clear{font-size:13px; font-weight:700; color:var(--lantern-deep); cursor:pointer; border:0; background:none; text-decoration:underline; text-underline-offset:3px;}
+  .clear[hidden]{display:none;}
+
+  .facets{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:8px;}
+  .facet{position:relative;}
+  .facet > label{display:block; font-size:11px; font-weight:700; color:var(--ink-soft); margin:0 0 4px 4px; letter-spacing:.02em;}
+  .facet select{appearance:none; font-family:var(--font-sans); font-weight:700; font-size:14px; color:var(--ink);
+    background:#fff; border:1.5px solid var(--lily-line); border-radius:14px; padding:11px 34px 11px 14px; cursor:pointer;
+    min-width:130px; transition:border-color .15s ease, box-shadow .15s ease;}
+  .facet select:focus{outline:none; border-color:var(--reed); box-shadow:0 0 0 3px rgba(14,94,54,.18);}
+  .facet[data-on="true"] select{border-color:var(--lantern); background:rgba(226,83,37,.06); color:var(--lantern-deep);}
+  .facet .caret{position:absolute; right:13px; bottom:13px; pointer-events:none; color:var(--ink-soft); font-size:11px;}
+
+  .urlbar{display:flex; align-items:center; gap:8px; margin:6px 0 18px; font-size:12.5px; color:var(--ink-soft);
+    background:#fff; border:1px dashed var(--lily-line); border-radius:12px; padding:9px 12px; overflow-x:auto; white-space:nowrap;}
+  .urlbar b{color:var(--pond-deep); font-weight:700;}
+  .urlbar .q{color:var(--lantern-deep); font-weight:700;}
+
+  .daygroup{margin-top:14px;}
+  .daygroup h3{font-family:var(--font-display); font-size:15px; font-weight:700; color:var(--ink); margin:0 0 8px; }
+  .cards{display:grid; gap:10px; grid-template-columns:1fr;}
+  @media(min-width:620px){.cards{grid-template-columns:1fr 1fr;}}
+  .card{display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--lily);
+    border:1px solid var(--lily-line); border-radius:16px; padding:12px 15px;}
+  .card .t{font-weight:700;}
+  .card .meta{font-size:12px; color:var(--ink-soft); margin-top:2px;}
+  .card .cov{font-size:12.5px; font-weight:700; border-radius:999px; padding:4px 11px; white-space:nowrap;}
+  .cov.full{background:var(--reed); color:#fff;}
+  .cov.open{background:#fff; color:var(--lantern-deep); border:1px solid rgba(226,83,37,.4);}
+  .empty{padding:26px; text-align:center; color:var(--ink-soft); background:#fff; border:1px dashed var(--lily-line); border-radius:16px;}
+  .chiprow{display:flex; gap:7px; flex-wrap:wrap; margin-bottom:6px;}
+  .chip{display:inline-flex; align-items:center; gap:6px; background:rgba(226,83,37,.10); color:var(--lantern-deep);
+    border:1px solid rgba(226,83,37,.3); border-radius:999px; font-size:12px; font-weight:700; padding:4px 10px;}
+  .chip b{font-weight:800;}
+  .note{margin-top:10px; font-size:12.5px; color:var(--ink-soft);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="crumb">Frog Board · design review</p>
+  <h1>Sort the grid. Filter the board.</h1>
+  <p class="lede">Two views of the same data. Organizers re-sort their working grid without disturbing the saved order; volunteers narrow the public board to exactly the shifts that fit them.</p>
+
+  <!-- ============ Feature 1: grid sort ============ -->
+  <section class="panel">
+    <div class="panel-head">
+      <h2>🗒️ Organizer grid</h2>
+      <span class="tag">Click any column to sort — your drag order stays saved.</span>
+    </div>
+    <div class="panel-body">
+      <div class="toolbar">
+        <button class="manual-btn" id="manualBtn" data-active="true">↕ Manual order</button>
+        <span class="hint" id="sortHint">Drag the handle to reorder. Click a header to sort the view.</span>
+      </div>
+      <div class="gridwrap" id="gridwrap">
+        <table>
+          <thead>
+            <tr id="headrow">
+              <th class="handle sr"><span class="muted" style="padding:0 8px; font-size:11px;">↕</span></th>
+              <!-- sortable headers injected -->
+            </tr>
+          </thead>
+          <tbody id="gridbody"></tbody>
+        </table>
+      </div>
+      <p class="note">Sorting is a <b>view</b>: it never renumbers positions. Drag is disabled while sorted; “Manual order” brings back your hand-tuned sequence. Adding a row returns to manual so the new blank row lands where you expect.</p>
+    </div>
+  </section>
+
+  <!-- ============ Feature 2: board filter ============ -->
+  <section class="panel">
+    <div class="panel-head">
+      <h2>🏮 Public board</h2>
+      <span class="tag">Stack Day · Group · Category · Location to find your shift.</span>
+    </div>
+    <div class="panel-body">
+      <div class="board-head">
+        <div class="coverage" id="coverage"></div>
+        <button class="clear" id="clearBtn" hidden>Clear filters</button>
+      </div>
+
+      <div class="facets" id="facets"></div>
+      <div class="urlbar"><b>frogboard.vercel.app/ginza-2026</b><span id="urlq"></span></div>
+
+      <div class="chiprow" id="chiprow"></div>
+      <div id="boardlist"></div>
+    </div>
+  </section>
+</div>
+
+<script>
+  // ---------- shared sample data ----------
+  const TASKS = [
+    {title:"Setup crew",     kind:"shift", date:"2026-07-25", day:"Sat Jul 25", time:"8:00 AM",  timeKey:480,  need:4, filled:4, category:"Setup", group:"Scouts", location:"Grounds"},
+    {title:"Food prep",      kind:"shift", date:"2026-07-25", day:"Sat Jul 25", time:"9:00 AM",  timeKey:540,  need:6, filled:3, category:"Food",  group:"BWA",    location:"Kitchen"},
+    {title:"Games booth",    kind:"shift", date:"2026-07-25", day:"Sat Jul 25", time:"10:00 AM", timeKey:600,  need:5, filled:5, category:"Games", group:"Scouts", location:"Inside Gym"},
+    {title:"Lantern hanging",kind:"frog",  date:"2026-07-25", day:"Sat Jul 25", time:"by 4:00 PM",timeKey:960, need:2, filled:1, category:"Setup", group:"Scouts", location:"Grounds"},
+    {title:"Taiko set",      kind:"shift", date:"2026-07-25", day:"Sat Jul 25", time:"6:00 PM",  timeKey:1080, need:3, filled:2, category:"Music", group:"YAO",    location:"Stage"},
+    {title:"Bingo",          kind:"shift", date:"2026-07-26", day:"Sun Jul 26", time:"1:00 PM",  timeKey:780,  need:2, filled:0, category:"Games", group:"YAO",    location:"Inside Gym"},
+    {title:"Drinks stand",   kind:"shift", date:"2026-07-26", day:"Sun Jul 26", time:"2:00 PM",  timeKey:840,  need:3, filled:3, category:"Food",  group:"BWA",    location:"Kitchen"},
+    {title:"Teardown",       kind:"frog",  date:"2026-07-26", day:"Sun Jul 26", time:"by 9:00 PM",timeKey:1260,need:4, filled:1, category:"Setup", group:"Scouts", location:"Grounds"},
+  ];
+
+  // ================= Feature 1: grid =================
+  const COLS = [
+    {field:"title",    label:"Title",    type:"str"},
+    {field:"kind",     label:"Kind",     type:"str"},
+    {field:"date",     label:"Date",     type:"date"},
+    {field:"need",     label:"Need",     type:"num"},
+    {field:"time",     label:"Time",     type:"time"},
+    {field:"category", label:"Category", type:"str"},
+    {field:"group",    label:"Group",    type:"str"},
+    {field:"location", label:"Location", type:"str"},
+  ];
+  let sortCol = null, sortDir = 1;          // null = manual
+  const baseOrder = TASKS.slice();           // "saved drag order"
+
+  const headrow = document.getElementById("headrow");
+  COLS.forEach(c=>{
+    const th=document.createElement("th"); th.dataset.field=c.field;
+    th.innerHTML=`<button class="sortbtn"><span>${c.label}</span><span class="arrow">▲</span></button>`;
+    th.querySelector(".sortbtn").addEventListener("click",()=>clickHeader(c.field));
+    headrow.appendChild(th);
+  });
+
+  function clickHeader(field){
+    if(sortCol===field){ sortDir*=-1; } else { sortCol=field; sortDir=1; }
+    renderGrid();
+  }
+  function toManual(){ sortCol=null; sortDir=1; renderGrid(); }
+  document.getElementById("manualBtn").addEventListener("click",toManual);
+
+  function sortKey(row,col){
+    const c=COLS.find(x=>x.field===col);
+    const v=row[col];
+    if(c.type==="num") return row.need;
+    if(c.type==="date") return row.date;            // ISO sorts lexically
+    if(c.type==="time") return row.timeKey;
+    return (v||"").toString().toLowerCase();
+  }
+  function renderGrid(){
+    let rows=baseOrder.slice();
+    const sorted = sortCol!==null;
+    if(sorted){
+      rows.sort((a,b)=>{
+        const ka=sortKey(a,sortCol), kb=sortKey(b,sortCol);
+        if(ka<kb) return -1*sortDir; if(ka>kb) return 1*sortDir; return 0;
+      });
+    }
+    document.getElementById("gridwrap").classList.toggle("sorted",sorted);
+    document.getElementById("manualBtn").dataset.active=String(!sorted);
+    document.getElementById("sortHint").textContent = sorted
+      ? `Sorted by ${COLS.find(c=>c.field===sortCol).label} ${sortDir>0?"↑":"↓"} — a view; drag is off until you return to Manual.`
+      : "Drag the handle to reorder. Click a header to sort the view.";
+    headrow.querySelectorAll("th[data-field]").forEach(th=>{
+      const on = th.dataset.field===sortCol;
+      th.dataset.active=String(on);
+      th.querySelector(".arrow").textContent = sortDir>0?"▲":"▼";
+    });
+    const tb=document.getElementById("gridbody"); tb.innerHTML="";
+    rows.forEach(r=>{
+      const tr=document.createElement("tr");
+      tr.innerHTML=`
+        <td class="handlecell">⠿</td>
+        <td class="title-strong">${r.title}</td>
+        <td><span class="kindpill kind-${r.kind}">${r.kind}</span></td>
+        <td>${r.day}</td>
+        <td>${r.need}</td>
+        <td class="muted">${r.time}</td>
+        <td>${r.category}</td>
+        <td>${r.group}</td>
+        <td class="muted">${r.location}</td>`;
+      tb.appendChild(tr);
+    });
+  }
+  renderGrid();
+
+  // ================= Feature 2: board filter =================
+  const FACETS=[
+    {key:"day",      label:"Day",      pick:t=>t.day},
+    {key:"group",    label:"Group",    pick:t=>t.group},
+    {key:"category", label:"Category", pick:t=>t.category},
+    {key:"location", label:"Location", pick:t=>t.location},
+  ];
+  const sel={day:"",group:"",category:"",location:""};
+
+  const facetsEl=document.getElementById("facets");
+  FACETS.forEach(f=>{
+    const opts=[...new Set(TASKS.map(f.pick))];
+    const wrap=document.createElement("div"); wrap.className="facet"; wrap.dataset.key=f.key;
+    wrap.innerHTML=`<label>${f.label}</label>
+      <select aria-label="${f.label}">
+        <option value="">Any ${f.label.toLowerCase()}</option>
+        ${opts.map(o=>`<option value="${o}">${o}</option>`).join("")}
+      </select><span class="caret">▼</span>`;
+    wrap.querySelector("select").addEventListener("change",e=>{ sel[f.key]=e.target.value; renderBoard(); });
+    facetsEl.appendChild(wrap);
+  });
+
+  function matches(t){
+    return (!sel.day||t.day===sel.day)&&(!sel.group||t.group===sel.group)
+      &&(!sel.category||t.category===sel.category)&&(!sel.location||t.location===sel.location);
+  }
+  function renderBoard(){
+    const active=FACETS.filter(f=>sel[f.key]);
+    FACETS.forEach(f=>document.querySelector(`.facet[data-key="${f.key}"]`).dataset.on=String(!!sel[f.key]));
+
+    const list=TASKS.filter(matches);
+    const covered=list.filter(t=>t.filled>=t.need).length, total=list.length;
+
+    // coverage header
+    const lead = active.length? active.map(f=>sel[f.key]).join(" · ")+" — " : "All shifts — ";
+    document.getElementById("coverage").innerHTML =
+      `<span class="pondtxt">Showing</span> ${lead}<b>${covered}</b> of <b>${total}</b> covered`;
+    document.getElementById("clearBtn").hidden = active.length===0;
+
+    // url preview
+    const qs = active.map(f=>`${f.key}=${encodeURIComponent(sel[f.key])}`).join("&");
+    document.getElementById("urlq").innerHTML = qs? `<span class="q">?${qs.replace(/&/g,'&amp;')}</span>` : "";
+
+    // active chips
+    document.getElementById("chiprow").innerHTML =
+      active.map(f=>`<span class="chip">${f.label}: <b>${sel[f.key]}</b></span>`).join("");
+
+    // grouped list
+    const host=document.getElementById("boardlist"); host.innerHTML="";
+    if(total===0){ host.innerHTML=`<div class="empty">No shifts match those filters. Loosen one to see more.</div>`; return; }
+    const days=[...new Set(list.map(t=>t.day))];
+    days.forEach(day=>{
+      const grp=document.createElement("div"); grp.className="daygroup";
+      grp.innerHTML=`<h3>${day}</h3>`;
+      const cards=document.createElement("div"); cards.className="cards";
+      list.filter(t=>t.day===day).forEach(t=>{
+        const full=t.filled>=t.need;
+        const card=document.createElement("div"); card.className="card";
+        card.innerHTML=`<div><div class="t">${t.title}</div>
+          <div class="meta">${t.time} · ${t.category} · ${t.group} · ${t.location}</div></div>
+          <div class="cov ${full?'full':'open'}">${t.filled}/${t.need}${full?' ✓':' open'}</div>`;
+        cards.appendChild(card);
+      });
+      grp.appendChild(cards); host.appendChild(grp);
+    });
+  }
+  document.getElementById("clearBtn").addEventListener("click",()=>{
+    Object.keys(sel).forEach(k=>sel[k]="");
+    document.querySelectorAll(".facet select").forEach(s=>s.value="");
+    renderBoard();
+  });
+
+  // start with a representative filter so the review shows the feature working
+  sel.day="Sat Jul 25"; sel.group="Scouts";
+  document.querySelector('.facet[data-key="day"] select').value="Sat Jul 25";
+  document.querySelector('.facet[data-key="group"] select').value="Scouts";
+  renderBoard();
+</script>
+</body>
+</html>
