@@ -1,14 +1,16 @@
 import Link from "next/link";
 import { groupTasksByDay } from "@/lib/domain/board";
+import type { FacetOptions } from "@/lib/domain/board";
 import type { BoardTask } from "@/lib/domain/types";
 import { TaskCard } from "@/components/TaskCard";
+import { FilterBar } from "@/components/FilterBar";
 
 export function Board({
   eventName, tasks, filter,
 }: {
   eventName: string;
   tasks: BoardTask[];
-  filter?: { group: string; covered: number; total: number };
+  filter?: { options: FacetOptions; activeLabels: string[]; covered: number; total: number };
 }) {
   const groups = groupTasksByDay(tasks);
   let cardIndex = 0; // running count for a board-wide staggered reveal
@@ -43,20 +45,19 @@ export function Board({
         </details>
       </header>
 
-      {filter && (
+      {filter && <FilterBar options={filter.options} />}
+
+      {filter && filter.activeLabels.length > 0 && (
         <div className="mx-auto mb-8 max-w-sm rounded-2xl border border-amber/50 bg-amber/10 px-4 py-3 text-center">
           <p className="text-sm font-bold text-lantern-deep">
-            {`Showing ${filter.group} tasks — ${filter.covered} of ${filter.total} covered`}
+            {`Showing ${filter.activeLabels.join(" · ")} — ${filter.covered} of ${filter.total} covered`}
           </p>
-          <Link href="/" className="mt-1 inline-block text-xs font-semibold text-pond underline-offset-4 hover:underline">
-            See the whole event →
-          </Link>
         </div>
       )}
 
-      {filter && tasks.length === 0 && (
+      {filter && filter.activeLabels.length > 0 && tasks.length === 0 && (
         <p className="mx-auto max-w-sm text-center text-sm text-ink-soft">
-          {`No ${filter.group} tasks yet — check back, or see the whole event above.`}
+          No matching shifts — loosen a filter above to see more.
         </p>
       )}
 

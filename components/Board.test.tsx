@@ -3,7 +3,11 @@ import { expect, test, vi } from "vitest";
 import { Board } from "@/components/Board";
 import type { BoardTask } from "@/lib/domain/types";
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  usePathname: () => "/ginza-2026",
+  useSearchParams: () => new URLSearchParams(),
+}));
 vi.mock("@/app/actions/signups", () => ({ claimSlot: vi.fn(), releaseSignup: vi.fn() }));
 
 function task(overrides: Partial<BoardTask>): BoardTask {
@@ -28,14 +32,13 @@ test("explains what a frog is", () => {
   expect(screen.getByText(/one-off thing that needs doing/i)).toBeInTheDocument();
 });
 
-test("a group filter shows a coverage header and a link back to the whole event", () => {
+test("active facet labels show a coverage header", () => {
   render(
     <Board eventName="Ginza Bazaar" tasks={[task({ requestedGroup: "Scouts" })]}
-      filter={{ group: "Scouts", covered: 7, total: 9 }} />,
+      filter={{ options: { date: [], group: [], category: [], location: [] }, activeLabels: ["Scouts"], covered: 7, total: 9 }} />,
   );
-  expect(screen.getByText(/showing scouts tasks/i)).toBeInTheDocument();
+  expect(screen.getByText(/Showing Scouts/)).toBeInTheDocument();
   expect(screen.getByText(/7 of 9 covered/i)).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: /whole event/i })).toHaveAttribute("href", "/");
 });
 
 test("without a filter there is no coverage header", () => {
@@ -43,9 +46,10 @@ test("without a filter there is no coverage header", () => {
   expect(screen.queryByText(/covered/i)).toBeNull();
 });
 
-test("a group filter with no matching tasks shows a friendly empty state", () => {
+test("active facet with no matching tasks shows a friendly empty state", () => {
   render(
-    <Board eventName="Ginza Bazaar" tasks={[]} filter={{ group: "Scouts", covered: 0, total: 0 }} />,
+    <Board eventName="Ginza Bazaar" tasks={[]}
+      filter={{ options: { date: [], group: [], category: [], location: [] }, activeLabels: ["Scouts"], covered: 0, total: 0 }} />,
   );
-  expect(screen.getByText(/no scouts tasks/i)).toBeInTheDocument();
+  expect(screen.getByText(/no matching shifts/i)).toBeInTheDocument();
 });
