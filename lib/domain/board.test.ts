@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { getSlotInfo, groupTasksByDay, filterTasksByGroup, coverageFor } from "@/lib/domain/board";
+import { getSlotInfo, groupTasksByDay, filterTasksByGroup, coverageFor, filterTasks, facetOptions } from "@/lib/domain/board";
 import type { BoardTask } from "@/lib/domain/types";
 
 function task(overrides: Partial<BoardTask>): BoardTask {
@@ -94,5 +94,50 @@ describe("coverageFor", () => {
   });
   test("an empty list is zero of zero", () => {
     expect(coverageFor([])).toEqual({ covered: 0, total: 0 });
+  });
+});
+
+function facetTask(over: Partial<BoardTask>): BoardTask {
+  return {
+    id: over.id ?? "t", kind: "shift", title: "T", category: null, requestedGroup: null,
+    neededCount: 1, date: null, startAt: null, endAt: null, dueBy: null, pointOfContact: null,
+    location: null, definitionOfDone: null, position: 0, status: "todo", waiting: false,
+    signups: [], ...over,
+  };
+}
+
+describe("filterTasks", () => {
+  const tasks = [
+    facetTask({ id: "a", requestedGroup: "Scouts", category: "Games", location: "Gym", date: new Date("2026-07-25T00:00:00Z") }),
+    facetTask({ id: "b", requestedGroup: "YAO", category: "Games", location: "Stage", date: new Date("2026-07-26T00:00:00Z") }),
+    facetTask({ id: "c", requestedGroup: "Scouts", category: "Food", location: "Gym", date: new Date("2026-07-25T00:00:00Z") }),
+  ];
+  test("an empty facet set returns everything", () => {
+    expect(filterTasks(tasks, {}).map((t) => t.id)).toEqual(["a", "b", "c"]);
+  });
+  test("AND across facets (Saturday + Scouts + Games)", () => {
+    expect(filterTasks(tasks, { date: "2026-07-25", group: "scouts", category: "Games" }).map((t) => t.id))
+      .toEqual(["a"]);
+  });
+  test("group match is case- and space-insensitive", () => {
+    expect(filterTasks(tasks, { group: "  SCOUTS " }).map((t) => t.id)).toEqual(["a", "c"]);
+  });
+  test("date matches the calendar day", () => {
+    expect(filterTasks(tasks, { date: "2026-07-26" }).map((t) => t.id)).toEqual(["b"]);
+  });
+});
+
+describe("facetOptions", () => {
+  test("distinct, sorted, labeled values; blanks ignored", () => {
+    const opts = facetOptions([
+      facetTask({ requestedGroup: "Scouts", category: "Games", location: "Gym", date: new Date("2026-07-26T00:00:00Z") }),
+      facetTask({ requestedGroup: "BWA", category: "Games", location: "", date: new Date("2026-07-25T00:00:00Z") }),
+      facetTask({ requestedGroup: "", category: null }),
+    ]);
+    expect(opts.group).toEqual(["BWA", "Scouts"]);
+    expect(opts.category).toEqual(["Games"]);
+    expect(opts.location).toEqual(["Gym"]);
+    expect(opts.date.map((d) => d.value)).toEqual(["2026-07-25", "2026-07-26"]);
+    expect(opts.date[0].label).toMatch(/Jul 25/);
   });
 });

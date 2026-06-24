@@ -6,12 +6,48 @@ export function getSlotInfo(task: BoardTask): SlotInfo {
   return { filled, needed, isFull: filled >= needed };
 }
 
+export interface Facets { date?: string; group?: string; category?: string; location?: string }
+export interface FacetOptions {
+  date: { value: string; label: string }[];
+  group: string[]; category: string[]; location: string[];
+}
+
+function fieldEq(actual: string | null, wanted: string): boolean {
+  return (actual ?? "").trim().toLowerCase() === wanted.trim().toLowerCase();
+}
+
+/** Tasks matching every provided facet (AND). A blank/absent facet adds no constraint. */
+export function filterTasks(tasks: BoardTask[], facets: Facets): BoardTask[] {
+  return tasks.filter((t) => {
+    if (facets.group?.trim() && !fieldEq(t.requestedGroup, facets.group)) return false;
+    if (facets.category?.trim() && !fieldEq(t.category, facets.category)) return false;
+    if (facets.location?.trim() && !fieldEq(t.location, facets.location)) return false;
+    if (facets.date?.trim() && (!t.date || tzIsoDate(t.date) !== facets.date.trim())) return false;
+    return true;
+  });
+}
+
+/** Distinct, non-empty values present in the tasks, for building the filter bar. */
+export function facetOptions(tasks: BoardTask[]): FacetOptions {
+  const dates = new Map<string, string>(); // iso -> weekday label
+  const group = new Set<string>(), category = new Set<string>(), location = new Set<string>();
+  for (const t of tasks) {
+    if (t.date) dates.set(tzIsoDate(t.date), dayLabel(t.date));
+    if (t.requestedGroup?.trim()) group.add(t.requestedGroup.trim());
+    if (t.category?.trim()) category.add(t.category.trim());
+    if (t.location?.trim()) location.add(t.location.trim());
+  }
+  const alpha = (s: Set<string>) => [...s].sort((a, b) => a.localeCompare(b));
+  return {
+    date: [...dates.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([value, label]) => ({ value, label })),
+    group: alpha(group), category: alpha(category), location: alpha(location),
+  };
+}
+
 /** Tasks asked of one group (case- and space-insensitive on `requestedGroup`).
  *  A blank group is treated as "no filter" and returns everything. */
 export function filterTasksByGroup(tasks: BoardTask[], group: string): BoardTask[] {
-  const g = group.trim().toLowerCase();
-  if (g === "") return tasks;
-  return tasks.filter((t) => (t.requestedGroup ?? "").trim().toLowerCase() === g);
+  return filterTasks(tasks, { group });
 }
 
 /** How many of these tasks are fully staffed, out of the total — the headline a
