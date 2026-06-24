@@ -15,6 +15,9 @@ test("organizer sets up an event and opens sign-ups", async ({ page }) => {
 
   await expect(page.getByText(/draft — only organizers/i)).toBeVisible();
 
+  // the organizer can jump to the public signup page for this event
+  await expect(page.getByRole("link", { name: /view signup page/i })).toBeVisible();
+
   await page.getByRole("button", { name: /add row/i }).click();
   await page.getByLabel("Title, row 1").fill("Lantern setup");
   await page.getByLabel("Date, row 1").fill("Aug 1");

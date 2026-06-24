@@ -24,6 +24,10 @@ export default async function OrganizeEventPage({
       <div className="mb-4 flex items-baseline justify-between">
         <h1 className="font-display text-2xl font-extrabold text-ink">🐸 {grid.name}</h1>
         <div className="flex items-baseline gap-4">
+          <Link href={`/${grid.slug ?? grid.id}`} target="_blank" rel="noopener noreferrer"
+            className="text-sm font-medium text-reed-deep underline-offset-2 hover:underline">
+            View signup page ↗
+          </Link>
           <Link href={`/organize/${grid.id}/history`} className="text-sm font-medium text-pond underline-offset-2 hover:underline">
             History
           </Link>
