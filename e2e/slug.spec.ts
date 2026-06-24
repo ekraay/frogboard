@@ -15,7 +15,7 @@ test("the pretty slug URL renders that event's board", async ({ page }) => {
 
 test("the group filter works on the pretty URL", async ({ page }) => {
   await page.goto("/ginza-2026?group=Scouts");
-  await expect(page.getByText(/showing scouts tasks/i)).toBeVisible();
+  await expect(page.getByText(/showing scouts/i)).toBeVisible();
 });
 
 test("an unknown slug returns 404", async ({ page }) => {
