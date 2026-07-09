@@ -10,7 +10,7 @@ import {
 beforeEach(async () => { await resetDb(); });
 afterAll(async () => { await prisma.$disconnect(); });
 
-const dates = { startDate: new Date("2026-07-24"), endDate: new Date("2026-07-26") };
+const dates = { startDate: new Date("2026-07-24"), endDate: new Date("2026-07-26"), orgId: "org_bcsf" };
 
 test("a minor's last name is abbreviated on the board; the minor flag is never exposed", async () => {
   const e = await prisma.event.create({ data: { name: "Ginza", status: "published", ...dates } });

@@ -13,6 +13,9 @@ export async function resetDb() {
   }
   await prisma.auditLog.deleteMany();
   await prisma.signup.deleteMany();
+  await prisma.rsvp.deleteMany();
+  await prisma.lead.deleteMany();
+  await prisma.person.deleteMany();
   await prisma.task.deleteMany();
   await prisma.event.deleteMany();
 }

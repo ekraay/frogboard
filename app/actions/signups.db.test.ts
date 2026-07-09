@@ -12,7 +12,7 @@ afterAll(async () => { await prisma.$disconnect(); });
 
 async function seedTask(): Promise<string> {
   const event = await prisma.event.create({
-    data: { name: "E", startDate: new Date(), endDate: new Date() },
+    data: { name: "E", startDate: new Date(), endDate: new Date(), orgId: "org_bcsf" },
   });
   const task = await prisma.task.create({
     data: { eventId: event.id, title: "Games", neededCount: 2 },

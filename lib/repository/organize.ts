@@ -6,7 +6,7 @@ import { generateUniqueSlug } from "@/lib/repository/events";
 
 export async function createEvent(name: string, startDate: Date, endDate: Date): Promise<Event> {
   const slug = await generateUniqueSlug(name);
-  return prisma.event.create({ data: { name, slug, startDate, endDate } });
+  return prisma.event.create({ data: { name, slug, startDate, endDate, orgId: "org_bcsf" } });
 }
 
 export interface EventListItem {

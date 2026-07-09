@@ -6,7 +6,7 @@ import { createSignupWithAudit, deleteSignupWithAudit } from "@/lib/repository/s
 
 async function makeTaskNeeding(n: number): Promise<string> {
   const event = await prisma.event.create({
-    data: { name: "Test", startDate: new Date(), endDate: new Date() },
+    data: { name: "Test", startDate: new Date(), endDate: new Date(), orgId: "org_bcsf" },
   });
   const task = await prisma.task.create({
     data: { eventId: event.id, title: "Games", neededCount: n },

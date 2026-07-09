@@ -22,12 +22,15 @@ function toBoardTasks(tasks: TaskWithSignups[]): BoardTask[] {
   }));
 }
 
-/** A slug derived from `name`, guaranteed free of reserved words and collisions. */
+/** A slug derived from `name`, guaranteed free of reserved words and collisions within org_bcsf. */
 export async function generateUniqueSlug(name: string): Promise<string> {
   const base = slugify(name);
   let candidate = base;
   let n = 1;
-  while (isReservedSlug(candidate) || (await prisma.event.findUnique({ where: { slug: candidate } }))) {
+  while (
+    isReservedSlug(candidate) ||
+    (await prisma.event.findUnique({ where: { orgId_slug: { orgId: "org_bcsf", slug: candidate } } }))
+  ) {
     n += 1;
     candidate = `${base}-${n}`;
   }
@@ -42,7 +45,7 @@ export async function updateEventSlug(
   if (rawSlug.trim() === "") return { ok: false, error: "Give the link a name." };
   const slug = slugify(rawSlug);
   if (isReservedSlug(slug)) return { ok: false, error: "That word is reserved — pick another." };
-  const clash = await prisma.event.findUnique({ where: { slug } });
+  const clash = await prisma.event.findUnique({ where: { orgId_slug: { orgId: "org_bcsf", slug } } });
   if (clash && clash.id !== eventId) return { ok: false, error: "That link is already taken." };
   const updated = await prisma.event.updateMany({ where: { id: eventId }, data: { slug } });
   if (updated.count === 0) return { ok: false, error: "That event no longer exists." };
