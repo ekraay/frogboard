@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { statusCounts, chaseList, type RosterPerson } from "@/lib/domain/roster";
+import { statusCounts, chaseList, parsePersonRows, type RosterPerson } from "@/lib/domain/roster";
 import type { RsvpRecord } from "@/lib/domain/rsvp";
 
 function person(id: string, subGroup: string | null): RosterPerson {
@@ -43,5 +43,26 @@ describe("chaseList", () => {
   test("null sub-group collects under 'Ungrouped'", () => {
     const groups = chaseList([person("a", null)], map([]));
     expect(groups[0].subGroup).toBe("Ungrouped");
+  });
+});
+
+describe("parsePersonRows", () => {
+  test("maps First/Last/Patrol/Position/Scout ID by header, skips blanks", () => {
+    const raw = [
+      "First Name\tLast Name\tPatrol\tPosition\tScout ID",
+      "Simon\tKraay\t\tSPL\t135291163",
+      "Naoto\tThompson\tHawk\tPL\t135684307",
+      "\t\t\t\t",
+    ].join("\n");
+    expect(parsePersonRows(raw)).toEqual([
+      { name: "Simon Kraay", subGroup: null, position: "SPL", externalId: "135291163" },
+      { name: "Naoto Thompson", subGroup: "Hawk", position: "PL", externalId: "135684307" },
+    ]);
+  });
+  test("accepts a Team column as the sub-group and tolerates a missing Scout ID", () => {
+    const raw = ["First Name\tLast Name\tTeam", "Ava\tLin\tTeam A"].join("\n");
+    expect(parsePersonRows(raw)).toEqual([
+      { name: "Ava Lin", subGroup: "Team A", position: null, externalId: null },
+    ]);
   });
 });
