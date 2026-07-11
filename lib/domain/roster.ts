@@ -6,6 +6,7 @@ export interface RosterPerson {
   name: string;
   subGroup: string | null;
   minor: boolean | null;
+  position: string | null;
 }
 
 export interface StatusCounts {
@@ -23,7 +24,7 @@ export function statusCounts(people: { id: string }[], byPerson: Map<string, Rsv
 
 export interface ChaseGroup {
   subGroup: string;
-  people: { id: string; name: string; status: EffectiveStatus; reason: string | null }[];
+  people: { id: string; name: string; position: string | null; status: EffectiveStatus; reason: string | null }[];
 }
 
 /** The people still to chase (blank, then maybe), grouped by sub-group, groups sorted alphabetically. */
@@ -37,7 +38,7 @@ export function chaseList(people: RosterPerson[], byPerson: Map<string, RsvpReco
     const reason = records.find((r) => r.day === null)?.reason ?? null;
     const key = p.subGroup?.trim() ? p.subGroup.trim() : "Ungrouped";
     if (!bySub.has(key)) bySub.set(key, []);
-    bySub.get(key)!.push({ id: p.id, name: p.name, status, reason });
+    bySub.get(key)!.push({ id: p.id, name: p.name, position: p.position, status, reason });
   }
   return [...bySub.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))

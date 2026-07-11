@@ -52,6 +52,7 @@ export function ChaseView({ token, group, eventName, counts, chase }: {
                   <div className="flex items-center justify-between gap-2">
                     <span className="min-w-0">
                       <span className="font-medium text-ink">{p.name}</span>
+                      {p.position && <span className="text-xs text-ink-soft"> · {p.position}</span>}
                       {p.reason && <span className="block text-xs text-ink-soft">{p.reason}</span>}
                     </span>
                     <ReasonThenButtons pending={pending} onPick={(status, reason) => record(p.id, status, reason)} />

@@ -3,7 +3,7 @@ import { statusCounts, chaseList, parsePersonRows, type RosterPerson } from "@/l
 import type { RsvpRecord } from "@/lib/domain/rsvp";
 
 function person(id: string, subGroup: string | null): RosterPerson {
-  return { id, name: `Name ${id}`, subGroup, minor: true };
+  return { id, name: `Name ${id}`, subGroup, minor: true, position: null };
 }
 function map(entries: [string, RsvpRecord[]][]): Map<string, RsvpRecord[]> {
   return new Map(entries);
@@ -53,6 +53,11 @@ describe("chaseList", () => {
   test("never exposes the minor flag on a chase row", () => {
     const row = chaseList([person("a", "Hawk")], map([]))[0].people[0];
     expect(row).not.toHaveProperty("minor");
+  });
+  test("carries position onto the chase row", () => {
+    const people: RosterPerson[] = [{ id: "a", name: "Alex T.", subGroup: "Hawk", minor: true, position: "PL" }];
+    const row = chaseList(people, map([]))[0].people[0];
+    expect(row.position).toBe("PL");
   });
 });
 

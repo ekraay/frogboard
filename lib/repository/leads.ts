@@ -56,7 +56,7 @@ export async function getLeadChaseView(
   if (!lead) return null;
   const people = await prisma.person.findMany({
     where: { orgId: lead.orgId, active: true, group: lead.group },
-    select: { id: true, name: true, subGroup: true, minor: true },
+    select: { id: true, name: true, subGroup: true, minor: true, position: true },
   });
   const rsvps = await getEventRsvps(lead.eventId);
   const byPerson = new Map<string, RsvpRecord[]>();
@@ -66,7 +66,7 @@ export async function getLeadChaseView(
   }
   // Abbreviate before building the view so a full surname never leaves the server.
   const roster: RosterPerson[] = people.map((p) => ({
-    id: p.id, name: boardDisplayName(p.name, p.minor), subGroup: p.subGroup, minor: p.minor,
+    id: p.id, name: boardDisplayName(p.name, p.minor), subGroup: p.subGroup, minor: p.minor, position: p.position,
   }));
   return {
     group: lead.group,

@@ -75,6 +75,16 @@ describe("getLeadChaseView", () => {
     const row = view!.chase.flatMap((g) => g.people).find((p) => p.id === cara!.id)!;
     expect(row.reason).toBe("Might have a game");
   });
+  test("shows each person's position on the chase row", async () => {
+    const e = await event();
+    await importPeople(ORG, "Scouts", [
+      { name: "Alex Tanaka", subGroup: "Hawk", position: "PL", externalId: "1" },
+    ], { minor: true });
+    const lead = await createLead(e.id, "Scouts", "Simon");
+    const view = await getLeadChaseView(lead.token);
+    const row = view!.chase.flatMap((g) => g.people).find((p) => p.name === "Alex T.")!;
+    expect(row.position).toBe("PL");
+  });
   test("null on an unknown token", async () => {
     expect(await getLeadChaseView("nope")).toBeNull();
   });
