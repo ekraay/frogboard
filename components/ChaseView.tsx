@@ -50,7 +50,10 @@ export function ChaseView({ token, group, eventName, counts, chase }: {
               {g.people.map((p) => (
                 <li key={p.id} className="rounded-2xl border border-lily-line bg-white px-4 py-3">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium text-ink">{p.name}</span>
+                    <span className="min-w-0">
+                      <span className="font-medium text-ink">{p.name}</span>
+                      {p.reason && <span className="block text-xs text-ink-soft">{p.reason}</span>}
+                    </span>
                     <ReasonThenButtons pending={pending} onPick={(status, reason) => record(p.id, status, reason)} />
                   </div>
                 </li>

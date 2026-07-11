@@ -34,8 +34,10 @@ test("the partial unique index rejects a second whole-event row", async () => {
   ).rejects.toMatchObject({ code: "P2002" });
 });
 
-test("getEventRsvps returns each person's rows", async () => {
+test("getEventRsvps returns each person's rows with reason", async () => {
   const { event, person } = await fixture();
-  await setRsvp(person.id, event.id, "maybe", null);
-  expect(await getEventRsvps(event.id)).toEqual([{ personId: person.id, day: null, status: "maybe" }]);
+  await setRsvp(person.id, event.id, "maybe", "Maybe if practice ends early");
+  expect(await getEventRsvps(event.id)).toEqual([
+    { personId: person.id, day: null, status: "maybe", reason: "Maybe if practice ends early" },
+  ]);
 });

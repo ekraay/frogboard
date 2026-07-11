@@ -60,7 +60,7 @@ export async function getLeadChaseView(
   const byPerson = new Map<string, RsvpRecord[]>();
   for (const r of rsvps) {
     if (!byPerson.has(r.personId)) byPerson.set(r.personId, []);
-    byPerson.get(r.personId)!.push({ day: r.day, status: r.status });
+    byPerson.get(r.personId)!.push({ day: r.day, status: r.status, reason: r.reason });
   }
   // Abbreviate before building the view so a full surname never leaves the server.
   const roster: RosterPerson[] = people.map((p) => ({

@@ -28,10 +28,9 @@ export async function setRsvp(
 
 export async function getEventRsvps(
   eventId: string,
-): Promise<{ personId: string; day: Date | null; status: RsvpStatus }[]> {
-  const rows = await prisma.rsvp.findMany({
+): Promise<{ personId: string; day: Date | null; status: RsvpStatus; reason: string | null }[]> {
+  return prisma.rsvp.findMany({
     where: { eventId },
-    select: { personId: true, day: true, status: true },
+    select: { personId: true, day: true, status: true, reason: true },
   });
-  return rows;
 }

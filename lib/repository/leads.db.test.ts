@@ -63,6 +63,18 @@ describe("getLeadChaseView", () => {
     const hawk = view!.chase.find((g) => g.subGroup === "Hawk")!;
     expect(hawk.people.map((p) => p.name)).toEqual(["Alex T."]); // minor abbreviation, Bo dropped
   });
+  test("shows a maybe person's reason on the chase row", async () => {
+    const e = await event();
+    await importPeople(ORG, "Scouts", [
+      { name: "Cara Ito", subGroup: "Hawk", position: null, externalId: "9" },
+    ], { minor: true });
+    const cara = await prisma.person.findFirst({ where: { name: "Cara Ito" } });
+    await setRsvp(cara!.id, e.id, "maybe", "Might have a game");
+    const lead = await createLead(e.id, "Scouts", "Simon");
+    const view = await getLeadChaseView(lead.token);
+    const row = view!.chase.flatMap((g) => g.people).find((p) => p.id === cara!.id)!;
+    expect(row.reason).toBe("Might have a game");
+  });
   test("null on an unknown token", async () => {
     expect(await getLeadChaseView("nope")).toBeNull();
   });

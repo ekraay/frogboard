@@ -44,6 +44,12 @@ describe("chaseList", () => {
     const groups = chaseList([person("a", null)], map([]));
     expect(groups[0].subGroup).toBe("Ungrouped");
   });
+  test("carries a maybe person's reason onto the chase row", () => {
+    const people = [person("a", "Hawk")];
+    const byPerson = map([["a", [{ day: null, status: "maybe", reason: "Working that night" }]]]);
+    const row = chaseList(people, byPerson)[0].people[0];
+    expect(row.reason).toBe("Working that night");
+  });
 });
 
 describe("parsePersonRows", () => {

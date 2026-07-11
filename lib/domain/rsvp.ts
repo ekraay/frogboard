@@ -4,6 +4,7 @@ export type EffectiveStatus = RsvpStatus | "blank";
 export interface RsvpRecord {
   day: Date | null;
   status: RsvpStatus;
+  reason?: string | null;
 }
 
 function sameDay(a: Date, b: Date): boolean {
