@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { updateEventSlugAction } from "@/app/actions/organize";
 
 /** Edit an event's public link slug, e.g. /ginza-2026. */
-export function SlugEditor({ eventId, slug }: { eventId: string; slug: string | null }) {
+export function SlugEditor({ eventId, slug, onSaved }: { eventId: string; slug: string | null; onSaved?: () => void }) {
   const [value, setValue] = useState(slug ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -18,7 +18,7 @@ export function SlugEditor({ eventId, slug }: { eventId: string; slug: string | 
     setSaved(false);
     startTransition(async () => {
       const result = await updateEventSlugAction(eventId, value);
-      if (result.ok) { setValue(result.slug); setSaved(true); router.refresh(); }
+      if (result.ok) { setValue(result.slug); setSaved(true); onSaved?.(); router.refresh(); }
       else setError(result.error);
     });
   }

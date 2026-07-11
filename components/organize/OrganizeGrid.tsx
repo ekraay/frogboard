@@ -11,9 +11,10 @@ import { parseTsv, applyPaste } from "@/lib/domain/paste";
 import { GridRow, GRID_COLUMNS, type RowState } from "@/components/organize/GridRow";
 import { PasteTasksDialog } from "@/components/organize/PasteTasksDialog";
 import { HelpPopover } from "@/components/organize/HelpPopover";
+import { SlugEditor } from "@/components/organize/SlugEditor";
 
 interface GridEvent {
-  id: string; name: string; status: "draft" | "published" | "archived"; startDate: Date; endDate: Date;
+  id: string; name: string; status: "draft" | "published" | "archived"; slug: string | null; startDate: Date; endDate: Date;
 }
 
 type Pending =
@@ -38,6 +39,8 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     })),
   );
   const [status, setStatus] = useState(event.status);
+  const [editingLink, setEditingLink] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [pasting, setPasting] = useState(false);
   // One undo window at a time, for either a single-row delete or a whole-grid
   // "Clear all". The server delete is DEFERRED for both, so Undo restores the
@@ -338,17 +341,46 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     ? `${attention} row${attention > 1 ? "s" : ""} need${attention === 1 ? "s" : ""} attention`
     : "Saved ✓";
 
+  const publicParam = event.slug ?? event.id;
+  const shownUrl = `frogboard.vercel.app/${event.slug ?? (status === "published" ? event.id : "…")}`;
+  function copyLink() {
+    const base = typeof window === "undefined" ? "" : window.location.origin;
+    void navigator.clipboard?.writeText(`${base}/${publicParam}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
   return (
     <div onPaste={onPaste}>
-      <div className={`mb-4 flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 ${
+      <div className={`mb-4 flex items-start justify-between gap-3 rounded-2xl border px-4 py-3 ${
         status === "published" ? "border-amber/50 bg-amber/10" : "border-lily-line bg-lily/50"
       }`}>
-        <p className="text-sm text-ink">
-          {status === "published"
-            ? <><strong>🏮 Live</strong> &mdash; volunteers see changes as you make them.</>
-            : <><strong>🌱 Draft</strong> &mdash; only organizers can see this.</>}
-        </p>
-        <div className="flex items-center gap-3">
+        <div className="min-w-0">
+          <p className="text-sm text-ink">
+            {status === "published" ? (
+              <>
+                <strong>🏮 Live</strong> at{" "}
+                <a href={`/${publicParam}`} target="_blank" rel="noopener noreferrer"
+                  className="font-medium text-reed-deep underline-offset-2 hover:underline">
+                  {shownUrl} ↗
+                </a>
+              </>
+            ) : (
+              <><strong>🌱 Draft</strong> · will publish to {shownUrl}</>
+            )}
+          </p>
+          <div className="mt-1 flex items-center gap-3 text-sm">
+            <button type="button" onClick={copyLink}
+              className="font-medium text-pond underline-offset-2 hover:underline">
+              {copied ? "Copied ✓" : "Copy link"}
+            </button>
+            <button type="button" onClick={() => setEditingLink((v) => !v)}
+              className="font-medium text-pond underline-offset-2 hover:underline">
+              Edit link
+            </button>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
           <span aria-live="polite" className="text-sm text-ink-soft">{chip}</span>
           <button type="button" onClick={toggleStatus}
             className="rounded-xl bg-reed px-4 py-2 text-sm font-bold text-white transition hover:bg-reed-deep">
@@ -356,6 +388,11 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
           </button>
         </div>
       </div>
+      {editingLink && (
+        <div className="mb-4">
+          <SlugEditor eventId={event.id} slug={event.slug} onSaved={() => setEditingLink(false)} />
+        </div>
+      )}
 
       <div className="mb-2.5 flex flex-wrap items-center gap-2 text-sm">
         <span className="inline-flex items-center gap-1">

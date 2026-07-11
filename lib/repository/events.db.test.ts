@@ -10,7 +10,7 @@ import {
 beforeEach(async () => { await resetDb(); });
 afterAll(async () => { await prisma.$disconnect(); });
 
-const dates = { startDate: new Date("2026-07-24"), endDate: new Date("2026-07-26") };
+const dates = { startDate: new Date("2026-07-24"), endDate: new Date("2026-07-26"), orgId: "org_bcsf" };
 
 test("a minor's last name is abbreviated on the board; the minor flag is never exposed", async () => {
   const e = await prisma.event.create({ data: { name: "Ginza", status: "published", ...dates } });
@@ -94,6 +94,17 @@ describe("getEventBoardByParam", () => {
     expect(await getEventBoardByParam("nope")).toBeNull();
     await prisma.event.create({ data: { name: "D", slug: "draft-one", status: "draft", ...dates } });
     expect(await getEventBoardByParam("draft-one")).toBeNull();
+  });
+  test("never serves another org's board for a shared slug", async () => {
+    const other = await prisma.organization.upsert({
+      where: { slug: "other" }, update: {}, create: { name: "Other", slug: "other" },
+    });
+    // Create the other org's event first, so an unscoped findFirst would return it.
+    await prisma.event.create({
+      data: { name: "Theirs", slug: "shared", status: "published", startDate: dates.startDate, endDate: dates.endDate, orgId: other.id },
+    });
+    await prisma.event.create({ data: { name: "Ours", slug: "shared", status: "published", ...dates } });
+    expect((await getEventBoardByParam("shared"))!.name).toBe("Ours");
   });
 });
 

@@ -36,6 +36,18 @@ so design them together.
 
 ## Explore / design first
 
+- **Single-card create view**: a focused one-card form to add a task/frog, instead
+  of adding rows in the spreadsheet grid. The grid stays the power tool for bulk
+  **edit / delete / archive**; the card is the quick "add one thing" path (title,
+  kind, area, need, when). Open Q: entry point (a "+ New task" button on the event
+  page? the board?), and whether the card also edits a single existing task or stays
+  create-only.
+
+- **Friendly page for an unopened board.** A draft event's public link returns a bare
+  404, so an organizer previewing the link before opening sign-ups sees a dead end. Show
+  a "this event isn't open yet" page instead, like the lead page's friendly invalid state.
+  Open Q: should the organizer see a preview of their own draft board while signed in?
+
 - **Full undo/redo history** — v1 ships single-level undo (last delete/clear via
   ⟲ button + Cmd/Ctrl+Z). A bigger card: multi-step history, **redo** (↷ /
   Cmd+Shift+Z), and undo of **cell edits** and **row reorders**. Hard because the
@@ -75,6 +87,15 @@ so design them together.
 - **AI agents for organizers** — explore agents that draft a task list from a
   plain description, suggest where help is needed, or write reminder messages.
   Intent is still loose; define the first concrete job before building.
+- **Passwordless accounts (magic links + SMS).** When real accounts arrive, make
+  sign-in passwordless and modern: email **magic links** and **SMS** one-time codes/
+  links, no passwords to remember. Fits the no-friction ethos that won adoption, and
+  reuses the reserved email-as-identity plumbing (`Signup.userId`). Needs: an email
+  sender (**Resend**, shared with the reminder loop) and an **SMS provider** (Twilio?
+  cost per message). Minor safety: text the **parent**, not the kid. Open Q: which
+  role gets accounts first (organizers, then volunteers?), and session/link expiry.
+  Underpins **Avatars** and the roster/RSVP identity work below.
+
 - **Avatars** — show people's avatars on the board and in history once real
   accounts exist (depends on the accounts/identity work; not possible with the
   current no-account, name-only model).
@@ -103,6 +124,19 @@ so design them together.
     sign-ups. Open Q: counts only, or names? (privacy, esp. minors).
   - Likely Phase 3/4. Biggest unknowns: identity-via-email, email infra, and the
     privacy model for rosters that include minors.
+- **Participation tracking across events (needs the groups epic).** Once people
+  persist in the org roster (`2026-07-11-groups-epic-design.md`), join a person's
+  answers across the year's events to see who volunteers and who does not.
+  - **Reliability report:** "Alex: 5 of 6 events; Bo: 0 of 6." Surfaces reliable
+    people, ghosts, and families carrying every event (fairness).
+  - **Scout service-hour tally:** count each scout's events (later, hours) across
+    the year. A concrete deliverable for the scoutmaster.
+  - **Feeds targeted reminders:** the reminder loop nudges exactly the people who
+    never respond.
+- **Attendance check-in (RSVP intent vs actual show).** RSVP and task sign-ups
+  record intent and claims, not whether someone showed up. Add a lightweight
+  "did it" / check-in mark at the event so participation reports reflect reality.
+  Separate from RSVP; builds on the persistent roster.
 
 ## Shipped
 

@@ -96,7 +96,7 @@ describe("createEventAction + setEventStatusAction", () => {
   });
   test("can archive an event", async () => {
     authenticate();
-    const e = await prisma.event.create({ data: { name: "E", startDate: new Date(), endDate: new Date() } });
+    const e = await prisma.event.create({ data: { name: "E", startDate: new Date(), endDate: new Date(), orgId: "org_bcsf" } });
     expect(await setEventStatusAction(e.id, "archived")).toEqual({ ok: true });
     expect((await prisma.event.findUnique({ where: { id: e.id } }))!.status).toBe("archived");
   });
@@ -104,13 +104,13 @@ describe("createEventAction + setEventStatusAction", () => {
 
 describe("deleteEventAction", () => {
   test("refuses without a session", async () => {
-    const e = await prisma.event.create({ data: { name: "E", startDate: new Date(), endDate: new Date() } });
+    const e = await prisma.event.create({ data: { name: "E", startDate: new Date(), endDate: new Date(), orgId: "org_bcsf" } });
     expect(await deleteEventAction(e.id)).toEqual({ ok: false, error: "Please sign in." });
     expect(await prisma.event.count()).toBe(1); // untouched
   });
   test("permanently deletes when signed in", async () => {
     authenticate();
-    const e = await prisma.event.create({ data: { name: "E", startDate: new Date(), endDate: new Date() } });
+    const e = await prisma.event.create({ data: { name: "E", startDate: new Date(), endDate: new Date(), orgId: "org_bcsf" } });
     expect(await deleteEventAction(e.id)).toEqual({ ok: true });
     expect(await prisma.event.count()).toBe(0);
   });
@@ -124,7 +124,7 @@ describe("saveTask", () => {
   test("creates a task from raw cells (server-side authoritative parse)", async () => {
     authenticate();
     const e = await prisma.event.create({
-      data: { name: "E", startDate: new Date("2026-07-24"), endDate: new Date("2026-07-26") },
+      data: { name: "E", startDate: new Date("2026-07-24"), endDate: new Date("2026-07-26"), orgId: "org_bcsf" },
     });
     const r = await saveTask({
       eventId: e.id, taskId: null,
@@ -139,7 +139,7 @@ describe("saveTask", () => {
   test("returns the parse problem and its field", async () => {
     authenticate();
     const e = await prisma.event.create({
-      data: { name: "E", startDate: new Date("2026-07-24"), endDate: new Date("2026-07-26") },
+      data: { name: "E", startDate: new Date("2026-07-24"), endDate: new Date("2026-07-26"), orgId: "org_bcsf" },
     });
     const r = await saveTask({ eventId: e.id, taskId: null, cells: { ...emptyCells(), title: "X", need: "lots" } });
     expect(r.ok).toBe(false);
@@ -150,14 +150,14 @@ describe("saveTask", () => {
 
 describe("clearTasks", () => {
   test("refuses without a session and leaves the tasks", async () => {
-    const e = await prisma.event.create({ data: { name: "E", startDate: new Date(), endDate: new Date() } });
+    const e = await prisma.event.create({ data: { name: "E", startDate: new Date(), endDate: new Date(), orgId: "org_bcsf" } });
     const t = await prisma.task.create({ data: { eventId: e.id, title: "T", position: 1024 } });
     expect(await clearTasks(e.id, [t.id])).toEqual({ ok: false, error: "Please sign in." });
     expect(await prisma.task.count()).toBe(1);
   });
   test("clears the listed tasks when signed in and reports the count", async () => {
     authenticate();
-    const e = await prisma.event.create({ data: { name: "E", startDate: new Date(), endDate: new Date() } });
+    const e = await prisma.event.create({ data: { name: "E", startDate: new Date(), endDate: new Date(), orgId: "org_bcsf" } });
     const a = await prisma.task.create({ data: { eventId: e.id, title: "A", position: 1024 } });
     const b = await prisma.task.create({ data: { eventId: e.id, title: "B", position: 2048 } });
     expect(await clearTasks(e.id, [a.id, b.id])).toEqual({ ok: true, count: 2 });
@@ -165,8 +165,8 @@ describe("clearTasks", () => {
   });
   test("never reaches across events", async () => {
     authenticate();
-    const e1 = await prisma.event.create({ data: { name: "One", startDate: new Date(), endDate: new Date() } });
-    const e2 = await prisma.event.create({ data: { name: "Two", startDate: new Date(), endDate: new Date() } });
+    const e1 = await prisma.event.create({ data: { name: "One", startDate: new Date(), endDate: new Date(), orgId: "org_bcsf" } });
+    const e2 = await prisma.event.create({ data: { name: "Two", startDate: new Date(), endDate: new Date(), orgId: "org_bcsf" } });
     const theirs = await prisma.task.create({ data: { eventId: e2.id, title: "Theirs", position: 1024 } });
     expect(await clearTasks(e1.id, [theirs.id])).toEqual({ ok: true, count: 0 });
     expect(await prisma.task.findUnique({ where: { id: theirs.id } })).not.toBeNull();
@@ -176,7 +176,7 @@ describe("clearTasks", () => {
 describe("organizer name (soft identity)", () => {
   async function eventWithDates() {
     return prisma.event.create({
-      data: { name: "E", startDate: new Date("2026-07-24"), endDate: new Date("2026-07-26") },
+      data: { name: "E", startDate: new Date("2026-07-24"), endDate: new Date("2026-07-26"), orgId: "org_bcsf" },
     });
   }
   test("signIn captures the name and stamps it on a created task's audit", async () => {
@@ -224,7 +224,7 @@ describe("revertChange", () => {
   test("brings back a deleted task when signed in", async () => {
     await signIn(fd({ password: "lily-pad-42", name: "Aya" }));
     const e = await prisma.event.create({
-      data: { name: "E", startDate: new Date("2026-07-24"), endDate: new Date("2026-07-26") },
+      data: { name: "E", startDate: new Date("2026-07-24"), endDate: new Date("2026-07-26"), orgId: "org_bcsf" },
     });
     const s = await saveTask({ eventId: e.id, taskId: null, cells: { ...emptyCells(), title: "Games" } });
     if (!s.ok) throw new Error("setup");
@@ -250,14 +250,14 @@ describe("updateEventSlugAction", () => {
   });
   test("sets a normalized slug when signed in", async () => {
     authenticate();
-    const e = await prisma.event.create({ data: { name: "E", startDate: new Date(), endDate: new Date() } });
+    const e = await prisma.event.create({ data: { name: "E", startDate: new Date(), endDate: new Date(), orgId: "org_bcsf" } });
     expect(await updateEventSlugAction(e.id, "Ginza 2026")).toEqual({ ok: true, slug: "ginza-2026" });
     expect((await prisma.event.findUnique({ where: { id: e.id } }))!.slug).toBe("ginza-2026");
   });
   test("reports a taken slug", async () => {
     authenticate();
-    await prisma.event.create({ data: { name: "A", slug: "taken", startDate: new Date(), endDate: new Date() } });
-    const b = await prisma.event.create({ data: { name: "B", startDate: new Date(), endDate: new Date() } });
+    await prisma.event.create({ data: { name: "A", slug: "taken", startDate: new Date(), endDate: new Date(), orgId: "org_bcsf" } });
+    const b = await prisma.event.create({ data: { name: "B", startDate: new Date(), endDate: new Date(), orgId: "org_bcsf" } });
     expect(await updateEventSlugAction(b.id, "taken")).toEqual({ ok: false, error: "That link is already taken." });
   });
 });
@@ -266,7 +266,7 @@ describe("deleteTask + reorderTasks", () => {
   test("full lifecycle", async () => {
     authenticate();
     const e = await prisma.event.create({
-      data: { name: "E", startDate: new Date("2026-07-24"), endDate: new Date("2026-07-26") },
+      data: { name: "E", startDate: new Date("2026-07-24"), endDate: new Date("2026-07-26"), orgId: "org_bcsf" },
     });
     const a = await saveTask({ eventId: e.id, taskId: null, cells: { ...emptyCells(), title: "A" } });
     const b = await saveTask({ eventId: e.id, taskId: null, cells: { ...emptyCells(), title: "B" } });

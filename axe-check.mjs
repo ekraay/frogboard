@@ -1,0 +1,12 @@
+import { chromium } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
+const b = await chromium.launch();
+const ctx = await b.newContext();
+const p = await ctx.newPage();
+await p.goto("http://localhost:3000", { waitUntil: "networkidle" });
+await p.waitForFunction(() => [...document.querySelectorAll('.pad-rise')].every(e => getComputedStyle(e).opacity === '1')).catch(()=>{});
+const r = await new AxeBuilder({ page: p }).withTags(["wcag2a","wcag2aa","wcag21a","wcag21aa"]).analyze();
+console.log("AXE violations:", r.violations.length, r.violations.map(v=>v.id).join(",")||"(none)");
+const link = p.getByRole("link", { name: /organizers/i });
+console.log("Organizers link present:", await link.count() > 0, "| href:", await link.getAttribute("href").catch(()=>"?"));
+await b.close();

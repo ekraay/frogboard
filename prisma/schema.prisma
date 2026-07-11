@@ -36,15 +36,21 @@ enum EventStatus {
 }
 
 model Event {
-  id        String   @id @default(cuid())
+  id        String      @id @default(cuid())
   name      String
-  slug      String?  @unique // human-readable URL, e.g. "ginza-2026"; null until set
+  slug      String? // human-readable URL, e.g. "ginza-2026"; null until set
   startDate DateTime
   endDate   DateTime
   status    EventStatus @default(draft)
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   tasks     Task[]
   auditLogs AuditLog[]
-  createdAt DateTime @default(now())
+  rsvps     Rsvp[]
+  leads     Lead[]
+  createdAt DateTime    @default(now())
+
+  @@unique([orgId, slug])
 }
 
 model Task {
@@ -105,4 +111,68 @@ model AuditLog {
 
   @@index([eventId, createdAt])
   @@index([taskId, createdAt])
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  people    Person[]
+  events    Event[]
+  leads     Lead[]
+}
+
+model Person {
+  id             String       @id @default(cuid())
+  orgId          String
+  org            Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name           String
+  externalIdHash String?
+  email          String?
+  phone          String?
+  group          String?
+  subGroup       String?
+  position       String?
+  minor          Boolean?
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  rsvps          Rsvp[]
+
+  @@unique([orgId, externalIdHash])
+  @@index([orgId, group, subGroup])
+}
+
+enum RsvpStatus {
+  yes
+  no
+  maybe
+}
+
+model Rsvp {
+  id        String     @id @default(cuid())
+  personId  String
+  person    Person     @relation(fields: [personId], references: [id], onDelete: Cascade)
+  eventId   String
+  event     Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  day       DateTime?
+  status    RsvpStatus
+  reason    String?
+  updatedAt DateTime   @updatedAt
+
+  @@index([eventId, personId])
+}
+
+model Lead {
+  id        String       @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  eventId   String
+  event     Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  group     String
+  name      String
+  token     String       @unique
+  createdAt DateTime     @default(now())
+
+  @@index([eventId, group])
 }

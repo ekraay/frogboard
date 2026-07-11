@@ -14,6 +14,7 @@ vi.mock("@/app/actions/organize", () => ({
   clearTasks: (e: string, ids: string[]) => clearTasksAction(e, ids),
   reorderTasks: (e: string, ids: string[]) => reorderTasksAction(e, ids),
   setEventStatusAction: (e: string, s: string) => setEventStatusAction(e, s),
+  updateEventSlugAction: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
@@ -21,7 +22,7 @@ import { OrganizeGrid } from "@/components/organize/OrganizeGrid";
 import type { GridTask } from "@/lib/repository/organize";
 
 const event = {
-  id: "e1", name: "Ginza", status: "draft" as const,
+  id: "e1", name: "Ginza", status: "draft" as const, slug: "ginza-2026",
   startDate: new Date("2026-07-24T00:00:00Z"), endDate: new Date("2026-07-26T00:00:00Z"),
 };
 
@@ -38,6 +39,35 @@ function gridTask(overrides: Partial<GridTask>): GridTask {
 beforeEach(() => {
   saveTask.mockReset(); deleteTaskAction.mockReset(); clearTasksAction.mockReset();
   reorderTasksAction.mockReset(); setEventStatusAction.mockReset();
+});
+
+test("the live banner links to the public board", () => {
+  render(<OrganizeGrid event={{ ...event, status: "published" }} initialTasks={[]} />);
+  const link = screen.getByRole("link", { name: /frogboard\.vercel\.app\/ginza-2026/i });
+  expect(link).toHaveAttribute("href", "/ginza-2026");
+});
+
+test("the draft banner shows where it will publish, without a live link", () => {
+  render(<OrganizeGrid event={event} initialTasks={[]} />);
+  expect(screen.getByText(/will publish to frogboard\.vercel\.app\/ginza-2026/i)).toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: /frogboard\.vercel\.app/i })).not.toBeInTheDocument();
+});
+
+test("Copy link copies the public URL", async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  const user = userEvent.setup();
+  Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+  render(<OrganizeGrid event={{ ...event, status: "published" }} initialTasks={[]} />);
+  await user.click(screen.getByRole("button", { name: /copy link/i }));
+  expect(writeText).toHaveBeenCalledWith(expect.stringContaining("/ginza-2026"));
+});
+
+test("Edit link reveals the inline slug editor", async () => {
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={event} initialTasks={[]} />);
+  expect(screen.queryByLabelText(/public link slug/i)).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: /edit link/i }));
+  expect(screen.getByLabelText(/public link slug/i)).toBeInTheDocument();
 });
 
 test("renders tasks as rows with readable cells", () => {
@@ -385,7 +415,7 @@ const baseTask = (over: Partial<GridTask>): GridTask => ({
   position: over.position ?? 1024, signupCount: 0, ...over,
 });
 const sortEvent = {
-  id: "e1", name: "E", status: "draft" as const,
+  id: "e1", name: "E", status: "draft" as const, slug: null,
   startDate: new Date("2026-07-24"), endDate: new Date("2026-07-26"),
 };
 function titlesInOrder(): string[] {

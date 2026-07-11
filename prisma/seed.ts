@@ -15,6 +15,7 @@ async function main() {
       startDate: new Date("2026-07-25T00:00:00Z"),
       endDate: new Date("2026-07-26T00:00:00Z"),
       status: "published",
+      orgId: "org_bcsf",
     },
   });
 
