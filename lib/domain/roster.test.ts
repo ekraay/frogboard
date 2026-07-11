@@ -59,6 +59,15 @@ describe("parsePersonRows", () => {
       { name: "Naoto Thompson", subGroup: "Hawk", position: "PL", externalId: "135684307" },
     ]);
   });
+  test("does not mistake a 'Paid' column for the Scout ID column", () => {
+    const raw = [
+      "First Name\tLast Name\tPaid\tScout ID",
+      "Simon\tKraay\tYes\t135291163",
+    ].join("\n");
+    expect(parsePersonRows(raw)).toEqual([
+      { name: "Simon Kraay", subGroup: null, position: null, externalId: "135291163" },
+    ]);
+  });
   test("accepts a Team column as the sub-group and tolerates a missing Scout ID", () => {
     const raw = ["First Name\tLast Name\tTeam", "Ava\tLin\tTeam A"].join("\n");
     expect(parsePersonRows(raw)).toEqual([

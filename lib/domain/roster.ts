@@ -61,7 +61,7 @@ export function parsePersonRows(raw: string): ImportedPerson[] {
   const iFirst = col("first"), iLast = col("last");
   const iSub = col("patrol", "team");
   const iPos = col("position");
-  const iId = col("scout id", "id");
+  const iId = col("scout id", "scout");
   const cell = (row: string[], i: number) => (i >= 0 ? (row[i] ?? "").trim() : "");
   return grid
     .slice(1)
