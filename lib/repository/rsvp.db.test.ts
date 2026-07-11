@@ -26,6 +26,14 @@ test("setRsvp creates then updates the single whole-event row", async () => {
   expect(rows[0].day).toBeNull();
 });
 
+test("the partial unique index rejects a second whole-event row", async () => {
+  const { event, person } = await fixture();
+  await prisma.rsvp.create({ data: { personId: person.id, eventId: event.id, day: null, status: "yes" } });
+  await expect(
+    prisma.rsvp.create({ data: { personId: person.id, eventId: event.id, day: null, status: "no" } }),
+  ).rejects.toMatchObject({ code: "P2002" });
+});
+
 test("getEventRsvps returns each person's rows", async () => {
   const { event, person } = await fixture();
   await setRsvp(person.id, event.id, "maybe", null);

@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import type { RsvpStatus } from "@/lib/domain/rsvp";
 
@@ -13,7 +14,16 @@ export async function setRsvp(
     await prisma.rsvp.update({ where: { id: existing.id }, data: { status, reason } });
     return;
   }
-  await prisma.rsvp.create({ data: { personId, eventId, day: null, status, reason } });
+  try {
+    await prisma.rsvp.create({ data: { personId, eventId, day: null, status, reason } });
+  } catch (e) {
+    // Lost the race to a concurrent whole-event write; the index rejected the duplicate.
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      await prisma.rsvp.updateMany({ where: { personId, eventId, day: null }, data: { status, reason } });
+      return;
+    }
+    throw e;
+  }
 }
 
 export async function getEventRsvps(
