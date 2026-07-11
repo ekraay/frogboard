@@ -103,12 +103,19 @@ A compact bar sits between the grid toolbar (Paste / Add row / Duplicate) and th
 - Replace the two ↑/↓ buttons in the first column with a single **drag handle** (a grip
   glyph). Dragging a row to a new position reorders the grid and persists via the existing
   `reorderTasks(eventId, orderedIds)` action, exactly as the arrows do today.
+- **Touch: tap-to-move, not drag-only.** The app is mobile-first, and pointer drag on a
+  touch spreadsheet is unreliable. So the handle supports a **tap-to-move** path: tap the
+  handle to "pick up" the row (it highlights and shows "Tap where it goes"), then tap another
+  row's handle to drop it there; tap the picked-up handle again to cancel. This is the primary
+  touch interaction; mouse users get pointer drag; both persist through the same
+  `reorderTasks`. The backlog flagged this explicitly: Phase 2 avoided pointer-only DnD for
+  mobile/a11y and wants a tap-to-move fallback.
 - **Keyboard accessibility is preserved:** the current Alt+ArrowUp / Alt+ArrowDown move stays,
   bound to the focusable handle, so reordering never requires a mouse. The handle carries an
-  `aria-label` describing the move.
-- **No new dependency.** Native pointer/drag handling covers a single-list reorder; dnd-kit is
-  the documented alternative if robustness later demands it, but the recommendation is to avoid
-  the dependency now.
+  `aria-label` describing the move and its picked-up state (`aria-pressed`).
+- **No new dependency.** Native pointer/drag plus the tap-to-move state covers a single-list
+  reorder; dnd-kit is the documented alternative if robustness later demands it, but the
+  recommendation is to avoid the dependency now.
 - **Reduced motion:** row-shift transitions respect `prefers-reduced-motion`.
 - Disabled (with the handle dimmed) while a filter, search, or sort is active, matching §2.
 
@@ -134,9 +141,10 @@ writing, and restraint principles do.
   component styles. The banner, filter bar, and handle look like the app, not a bolt-on.
 - **Restraint ("remove one accessory"):** the defining move is subtraction. Deleting the
   Public link card and a redundant header link is the cleanup; nothing decorative is added.
-- **Quality floor:** keyboard-operable reorder (Alt+Arrow retained), visible focus on the new
-  handle, filter controls, and inline slug editor; `prefers-reduced-motion` respected on drag;
-  the bar and banner wrap on mobile. Verified by the axe check.
+- **Quality floor:** reorder works by mouse (drag), touch (**tap-to-move**), and keyboard
+  (Alt+Arrow retained), so it is never drag-only; visible focus on the new handle, filter
+  controls, and inline slug editor; `prefers-reduced-motion` respected on drag; the bar and
+  banner wrap on mobile. Verified by the axe check.
 - **Writing as design material:** active-voice, sentence-case, end-user vocabulary, consistent
   through each flow.
   - Buttons name the result: **Copy link** → "Copied ✓"; **Edit link** reveals the editor;
@@ -161,8 +169,9 @@ TDD, matching the repo: red → green → refactor.
   - The banner shows the URL link, Copy link, and Edit link; Edit reveals the slug editor.
   - A facet and the search each narrow the visible rows; "Showing X of Y" and Clear appear;
     the empty state shows its message.
-  - Drag-reordering persists a new order (asserting `reorderTasks` is called with the new ids)
-    and is disabled while a filter/search/sort is active; Alt+Arrow still moves a row.
+  - Reordering persists a new order (asserting `reorderTasks` is called with the new ids) via
+    pointer drag, **tap-to-move** (tap a handle to pick up, tap another to drop), and Alt+Arrow;
+    all three are disabled while a filter/search/sort is active.
   - Category/Group/Location render a datalist of existing values and carry no placeholder;
     Date/Need/Time keep their format hints.
 - **Accessibility:** the page passes the repo axe check with zero violations, including
