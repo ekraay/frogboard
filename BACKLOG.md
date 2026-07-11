@@ -82,6 +82,15 @@ so design them together.
 - **AI agents for organizers** — explore agents that draft a task list from a
   plain description, suggest where help is needed, or write reminder messages.
   Intent is still loose; define the first concrete job before building.
+- **Passwordless accounts (magic links + SMS).** When real accounts arrive, make
+  sign-in passwordless and modern: email **magic links** and **SMS** one-time codes/
+  links, no passwords to remember. Fits the no-friction ethos that won adoption, and
+  reuses the reserved email-as-identity plumbing (`Signup.userId`). Needs: an email
+  sender (**Resend**, shared with the reminder loop) and an **SMS provider** (Twilio?
+  cost per message). Minor safety: text the **parent**, not the kid. Open Q: which
+  role gets accounts first (organizers, then volunteers?), and session/link expiry.
+  Underpins **Avatars** and the roster/RSVP identity work below.
+
 - **Avatars** — show people's avatars on the board and in history once real
   accounts exist (depends on the accounts/identity work; not possible with the
   current no-account, name-only model).
