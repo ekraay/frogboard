@@ -60,3 +60,15 @@ test("remove and regenerate are gated and effective", async () => {
   expect(rolled.ok).toBe(true);
   expect(await removeLeadAction(lead.id, e.id)).toEqual({ ok: true });
 });
+
+test("cannot remove or regenerate a lead by naming a different event", async () => {
+  authenticate();
+  const a = await event();
+  const b = await event();
+  const lead = await prisma.lead.create({ data: { eventId: a.id, orgId: ORG, group: "Scouts", name: "S", token: "t" } });
+  expect(await removeLeadAction(lead.id, b.id)).toEqual({ ok: false, error: "That lead is already gone." });
+  expect(await prisma.lead.count({ where: { id: lead.id } })).toBe(1);
+  const rolled = await regenerateLeadTokenAction(lead.id, b.id);
+  expect(rolled.ok).toBe(false);
+  expect((await prisma.lead.findUnique({ where: { id: lead.id } }))!.token).toBe("t");
+});

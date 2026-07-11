@@ -11,13 +11,15 @@ export async function createLead(eventId: string, group: string, name: string): 
   return prisma.lead.create({ data: { eventId, orgId: event.orgId, group, name, token: newClaimToken() } });
 }
 
-export async function removeLead(id: string): Promise<boolean> {
-  const res = await prisma.lead.deleteMany({ where: { id } });
+/** Delete a lead only within its own event, so a caller can't revoke another event's link. */
+export async function removeLead(id: string, eventId: string): Promise<boolean> {
+  const res = await prisma.lead.deleteMany({ where: { id, eventId } });
   return res.count > 0;
 }
 
-export async function regenerateLeadToken(id: string): Promise<Lead | null> {
-  const existing = await prisma.lead.findUnique({ where: { id } });
+/** Roll a lead's token only within its own event. */
+export async function regenerateLeadToken(id: string, eventId: string): Promise<Lead | null> {
+  const existing = await prisma.lead.findFirst({ where: { id, eventId } });
   if (!existing) return null;
   return prisma.lead.update({ where: { id }, data: { token: newClaimToken() } });
 }

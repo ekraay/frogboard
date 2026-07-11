@@ -30,7 +30,7 @@ export async function createLeadAction(
 export async function removeLeadAction(id: string, eventId: string): Promise<{ ok: true } | Err> {
   const gate = await requireOrganizer();
   if (!gate.ok) return gate;
-  if (!(await removeLead(id))) return { ok: false, error: "That lead is already gone." };
+  if (!(await removeLead(id, eventId))) return { ok: false, error: "That lead is already gone." };
   revalidatePath(`/organize/${eventId}`);
   return { ok: true };
 }
@@ -40,7 +40,7 @@ export async function regenerateLeadTokenAction(
 ): Promise<{ ok: true; token: string } | Err> {
   const gate = await requireOrganizer();
   if (!gate.ok) return gate;
-  const lead = await regenerateLeadToken(id);
+  const lead = await regenerateLeadToken(id, eventId);
   if (!lead) return { ok: false, error: "That lead is already gone." };
   revalidatePath(`/organize/${eventId}`);
   return { ok: true, token: lead.token };

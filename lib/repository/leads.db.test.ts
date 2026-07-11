@@ -32,11 +32,11 @@ test("multiple leads per group are allowed", async () => {
 test("removeLead and regenerateLeadToken revoke the link", async () => {
   const e = await event();
   const lead = await createLead(e.id, "Scouts", "Simon");
-  const rolled = await regenerateLeadToken(lead.id);
+  const rolled = await regenerateLeadToken(lead.id, e.id);
   expect(rolled!.token).not.toBe(lead.token);
-  expect(await removeLead(lead.id)).toBe(true);
-  expect(await removeLead("missing")).toBe(false);
-  expect(await regenerateLeadToken("missing")).toBeNull();
+  expect(await removeLead(lead.id, e.id)).toBe(true);
+  expect(await removeLead("missing", e.id)).toBe(false);
+  expect(await regenerateLeadToken("missing", e.id)).toBeNull();
 });
 
 test("getLeadAuth resolves scope, null on bad token", async () => {
