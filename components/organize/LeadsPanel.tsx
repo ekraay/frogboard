@@ -61,7 +61,7 @@ export function LeadsPanel({ eventId, groups, leads }: { eventId: string; groups
       </ul>
 
       <form onSubmit={onAssign} className="mt-3 flex flex-wrap items-center gap-2">
-        <input name="group" list="lead-groups" placeholder="Group" required
+        <input name="group" list="lead-groups" aria-label="Group" placeholder="Group" required
           className="min-w-0 flex-1 rounded-lg border border-lily-line px-2 py-1 text-sm text-ink outline-none focus:border-reed" />
         <datalist id="lead-groups">{groups.map((g) => <option key={g} value={g} />)}</datalist>
         <input name="name" aria-label="Lead name" placeholder="Lead name" required
@@ -93,13 +93,13 @@ function ImportForm({ eventId, pending, onDone, onError }: {
   return (
     <form onSubmit={submit} className="mt-3 rounded-xl border border-lily-line bg-pond/5 p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <input value={group} onChange={(e) => setGroup(e.target.value)} placeholder="Group name (e.g. Scouts)" required
+        <input value={group} onChange={(e) => setGroup(e.target.value)} aria-label="Group name" placeholder="Group name (e.g. Scouts)" required
           className="min-w-0 flex-1 rounded-lg border border-lily-line px-2 py-1 text-sm text-ink outline-none focus:border-reed" />
         <label className="flex items-center gap-1 text-sm text-ink">
           <input type="checkbox" checked={youth} onChange={(e) => setYouth(e.target.checked)} /> youth roster
         </label>
       </div>
-      <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5}
+      <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5} aria-label="Roster rows"
         placeholder="Paste rows from your sheet (First Name, Last Name, Patrol, Scout ID)"
         className="mt-2 w-full rounded-lg border border-lily-line px-2 py-1 text-sm text-ink outline-none focus:border-reed" />
       <div className="mt-2 flex items-center justify-between">
