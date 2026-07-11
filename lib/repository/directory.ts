@@ -1,63 +1,56 @@
 import { prisma } from "@/lib/db";
-import type { Person } from "@prisma/client";
 import { hashExternalId } from "@/lib/security/hash";
 import type { ImportedPerson } from "@/lib/domain/roster";
 import { statusCounts, type StatusCounts } from "@/lib/domain/roster";
 import { getEventRsvps } from "@/lib/repository/rsvp";
 import type { RsvpRecord } from "@/lib/domain/rsvp";
 
-/** Idempotent roster import. People with a source id dedup by its hash; others are created. */
+/**
+ * Idempotent roster import in one transaction. People with a source id dedup by
+ * its hash (existing rows update, new rows insert); people without one always
+ * insert. A duplicate source id inside one paste keeps the last row.
+ */
 export async function importPeople(
   orgId: string,
   group: string,
   rows: ImportedPerson[],
   opts: { minor: boolean },
 ): Promise<{ created: number; updated: number }> {
-  let created = 0;
-  let updated = 0;
+  const byHash = new Map<string, ImportedPerson>();
+  const withoutHash: ImportedPerson[] = [];
   for (const row of rows) {
-    const externalIdHash = row.externalId ? hashExternalId(row.externalId) : null;
-    const data = {
-      name: row.name, group, subGroup: row.subGroup, position: row.position,
-      minor: opts.minor, externalIdHash,
-    };
-    if (externalIdHash) {
-      const existing = await prisma.person.findUnique({
-        where: { orgId_externalIdHash: { orgId, externalIdHash } },
-      });
-      if (existing) {
-        await prisma.person.update({ where: { id: existing.id }, data: { ...data, active: true } });
-        updated += 1;
-        continue;
-      }
-    }
-    await prisma.person.create({ data: { orgId, ...data } });
-    created += 1;
+    const hash = row.externalId ? hashExternalId(row.externalId) : null;
+    if (hash) byHash.set(hash, row);
+    else withoutHash.push(row);
   }
-  return { created, updated };
-}
 
-export async function addPerson(
-  orgId: string,
-  data: { name: string; group: string; subGroup?: string | null; minor?: boolean },
-): Promise<Person> {
-  return prisma.person.create({
-    data: { orgId, name: data.name, group: data.group, subGroup: data.subGroup ?? null, minor: data.minor ?? false },
+  const existing = byHash.size
+    ? await prisma.person.findMany({
+        where: { orgId, externalIdHash: { in: [...byHash.keys()] } },
+        select: { id: true, externalIdHash: true },
+      })
+    : [];
+  const idByHash = new Map(existing.map((p) => [p.externalIdHash!, p.id]));
+
+  const rowData = (row: ImportedPerson, hash: string | null) => ({
+    name: row.name, group, subGroup: row.subGroup, position: row.position,
+    minor: opts.minor, externalIdHash: hash,
   });
-}
+  const toCreate: ReturnType<typeof rowData>[] = withoutHash.map((row) => rowData(row, null));
+  const toUpdate: { id: string; data: ReturnType<typeof rowData> }[] = [];
+  for (const [hash, row] of byHash) {
+    const id = idByHash.get(hash);
+    if (id) toUpdate.push({ id, data: rowData(row, hash) });
+    else toCreate.push(rowData(row, hash));
+  }
 
-/** False when the person is already gone. Soft-deactivates (keeps history). */
-export async function deactivatePerson(id: string): Promise<boolean> {
-  const res = await prisma.person.updateMany({ where: { id }, data: { active: false } });
-  return res.count > 0;
-}
-
-/** Active people in an org, optionally one group, ordered by sub-group then name. */
-export async function getDirectory(orgId: string, group?: string): Promise<Person[]> {
-  return prisma.person.findMany({
-    where: { orgId, active: true, ...(group ? { group } : {}) },
-    orderBy: [{ subGroup: "asc" }, { name: "asc" }],
-  });
+  await prisma.$transaction([
+    prisma.person.createMany({ data: toCreate.map((d) => ({ orgId, ...d })) }),
+    ...toUpdate.map((u) =>
+      prisma.person.update({ where: { id: u.id }, data: { ...u.data, active: true } }),
+    ),
+  ]);
+  return { created: toCreate.length, updated: toUpdate.length };
 }
 
 /** Attendance counts per group for an event: what the org coordinator sees (no names). */

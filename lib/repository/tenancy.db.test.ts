@@ -2,7 +2,7 @@
 import { afterAll, afterEach, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "@/lib/db";
 import { resetDb } from "@/test/db";
-import { importPeople, getDirectory, getGroupRollups } from "@/lib/repository/directory";
+import { importPeople, getGroupRollups } from "@/lib/repository/directory";
 import { createLead, getLeadAuth, getLeadChaseView } from "@/lib/repository/leads";
 
 const ORG_A = "org_bcsf";
@@ -26,11 +26,11 @@ afterEach(async () => {
 afterAll(async () => { await prisma.$disconnect(); });
 
 describe("multi-tenant isolation", () => {
-  test("getDirectory returns only the queried org's people", async () => {
+  test("an import writes people only under its own org", async () => {
     await importPeople(ORG_A, "Scouts", [{ name: "A One", subGroup: null, position: null, externalId: "a1" }], { minor: true });
     await importPeople(ORG_B, "Scouts", [{ name: "B One", subGroup: null, position: null, externalId: "b1" }], { minor: true });
-    expect((await getDirectory(ORG_A)).map((p) => p.name)).toEqual(["A One"]);
-    expect((await getDirectory(ORG_B)).map((p) => p.name)).toEqual(["B One"]);
+    expect((await prisma.person.findMany({ where: { orgId: ORG_A } })).map((p) => p.name)).toEqual(["A One"]);
+    expect((await prisma.person.findMany({ where: { orgId: ORG_B } })).map((p) => p.name)).toEqual(["B One"]);
   });
 
   test("getGroupRollups counts only the event's own org", async () => {

@@ -3,7 +3,7 @@ import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "@/lib/db";
 import { resetDb } from "@/test/db";
 import { hashExternalId } from "@/lib/security/hash";
-import { importPeople, addPerson, deactivatePerson, getDirectory, getGroupRollups } from "@/lib/repository/directory";
+import { importPeople, getGroupRollups } from "@/lib/repository/directory";
 import { setRsvp } from "@/lib/repository/rsvp";
 
 const ORG = "org_bcsf";
@@ -31,15 +31,6 @@ describe("importPeople", () => {
     const p = await prisma.person.findFirst({ where: { orgId: ORG } });
     expect(p!.name).toBe("New Name");
     expect(p!.subGroup).toBe("Hawk");
-  });
-});
-
-describe("addPerson / deactivatePerson / getDirectory", () => {
-  test("manual add appears in the directory; deactivate hides it", async () => {
-    const p = await addPerson(ORG, { name: "Ava Lin", group: "YAO", subGroup: "Team A" });
-    expect((await getDirectory(ORG, "YAO")).map((x) => x.name)).toEqual(["Ava Lin"]);
-    expect(await deactivatePerson(p.id)).toBe(true);
-    expect(await getDirectory(ORG, "YAO")).toEqual([]);
   });
 });
 
