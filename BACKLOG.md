@@ -137,6 +137,16 @@ so design them together.
   record intent and claims, not whether someone showed up. Add a lightweight
   "did it" / check-in mark at the event so participation reports reflect reality.
   Separate from RSVP; builds on the persistent roster.
+- **Email as identity, not as a dedup fix.** Import dedups by hashed Scout ID;
+  people without one (adults/parents) do not dedup and duplicate on re-import.
+  Do not add email just to fix that: scouts already have IDs, and the groups
+  directory (add/remove/edit a person directly) removes the re-paste workflow
+  that makes dedup hurt. Email earns its place with the reminder loop and
+  passwordless accounts, so introduce it there, not here. Privacy weight is real:
+  storing minors' contact info is the escalation this app deliberately avoided
+  (youth protection). If ID-less dedup is needed sooner, store an optional
+  `emailHash` as a secondary match key (no raw address); keep raw email only for
+  people you actually message.
 
 ## Shipped
 
