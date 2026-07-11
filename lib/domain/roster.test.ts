@@ -50,6 +50,10 @@ describe("chaseList", () => {
     const row = chaseList(people, byPerson)[0].people[0];
     expect(row.reason).toBe("Working that night");
   });
+  test("never exposes the minor flag on a chase row", () => {
+    const row = chaseList([person("a", "Hawk")], map([]))[0].people[0];
+    expect(row).not.toHaveProperty("minor");
+  });
 });
 
 describe("parsePersonRows", () => {
