@@ -95,6 +95,17 @@ describe("getEventBoardByParam", () => {
     await prisma.event.create({ data: { name: "D", slug: "draft-one", status: "draft", ...dates } });
     expect(await getEventBoardByParam("draft-one")).toBeNull();
   });
+  test("never serves another org's board for a shared slug", async () => {
+    const other = await prisma.organization.upsert({
+      where: { slug: "other" }, update: {}, create: { name: "Other", slug: "other" },
+    });
+    // Create the other org's event first, so an unscoped findFirst would return it.
+    await prisma.event.create({
+      data: { name: "Theirs", slug: "shared", status: "published", startDate: dates.startDate, endDate: dates.endDate, orgId: other.id },
+    });
+    await prisma.event.create({ data: { name: "Ours", slug: "shared", status: "published", ...dates } });
+    expect((await getEventBoardByParam("shared"))!.name).toBe("Ours");
+  });
 });
 
 describe("getEventParam", () => {

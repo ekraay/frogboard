@@ -62,12 +62,12 @@ export async function getEventParam(eventId: string): Promise<string | null> {
   return event.slug ?? event.id;
 }
 
-/** One published event's board by slug or id, or null. */
+/** One published event's board by slug or id, or null. Scoped to the org so a slug another org reuses never leaks. */
 export async function getEventBoardByParam(param: string): Promise<
   { id: string; name: string; tasks: BoardTask[] } | null
 > {
   const event = await prisma.event.findFirst({
-    where: { status: "published", OR: [{ slug: param }, { id: param }] },
+    where: { orgId: "org_bcsf", status: "published", OR: [{ slug: param }, { id: param }] },
     include: {
       tasks: {
         orderBy: { position: "asc" },
