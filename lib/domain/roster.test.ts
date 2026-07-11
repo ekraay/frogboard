@@ -33,6 +33,13 @@ describe("chaseList", () => {
     expect(groups.find((g) => g.subGroup === "Hawk")!.people.map((p) => p.id)).toEqual(["b"]);
     expect(groups.find((g) => g.subGroup === "Fox")!.people.map((p) => p.status)).toEqual(["blank"]);
   });
+  test("blank sorts before maybe within a sub-group, even against name order", () => {
+    // "Name a" (maybe) sorts before "Name z" (blank), so status rank must win.
+    const people = [person("a", "Hawk"), person("z", "Hawk")];
+    const byPerson = map([["a", [{ day: null, status: "maybe" }]]]);
+    const groups = chaseList(people, byPerson);
+    expect(groups[0].people.map((p) => p.status)).toEqual(["blank", "maybe"]);
+  });
   test("null sub-group collects under 'Ungrouped'", () => {
     const groups = chaseList([person("a", null)], map([]));
     expect(groups[0].subGroup).toBe("Ungrouped");
