@@ -30,6 +30,15 @@ test("saves an edited slug", async () => {
   expect(refresh).toHaveBeenCalled();
 });
 
+test("calls onSaved after a successful save", async () => {
+  updateEventSlugAction.mockResolvedValue({ ok: true, slug: "ginza-2027" });
+  const onSaved = vi.fn();
+  const user = userEvent.setup();
+  render(<SlugEditor eventId="e1" slug="ginza-2026" onSaved={onSaved} />);
+  await user.click(screen.getByRole("button", { name: /save/i }));
+  expect(onSaved).toHaveBeenCalled();
+});
+
 test("surfaces an error", async () => {
   updateEventSlugAction.mockResolvedValue({ ok: false, error: "That link is already taken." });
   const user = userEvent.setup();

@@ -6,7 +6,6 @@ import { getEventGrid } from "@/lib/repository/organize";
 import { getGroupRollups } from "@/lib/repository/directory";
 import { getEventLeads } from "@/lib/repository/leads";
 import { OrganizeGrid } from "@/components/organize/OrganizeGrid";
-import { SlugEditor } from "@/components/organize/SlugEditor";
 import { GroupRollups } from "@/components/organize/GroupRollups";
 import { LeadsPanel } from "@/components/organize/LeadsPanel";
 
@@ -38,26 +37,17 @@ export default async function OrganizeEventPage({
         </Link>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
           <h1 className="font-display text-2xl font-extrabold text-ink">🐸 {grid.name}</h1>
-          <div className="flex items-baseline gap-4">
-            <Link href={`/${grid.slug ?? grid.id}`} target="_blank" rel="noopener noreferrer"
-              className="text-sm font-medium text-reed-deep underline-offset-2 hover:underline">
-              View signup page ↗
-            </Link>
-            <Link href={`/organize/${grid.id}/history`} className="text-sm font-medium text-pond underline-offset-2 hover:underline">
-              History
-            </Link>
-          </div>
+          <Link href={`/organize/${grid.id}/history`} className="text-sm font-medium text-pond underline-offset-2 hover:underline">
+            History
+          </Link>
         </div>
-      </div>
-      <div className="mb-4">
-        <SlugEditor eventId={grid.id} slug={grid.slug} />
       </div>
       <div className="mb-4 space-y-4">
         <GroupRollups groups={rollups} />
         <LeadsPanel eventId={grid.id} groups={groups} leads={leads} />
       </div>
       <OrganizeGrid
-        event={{ id: grid.id, name: grid.name, status: grid.status, startDate: grid.startDate, endDate: grid.endDate }}
+        event={{ id: grid.id, name: grid.name, status: grid.status, slug: grid.slug, startDate: grid.startDate, endDate: grid.endDate }}
         initialTasks={grid.tasks}
       />
     </main>
