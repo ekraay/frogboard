@@ -124,6 +124,19 @@ so design them together.
     sign-ups. Open Q: counts only, or names? (privacy, esp. minors).
   - Likely Phase 3/4. Biggest unknowns: identity-via-email, email infra, and the
     privacy model for rosters that include minors.
+- **Participation tracking across events (needs the groups epic).** Once people
+  persist in the org roster (`2026-07-11-groups-epic-design.md`), join a person's
+  answers across the year's events to see who volunteers and who does not.
+  - **Reliability report:** "Alex: 5 of 6 events; Bo: 0 of 6." Surfaces reliable
+    people, ghosts, and families carrying every event (fairness).
+  - **Scout service-hour tally:** count each scout's events (later, hours) across
+    the year. A concrete deliverable for the scoutmaster.
+  - **Feeds targeted reminders:** the reminder loop nudges exactly the people who
+    never respond.
+- **Attendance check-in (RSVP intent vs actual show).** RSVP and task sign-ups
+  record intent and claims, not whether someone showed up. Add a lightweight
+  "did it" / check-in mark at the event so participation reports reflect reality.
+  Separate from RSVP; builds on the persistent roster.
 
 ## Shipped
 
