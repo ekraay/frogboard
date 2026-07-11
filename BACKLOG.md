@@ -36,6 +36,13 @@ so design them together.
 
 ## Explore / design first
 
+- **Single-card create view** — a focused one-card form to add a task/frog, instead
+  of adding rows in the spreadsheet grid. The grid stays the power tool for bulk
+  **edit / delete / archive**; the card is the quick "add one thing" path (title,
+  kind, area, need, when). Open Q: entry point (a "+ New task" button on the event
+  page? the board?), and whether the card also edits a single existing task or stays
+  create-only.
+
 - **Full undo/redo history** — v1 ships single-level undo (last delete/clear via
   ⟲ button + Cmd/Ctrl+Z). A bigger card: multi-step history, **redo** (↷ /
   Cmd+Shift+Z), and undo of **cell edits** and **row reorders**. Hard because the
