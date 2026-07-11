@@ -34,6 +34,15 @@ test("the partial unique index rejects a second whole-event row", async () => {
   ).rejects.toMatchObject({ code: "P2002" });
 });
 
+test("the partial unique index rejects a second row for the same day", async () => {
+  const { event, person } = await fixture();
+  const day = new Date("2026-07-25T00:00:00Z");
+  await prisma.rsvp.create({ data: { personId: person.id, eventId: event.id, day, status: "yes" } });
+  await expect(
+    prisma.rsvp.create({ data: { personId: person.id, eventId: event.id, day, status: "no" } }),
+  ).rejects.toMatchObject({ code: "P2002" });
+});
+
 test("getEventRsvps returns each person's rows with reason", async () => {
   const { event, person } = await fixture();
   await setRsvp(person.id, event.id, "maybe", "Maybe if practice ends early");
