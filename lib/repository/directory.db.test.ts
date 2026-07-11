@@ -3,7 +3,8 @@ import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "@/lib/db";
 import { resetDb } from "@/test/db";
 import { hashExternalId } from "@/lib/security/hash";
-import { importPeople, addPerson, deactivatePerson, getDirectory } from "@/lib/repository/directory";
+import { importPeople, addPerson, deactivatePerson, getDirectory, getGroupRollups } from "@/lib/repository/directory";
+import { setRsvp } from "@/lib/repository/rsvp";
 
 const ORG = "org_bcsf";
 
@@ -39,5 +40,20 @@ describe("addPerson / deactivatePerson / getDirectory", () => {
     expect((await getDirectory(ORG, "YAO")).map((x) => x.name)).toEqual(["Ava Lin"]);
     expect(await deactivatePerson(p.id)).toBe(true);
     expect(await getDirectory(ORG, "YAO")).toEqual([]);
+  });
+});
+
+describe("getGroupRollups", () => {
+  test("counts attendance per group for the event", async () => {
+    const e = await prisma.event.create({ data: { name: "Obon", orgId: ORG, startDate: new Date(), endDate: new Date() } });
+    await importPeople(ORG, "Scouts", [
+      { name: "A A", subGroup: "Hawk", position: null, externalId: "1" },
+      { name: "B B", subGroup: "Fox", position: null, externalId: "2" },
+    ], { minor: true });
+    const a = await prisma.person.findFirst({ where: { name: "A A" } });
+    await setRsvp(a!.id, e.id, "yes", null);
+    expect(await getGroupRollups(e.id)).toEqual([
+      { group: "Scouts", counts: { yes: 1, maybe: 0, no: 0, blank: 1 } },
+    ]);
   });
 });

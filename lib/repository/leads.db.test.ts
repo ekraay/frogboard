@@ -1,8 +1,10 @@
 // @vitest-environment node
-import { afterAll, beforeEach, expect, test } from "vitest";
+import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "@/lib/db";
 import { resetDb } from "@/test/db";
-import { createLead, removeLead, regenerateLeadToken, getEventLeads, getLeadAuth } from "@/lib/repository/leads";
+import { createLead, removeLead, regenerateLeadToken, getEventLeads, getLeadAuth, getLeadChaseView } from "@/lib/repository/leads";
+import { importPeople } from "@/lib/repository/directory";
+import { setRsvp } from "@/lib/repository/rsvp";
 
 const ORG = "org_bcsf";
 async function event() {
@@ -42,4 +44,26 @@ test("getLeadAuth resolves scope, null on bad token", async () => {
   const lead = await createLead(e.id, "Scouts", "Simon");
   expect(await getLeadAuth(lead.token)).toEqual({ eventId: e.id, orgId: ORG, group: "Scouts" });
   expect(await getLeadAuth("nope")).toBeNull();
+});
+
+describe("getLeadChaseView", () => {
+  test("shows the group's chase list, abbreviated, with counts", async () => {
+    const e = await event();
+    await importPeople(ORG, "Scouts", [
+      { name: "Alex Tanaka", subGroup: "Hawk", position: null, externalId: "1" },
+      { name: "Bo Smith", subGroup: "Hawk", position: null, externalId: "2" },
+    ], { minor: true });
+    const bo = await prisma.person.findFirst({ where: { name: "Bo Smith" } });
+    await setRsvp(bo!.id, e.id, "yes", null); // answered, drops off the chase list
+    const lead = await createLead(e.id, "Scouts", "Simon");
+    const view = await getLeadChaseView(lead.token);
+    expect(view!.group).toBe("Scouts");
+    expect(view!.eventName).toBe("Obon");
+    expect(view!.counts).toEqual({ yes: 1, maybe: 0, no: 0, blank: 1 });
+    const hawk = view!.chase.find((g) => g.subGroup === "Hawk")!;
+    expect(hawk.people.map((p) => p.name)).toEqual(["Alex T."]); // minor abbreviation, Bo dropped
+  });
+  test("null on an unknown token", async () => {
+    expect(await getLeadChaseView("nope")).toBeNull();
+  });
 });

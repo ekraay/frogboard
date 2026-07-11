@@ -2,6 +2,9 @@ import { prisma } from "@/lib/db";
 import type { Person } from "@prisma/client";
 import { hashExternalId } from "@/lib/security/hash";
 import type { ImportedPerson } from "@/lib/domain/roster";
+import { statusCounts, type StatusCounts } from "@/lib/domain/roster";
+import { getEventRsvps } from "@/lib/repository/rsvp";
+import type { RsvpRecord } from "@/lib/domain/rsvp";
 
 /** Idempotent roster import. People with a source id dedup by its hash; others are created. */
 export async function importPeople(
@@ -55,4 +58,28 @@ export async function getDirectory(orgId: string, group?: string): Promise<Perso
     where: { orgId, active: true, ...(group ? { group } : {}) },
     orderBy: [{ subGroup: "asc" }, { name: "asc" }],
   });
+}
+
+/** Attendance counts per group for an event: what the org coordinator sees (no names). */
+export async function getGroupRollups(eventId: string): Promise<{ group: string; counts: StatusCounts }[]> {
+  const event = await prisma.event.findUniqueOrThrow({ where: { id: eventId }, select: { orgId: true } });
+  const people = await prisma.person.findMany({
+    where: { orgId: event.orgId, active: true, NOT: { group: null } },
+    select: { id: true, group: true },
+  });
+  const rsvps = await getEventRsvps(eventId);
+  const byPerson = new Map<string, RsvpRecord[]>();
+  for (const r of rsvps) {
+    if (!byPerson.has(r.personId)) byPerson.set(r.personId, []);
+    byPerson.get(r.personId)!.push({ day: r.day, status: r.status });
+  }
+  const groups = new Map<string, { id: string }[]>();
+  for (const p of people) {
+    const g = p.group!;
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g)!.push({ id: p.id });
+  }
+  return [...groups.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([group, ppl]) => ({ group, counts: statusCounts(ppl, byPerson) }));
 }
