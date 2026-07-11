@@ -31,19 +31,22 @@ export default async function OrganizeEventPage({
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-16 pt-8">
-      <div className="mb-4 flex items-baseline justify-between">
-        <h1 className="font-display text-2xl font-extrabold text-ink">🐸 {grid.name}</h1>
-        <div className="flex items-baseline gap-4">
-          <Link href={`/${grid.slug ?? grid.id}`} target="_blank" rel="noopener noreferrer"
-            className="text-sm font-medium text-reed-deep underline-offset-2 hover:underline">
-            View signup page ↗
-          </Link>
-          <Link href={`/organize/${grid.id}/history`} className="text-sm font-medium text-pond underline-offset-2 hover:underline">
-            History
-          </Link>
-          <Link href="/organize" className="text-sm font-medium text-pond underline-offset-2 hover:underline">
-            ← All events
-          </Link>
+      <div className="mb-4">
+        <Link href="/organize"
+          className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-pond underline-offset-2 hover:underline">
+          ← All events
+        </Link>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
+          <h1 className="font-display text-2xl font-extrabold text-ink">🐸 {grid.name}</h1>
+          <div className="flex items-baseline gap-4">
+            <Link href={`/${grid.slug ?? grid.id}`} target="_blank" rel="noopener noreferrer"
+              className="text-sm font-medium text-reed-deep underline-offset-2 hover:underline">
+              View signup page ↗
+            </Link>
+            <Link href={`/organize/${grid.id}/history`} className="text-sm font-medium text-pond underline-offset-2 hover:underline">
+              History
+            </Link>
+          </div>
         </div>
       </div>
       <div className="mb-4">
