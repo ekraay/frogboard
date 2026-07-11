@@ -3,8 +3,12 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { isValidSession, SESSION_COOKIE } from "@/lib/security/session";
 import { getEventGrid } from "@/lib/repository/organize";
+import { getGroupRollups } from "@/lib/repository/directory";
+import { getEventLeads } from "@/lib/repository/leads";
 import { OrganizeGrid } from "@/components/organize/OrganizeGrid";
 import { SlugEditor } from "@/components/organize/SlugEditor";
+import { GroupRollups } from "@/components/organize/GroupRollups";
+import { LeadsPanel } from "@/components/organize/LeadsPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +22,12 @@ export default async function OrganizeEventPage({
   const { eventId } = await params;
   const grid = await getEventGrid(eventId);
   if (!grid) redirect("/organize");
+
+  const [rollups, leads] = await Promise.all([
+    getGroupRollups(grid.id),
+    getEventLeads(grid.id),
+  ]);
+  const groups = rollups.map((r) => r.group);
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-16 pt-8">
@@ -38,6 +48,10 @@ export default async function OrganizeEventPage({
       </div>
       <div className="mb-4">
         <SlugEditor eventId={grid.id} slug={grid.slug} />
+      </div>
+      <div className="mb-4 space-y-4">
+        <GroupRollups groups={rollups} />
+        <LeadsPanel eventId={grid.id} groups={groups} leads={leads} />
       </div>
       <OrganizeGrid
         event={{ id: grid.id, name: grid.name, status: grid.status, startDate: grid.startDate, endDate: grid.endDate }}
