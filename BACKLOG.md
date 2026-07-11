@@ -36,7 +36,7 @@ so design them together.
 
 ## Explore / design first
 
-- **Single-card create view** — a focused one-card form to add a task/frog, instead
+- **Single-card create view**: a focused one-card form to add a task/frog, instead
   of adding rows in the spreadsheet grid. The grid stays the power tool for bulk
   **edit / delete / archive**; the card is the quick "add one thing" path (title,
   kind, area, need, when). Open Q: entry point (a "+ New task" button on the event

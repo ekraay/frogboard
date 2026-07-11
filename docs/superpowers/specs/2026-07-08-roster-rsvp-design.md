@@ -1,4 +1,4 @@
-# Roster + RSVP (with minimal delegation) — Design Spec
+# Roster + RSVP (with minimal delegation): Design Spec
 
 **Sub-project 1 of the "Delegated Organizing / universal volunteer platform" effort.**
 Give each group a standing directory of its people, let them RSVP Yes/No/Maybe (with a
@@ -46,9 +46,9 @@ volunteer signals, never assignments.
 reasons, chase rollups, group-level lead links.
 
 **Deferred (named so the map is on paper):**
-- **Sub-project 2 — delegation tree.** Leads appoint sub-leads from their own page
+- **Sub-project 2: delegation tree.** Leads appoint sub-leads from their own page
   (`appointedById`, cascade revocation); sub-group scoping; board coverage on the report.
-- **Sub-project 3+ — universal platform** (Rev. Opel): toggleable sections for ongoing
+- **Sub-project 3+: universal platform** (Rev. Opel): toggleable sections for ongoing
   needs, supplies, fundraising; **per-group accounts** (replacing the shared password and
   closing the last privacy gap below); org routing; org onboarding.
 - **Per-day RSVP refinement.** Slice 1 records one whole-event answer per person
@@ -263,25 +263,25 @@ answer" effortless and "who is left" obvious.
 
 ## Components and layering (existing clean architecture)
 
-### Domain (pure, unit-tested) — `lib/domain/rsvp.ts`, `lib/domain/roster.ts`
+### Domain (pure, unit-tested): `lib/domain/rsvp.ts`, `lib/domain/roster.ts`
 `effectiveStatus`, `eventStatus`, `statusCounts`, `chaseList`, `parsePersonRows`.
 
-### Repository (DB-tested) — `lib/repository/directory.ts`, `rsvp.ts`, `leads.ts`
+### Repository (DB-tested): `lib/repository/directory.ts`, `rsvp.ts`, `leads.ts`
 `importPeople`, `addPerson`, `deactivatePerson`, `getDirectory(orgId, group)`,
 `setRsvp(personId, eventId, day, status, reason)`, `getEventRsvps(eventId)`,
 `getGroupRollups(eventId)` (counts only, for the org view), `createLead`, `removeLead`,
 `regenerateLeadToken`, `getLeadChaseView(token)` (null on unknown token; group + counts +
 chase list, abbreviated names, no contact details).
 
-### Actions — `app/actions/leads.ts` (organizer-gated: create/remove/regenerate, import),
+### Actions: `app/actions/leads.ts` (organizer-gated: create/remove/regenerate, import),
 `app/actions/rsvp.ts` (`setRsvp` authorized by a **valid lead token for that person's
 group**, not the password; scoped so a token can only write its own group).
 
 ### Pages / components (unit-tested)
-- `components/organize/GroupRollups.tsx` — per-group count cards, no PII.
-- `components/organize/LeadsPanel.tsx` — create/copy/regenerate/remove leads.
-- `components/ChaseView.tsx` — the lead's read + one-tap-RSVP surface.
-- `app/lead/[token]/page.tsx` — `force-dynamic`, `noindex`/no-referrer, renders `ChaseView`
+- `components/organize/GroupRollups.tsx`: per-group count cards, no PII.
+- `components/organize/LeadsPanel.tsx`: create/copy/regenerate/remove leads.
+- `components/ChaseView.tsx`: the lead's read + one-tap-RSVP surface.
+- `app/lead/[token]/page.tsx`: `force-dynamic`, `noindex`/no-referrer, renders `ChaseView`
   or the friendly invalid message.
 
 ---

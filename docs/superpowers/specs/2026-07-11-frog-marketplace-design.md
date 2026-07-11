@@ -1,4 +1,4 @@
-# Frog Marketplace (standing board) — Design Spec
+# Frog Marketplace (standing board): Design Spec
 
 **Sub-project of the "universal volunteer platform" effort.**
 Let the temple post its ongoing needs as frogs on an evergreen board. A coordinator

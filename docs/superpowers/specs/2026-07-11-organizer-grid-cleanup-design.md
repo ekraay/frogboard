@@ -1,4 +1,4 @@
-# Organizer Task-Grid Cleanup — Design Spec
+# Organizer Task-Grid Cleanup: Design Spec
 
 **Sub-project of the organizer experience.**
 Reclaim the organizer event page (`/organize/[eventId]`) so the task grid is the star:
