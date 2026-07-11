@@ -43,6 +43,11 @@ so design them together.
   page? the board?), and whether the card also edits a single existing task or stays
   create-only.
 
+- **Friendly page for an unopened board.** A draft event's public link returns a bare
+  404, so an organizer previewing the link before opening sign-ups sees a dead end. Show
+  a "this event isn't open yet" page instead, like the lead page's friendly invalid state.
+  Open Q: should the organizer see a preview of their own draft board while signed in?
+
 - **Full undo/redo history** — v1 ships single-level undo (last delete/clear via
   ⟲ button + Cmd/Ctrl+Z). A bigger card: multi-step history, **redo** (↷ /
   Cmd+Shift+Z), and undo of **cell edits** and **row reorders**. Hard because the
