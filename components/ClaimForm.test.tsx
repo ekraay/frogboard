@@ -32,6 +32,26 @@ test("submits a name, calls the action, and stores the returned token", async ()
   expect(JSON.parse(window.localStorage.getItem("frogboard.claims")!)).toEqual({ s1: "tok-1" });
 });
 
+test("prefills name and group from a remembered profile", async () => {
+  window.localStorage.setItem("frogboard.profile", JSON.stringify({ name: "Kenji", group: "Scouts" }));
+  const user = userEvent.setup();
+  render(<ClaimForm taskId="t1" />);
+  await user.click(screen.getByRole("button", { name: /grab a frog/i }));
+  expect(screen.getByLabelText(/your name/i)).toHaveValue("Kenji");
+  expect(screen.getByLabelText(/group/i)).toHaveValue("Scouts");
+});
+
+test("remembers name and group after a successful claim", async () => {
+  claimSlot.mockResolvedValue({ ok: true, signupId: "s1", claimToken: "tok-1" });
+  const user = userEvent.setup();
+  render(<ClaimForm taskId="t1" />);
+  await user.click(screen.getByRole("button", { name: /grab a frog/i }));
+  await user.type(screen.getByLabelText(/your name/i), "Mika");
+  await user.type(screen.getByLabelText(/group/i), "YAO");
+  await user.click(screen.getByRole("button", { name: /^add me$/i }));
+  expect(JSON.parse(window.localStorage.getItem("frogboard.profile")!)).toEqual({ name: "Mika", group: "YAO" });
+});
+
 test("explains that email and phone are for reminders", async () => {
   const user = userEvent.setup();
   render(<ClaimForm taskId="t1" />);

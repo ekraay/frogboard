@@ -4,18 +4,26 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { claimSlot } from "@/app/actions/signups";
 import { rememberClaim } from "@/lib/client/ownership";
+import { getProfile, rememberProfile } from "@/lib/client/profile";
 
 export function ClaimForm({ taskId }: { taskId: string }) {
   const [open, setOpen] = useState(false);
+  const [profile, setProfile] = useState({ name: "", group: "" });
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
+
+  // Prefill from the last claim on this device so extra shifts are one tap.
+  function openForm() {
+    setProfile(getProfile());
+    setOpen(true);
+  }
 
   if (!open) {
     return (
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={openForm}
         className="group mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-reed py-3 text-base font-bold text-white shadow-[0_6px_0_0_var(--color-reed-deep)] transition active:translate-y-[3px] active:shadow-[0_3px_0_0_var(--color-reed-deep)] hover:bg-reed-deep"
       >
         <span aria-hidden className="text-lg transition group-hover:-translate-y-0.5">🐸</span>
@@ -31,6 +39,7 @@ export function ClaimForm({ taskId }: { taskId: string }) {
       const result = await claimSlot(formData);
       if (result.ok) {
         rememberClaim(result.signupId, result.claimToken);
+        rememberProfile({ name: String(formData.get("name") ?? ""), group: String(formData.get("group") ?? "") });
         setOpen(false);
         router.refresh();
       } else {
@@ -58,6 +67,7 @@ export function ClaimForm({ taskId }: { taskId: string }) {
         <input
           name="name"
           maxLength={80}
+          defaultValue={profile.name}
           placeholder="e.g. Kenji"
           className="mt-1 w-full rounded-xl border border-lily-line bg-white px-3 py-2.5 text-ink outline-none transition focus:border-reed focus:ring-2 focus:ring-reed/30"
         />
@@ -68,6 +78,7 @@ export function ClaimForm({ taskId }: { taskId: string }) {
         <input
           name="group"
           maxLength={40}
+          defaultValue={profile.group}
           placeholder="Scouts, YAO, BWA…"
           className="mt-1 w-full rounded-xl border border-lily-line bg-white px-3 py-2.5 text-ink outline-none transition focus:border-reed focus:ring-2 focus:ring-reed/30"
         />

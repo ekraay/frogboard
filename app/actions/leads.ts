@@ -57,7 +57,14 @@ export async function importRosterAction(
   if (!event) return { ok: false, error: "That event no longer exists." };
   const people = parsePersonRows(raw);
   if (people.length === 0) return { ok: false, error: "No people found in that paste." };
-  const res = await importPeople(event.orgId, group.trim(), people, { minor: isYouth });
+  let res;
+  try {
+    res = await importPeople(event.orgId, group.trim(), people, { minor: isYouth });
+  } catch (err) {
+    // A server-side failure (e.g. missing import config) must not crash the page.
+    console.error("importRosterAction failed", err);
+    return { ok: false, error: "Import failed on the server. Please try again in a moment." };
+  }
   revalidatePath(`/organize/${eventId}`);
   return { ok: true, ...res };
 }
