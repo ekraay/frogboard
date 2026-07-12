@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useId, useRef } from "react";
 import type { FacetOptions } from "@/lib/domain/board";
 import { emptyFilters, type BoardFilters } from "@/lib/domain/boardFilters";
 
@@ -46,6 +46,13 @@ export function FilterFlyout({
   onChange: (next: BoardFilters) => void;
   onClose: () => void;
 }) {
+  const headingId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    dialogRef.current?.focus();
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
@@ -56,10 +63,10 @@ export function FilterFlyout({
     <div className="fixed inset-0 z-40 flex items-start justify-center sm:items-center">
       <button type="button" aria-label="Close filters" onClick={onClose}
         className="absolute inset-0 bg-ink/40 backdrop-blur-sm" />
-      <div role="dialog" aria-modal="true" aria-label="Filter tasks"
-        className="relative z-10 m-4 w-full max-w-md rounded-3xl border border-lily-line bg-white p-6 shadow-xl">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={headingId} tabIndex={-1}
+        className="relative z-10 m-4 w-full max-w-md rounded-3xl border border-lily-line bg-white p-6 shadow-xl outline-none">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-display text-xl font-bold text-ink">Filter tasks</h2>
+          <h2 id={headingId} className="font-display text-xl font-bold text-ink">Filter tasks</h2>
           <button type="button" onClick={onClose} aria-label="Close"
             className="rounded-full px-2 text-lg text-ink-soft hover:text-ink">✕</button>
         </div>

@@ -56,6 +56,10 @@ test("Escape closes the flyout", async () => {
   await user.keyboard("{Escape}");
   expect(onClose).toHaveBeenCalled();
 });
+test("moves focus into the dialog when it opens", () => {
+  render(<FilterFlyout facets={facets} showDueSoon showBigGap value={emptyFilters()} onChange={vi.fn()} onClose={vi.fn()} />);
+  expect(screen.getByRole("dialog", { name: /filter tasks/i })).toHaveFocus();
+});
 test("Show all tasks clears every section", async () => {
   const onChange = vi.fn();
   const user = userEvent.setup();
