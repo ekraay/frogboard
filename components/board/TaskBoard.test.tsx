@@ -50,6 +50,15 @@ test("shows the copy-public-link control for an organizer only", () => {
   expect(screen.queryByRole("button", { name: /copy public link/i })).not.toBeInTheDocument();
 });
 
+test("offers an organizer sign-in link to a visitor, and hides it once signed in", () => {
+  const { rerender } = renderBoard({ isOrganizer: false });
+  const link = screen.getByRole("link", { name: /organizer sign.?in/i });
+  expect(link).toHaveAttribute("href", "/organize");
+
+  rerender(<TaskBoard event={{ name: "Bon Odori" }} tasks={[open, full]} isOrganizer={true} />);
+  expect(screen.queryByRole("link", { name: /organizer sign.?in/i })).not.toBeInTheDocument();
+});
+
 test("clicking a card opens its panel and sets the URL hash", async () => {
   const user = userEvent.setup();
   renderBoard();

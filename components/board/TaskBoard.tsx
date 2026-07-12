@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { partitionByAvailability } from "@/lib/domain/board";
 import type { BoardTask } from "@/lib/domain/types";
 import { BoardCard } from "@/components/board/BoardCard";
@@ -87,7 +88,7 @@ export function TaskBoard({
           </h1>
           <p className="mt-1 text-ink-soft">Grab a task to help out.</p>
         </div>
-        {isOrganizer && (
+        {isOrganizer ? (
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -100,6 +101,13 @@ export function TaskBoard({
               Live · {tasks.length} tasks
             </span>
           </div>
+        ) : (
+          <Link
+            href="/organize"
+            className="text-sm font-medium text-ink-soft underline-offset-2 transition hover:text-pond hover:underline"
+          >
+            Organizer sign-in
+          </Link>
         )}
       </header>
 
