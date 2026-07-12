@@ -9,6 +9,7 @@ import {
 import {
   createEvent, setEventStatus, deleteEvent,
   upsertTaskWithAudit, deleteTaskWithAudit, deleteTasks, renumberTasks, revertAuditEntry,
+  createStandingBoard,
 } from "@/lib/repository/organize";
 import { updateEventSlug } from "@/lib/repository/events";
 import { prisma } from "@/lib/db";
@@ -73,6 +74,18 @@ export async function createEventAction(
   const event = await createEvent(name, dates.startDate, dates.endDate);
   revalidatePath("/organize");
   return { ok: true, eventId: event.id };
+}
+
+export async function createStandingBoardAction(
+  formData: FormData,
+): Promise<{ ok: true; eventId: string } | Err> {
+  const gate = await requireOrganizer();
+  if (!gate.ok) return gate;
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { ok: false, error: "Give the board a name." };
+  const board = await createStandingBoard(name);
+  revalidatePath("/organize");
+  return { ok: true, eventId: board.id };
 }
 
 export async function setEventStatusAction(

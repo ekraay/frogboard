@@ -9,6 +9,12 @@ export async function createEvent(name: string, startDate: Date, endDate: Date):
   return prisma.event.create({ data: { name, slug, startDate, endDate, orgId: "org_bcsf" } });
 }
 
+/** An evergreen board of frogs: no dates, drafted until the organizer publishes it. */
+export async function createStandingBoard(name: string): Promise<Event> {
+  const slug = await generateUniqueSlug(name);
+  return prisma.event.create({ data: { name, slug, standing: true, orgId: "org_bcsf" } });
+}
+
 export interface EventListItem {
   id: string; name: string; startDate: Date | null; endDate: Date | null;
   status: EventStatus; taskCount: number;

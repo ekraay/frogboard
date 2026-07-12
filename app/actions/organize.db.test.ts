@@ -17,6 +17,7 @@ import { sessionToken, SESSION_COOKIE } from "@/lib/security/session";
 import {
   signIn, signOut, createEventAction, setEventStatusAction, deleteEventAction,
   saveTask, deleteTask, clearTasks, reorderTasks, revertChange, updateEventSlugAction,
+  createStandingBoardAction,
 } from "@/app/actions/organize";
 import { emptyCells } from "@/lib/domain/gridRow";
 
@@ -259,6 +260,25 @@ describe("updateEventSlugAction", () => {
     await prisma.event.create({ data: { name: "A", slug: "taken", startDate: new Date(), endDate: new Date(), orgId: "org_bcsf" } });
     const b = await prisma.event.create({ data: { name: "B", startDate: new Date(), endDate: new Date(), orgId: "org_bcsf" } });
     expect(await updateEventSlugAction(b.id, "taken")).toEqual({ ok: false, error: "That link is already taken." });
+  });
+});
+
+describe("createStandingBoardAction", () => {
+  test("rejects a signed-out caller", async () => {
+    const f = fd({ name: "Temple needs" });
+    expect(await createStandingBoardAction(f)).toEqual({ ok: false, error: "Please sign in." });
+  });
+  test("creates a standing board when signed in", async () => {
+    authenticate();
+    const f = fd({ name: "Temple needs" });
+    const r = await createStandingBoardAction(f);
+    expect(r.ok).toBe(true);
+    expect(await prisma.event.count({ where: { standing: true } })).toBe(1);
+  });
+  test("requires a name", async () => {
+    authenticate();
+    const f = fd({ name: "  " });
+    expect(await createStandingBoardAction(f)).toEqual({ ok: false, error: "Give the board a name." });
   });
 });
 
