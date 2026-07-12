@@ -147,6 +147,24 @@ so design them together.
   (youth protection). If ID-less dedup is needed sooner, store an optional
   `emailHash` as a secondary match key (no raw address); keep raw email only for
   people you actually message.
+- **Callable API layer (external integrations).** Expose a thin HTTP API over the
+  existing repository layer so scripts can populate events and rosters, not just
+  the browser. The layering already supports it: a Route Handler
+  (`app/api/v1/.../route.ts`) validates input, authenticates, then calls the same
+  `createEvent` / `createStandingBoard` / `importPeople` functions the server
+  actions call, so the privacy invariants (hashed Scout IDs, abbreviated minors)
+  come for free.
+  - **Auth:** per-integration API keys (random token, stored hashed via the
+    existing HMAC util, `Authorization: Bearer`), scoped to the org, separate from
+    the browser session.
+  - **Validation + idempotency:** zod at the edge; a stable per-org `externalRef`
+    on events so re-syncs update instead of duplicating (people already dedup by
+    hashed Scout ID).
+  - **First integrations:** Google Calendar → events (real API but needs OAuth; a
+    cheap v1 is `POST /api/v1/events/import` fed by a connector script); Scoutbook
+    → roster (no open API, so a CSV-export script POSTs to
+    `/api/v1/rosters/import`). Open Q: which integration first, and whether to do
+    full Google OAuth or start with the script-fed import endpoint.
 
 ## Shipped
 
