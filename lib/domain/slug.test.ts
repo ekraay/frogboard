@@ -25,6 +25,7 @@ describe("isReservedSlug", () => {
     expect(isReservedSlug("lead")).toBe(true);
     expect(isReservedSlug("e")).toBe(true);
     expect(isReservedSlug("api")).toBe(true);
+    expect(isReservedSlug("b")).toBe(true);
   });
   test("allows ordinary event slugs", () => {
     expect(isReservedSlug("ginza-2026")).toBe(false);

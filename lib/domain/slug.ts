@@ -1,7 +1,7 @@
 // Paths that would shadow an event slug at the site root. An event must never
 // claim one of these, or its board becomes unreachable.
 export const RESERVED_SLUGS = new Set([
-  "e", "organize", "lead", "api", "_next",
+  "e", "b", "organize", "lead", "api", "_next",
   "favicon.ico", "robots.txt", "sitemap.xml", "static", "public",
 ]);
 
