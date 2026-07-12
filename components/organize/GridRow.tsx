@@ -134,6 +134,7 @@ export function GridRow({
                   aria-invalid={invalid(field) || undefined}
                   aria-describedby={invalid(field) ? `row-problem-${row.key}` : undefined}
                   placeholder={placeholder}
+                  list={field === "category" ? "grid-areas" : undefined}
                   value={row.cells[field]}
                   onChange={(e) => onCell(row.key, field, e.target.value)}
                   onKeyDown={onKeyDown}

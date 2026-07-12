@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import { getEventBoardByParam } from "@/lib/repository/events";
 import { Board } from "@/components/Board";
 import { filterTasks, facetOptions, coverageFor } from "@/lib/domain/board";
+import { isValidSession, SESSION_COOKIE } from "@/lib/security/session";
 
 // The board reflects live signups; always render fresh.
 export const dynamic = "force-dynamic";
@@ -30,5 +32,6 @@ export default async function EventBoardPage({
     facets.group, facets.category, facets.location,
   ].filter((s) => s !== "");
   const { covered, total } = coverageFor(tasks);
-  return <Board eventName={board.name} tasks={tasks} filter={{ options, activeLabels, covered, total }} />;
+  const isOrganizer = isValidSession((await cookies()).get(SESSION_COOKIE)?.value);
+  return <Board eventName={board.name} tasks={tasks} standing={board.standing} isOrganizer={isOrganizer} filter={{ options, activeLabels, covered, total }} />;
 }

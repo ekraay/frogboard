@@ -2,7 +2,7 @@
 import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "@/lib/db";
 import { resetDb } from "@/test/db";
-import { createSignupWithAudit, deleteSignupWithAudit } from "@/lib/repository/signups";
+import { createSignupWithAudit, deleteSignupWithAudit, deleteSignupAsOrganizer } from "@/lib/repository/signups";
 
 async function makeTaskNeeding(n: number): Promise<string> {
   const event = await prisma.event.create({
@@ -97,4 +97,15 @@ describe("audit actor (volunteer's own name)", () => {
     const release = await prisma.auditLog.findFirst({ where: { taskId, action: "release" } });
     expect(release!.actorName).toBe("Kenji");
   });
+});
+
+test("deleteSignupAsOrganizer removes a claim without a token and reopens the frog", async () => {
+  const event = await prisma.event.create({ data: { name: "Temple", orgId: "org_bcsf", standing: true } });
+  const task = await prisma.task.create({ data: { eventId: event.id, kind: "frog", title: "Trim hedges", neededCount: 1, position: 1024 } });
+  const signup = await prisma.signup.create({ data: { taskId: task.id, name: "Sam", claimToken: "device-token" } });
+
+  expect(await deleteSignupAsOrganizer(signup.id)).toEqual({ ok: true });
+  expect(await prisma.signup.count({ where: { taskId: task.id } })).toBe(0);
+  expect(await prisma.auditLog.count({ where: { taskId: task.id, action: "release" } })).toBe(1);
+  expect(await deleteSignupAsOrganizer("missing")).toEqual({ ok: false, error: "That signup is no longer here." });
 });

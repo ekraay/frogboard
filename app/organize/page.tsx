@@ -4,6 +4,7 @@ import { listEvents } from "@/lib/repository/organize";
 import { signOutAction } from "@/app/actions/organize";
 import { SignInForm } from "@/components/organize/SignInForm";
 import { NewEventForm } from "@/components/organize/NewEventForm";
+import { NewOngoingBoardForm } from "@/components/organize/NewOngoingBoardForm";
 import { EventList } from "@/components/organize/EventList";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,7 @@ export default async function OrganizePage() {
       </div>
       <EventList events={events} />
       <NewEventForm />
+      <NewOngoingBoardForm />
     </main>
   );
 }

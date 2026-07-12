@@ -17,6 +17,7 @@ import { sessionToken, SESSION_COOKIE } from "@/lib/security/session";
 import {
   signIn, signOut, createEventAction, setEventStatusAction, deleteEventAction,
   saveTask, deleteTask, clearTasks, reorderTasks, revertChange, updateEventSlugAction,
+  createStandingBoardAction,
 } from "@/app/actions/organize";
 import { emptyCells } from "@/lib/domain/gridRow";
 
@@ -86,8 +87,8 @@ describe("createEventAction + setEventStatusAction", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     const e = (await prisma.event.findUnique({ where: { id: r.eventId } }))!;
-    expect(e.startDate.getUTCMonth()).toBe(8); // September
-    expect(e.endDate.getUTCDate()).toBe(27);
+    expect(e.startDate!.getUTCMonth()).toBe(8); // September
+    expect(e.endDate!.getUTCDate()).toBe(27);
   });
   test("rejects an end before the start with a clear, field-tagged message", async () => {
     authenticate();
@@ -262,6 +263,25 @@ describe("updateEventSlugAction", () => {
   });
 });
 
+describe("createStandingBoardAction", () => {
+  test("rejects a signed-out caller", async () => {
+    const f = fd({ name: "Temple needs" });
+    expect(await createStandingBoardAction(f)).toEqual({ ok: false, error: "Please sign in." });
+  });
+  test("creates a standing board when signed in", async () => {
+    authenticate();
+    const f = fd({ name: "Temple needs" });
+    const r = await createStandingBoardAction(f);
+    expect(r.ok).toBe(true);
+    expect(await prisma.event.count({ where: { standing: true } })).toBe(1);
+  });
+  test("requires a name", async () => {
+    authenticate();
+    const f = fd({ name: "  " });
+    expect(await createStandingBoardAction(f)).toEqual({ ok: false, error: "Give the board a name." });
+  });
+});
+
 describe("deleteTask + reorderTasks", () => {
   test("full lifecycle", async () => {
     authenticate();
@@ -274,5 +294,24 @@ describe("deleteTask + reorderTasks", () => {
     expect(await reorderTasks(e.id, [b.taskId, a.taskId])).toEqual({ ok: true });
     expect(await deleteTask(a.taskId)).toEqual({ ok: true });
     expect(await prisma.task.count()).toBe(1);
+  });
+});
+
+describe("saveTask frog-only guard on standing boards", () => {
+  test("rejects a shift on a standing board", async () => {
+    authenticate();
+    const board = await prisma.event.create({ data: { name: "Temple", orgId: "org_bcsf", standing: true } });
+    const cells = { ...emptyCells(), title: "Trim hedges", kind: "shift" };
+    expect(await saveTask({ eventId: board.id, taskId: null, cells }))
+      .toEqual({ ok: false, error: "Standing boards hold frogs only." });
+    expect(await prisma.task.count({ where: { eventId: board.id } })).toBe(0);
+  });
+  test("accepts a frog on a standing board", async () => {
+    authenticate();
+    const board = await prisma.event.create({ data: { name: "Temple", orgId: "org_bcsf", standing: true } });
+    const cells = { ...emptyCells(), title: "Trim hedges", kind: "frog" };
+    const r = await saveTask({ eventId: board.id, taskId: null, cells });
+    expect(r.ok).toBe(true);
+    expect(await prisma.task.count({ where: { eventId: board.id, kind: "frog" } })).toBe(1);
   });
 });

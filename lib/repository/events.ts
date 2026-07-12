@@ -64,7 +64,7 @@ export async function getEventParam(eventId: string): Promise<string | null> {
 
 /** One published event's board by slug or id, or null. Scoped to the org so a slug another org reuses never leaks. */
 export async function getEventBoardByParam(param: string): Promise<
-  { id: string; name: string; tasks: BoardTask[] } | null
+  { id: string; name: string; standing: boolean; tasks: BoardTask[] } | null
 > {
   const event = await prisma.event.findFirst({
     where: { orgId: "org_bcsf", status: "published", OR: [{ slug: param }, { id: param }] },
@@ -81,7 +81,7 @@ export async function getEventBoardByParam(param: string): Promise<
     },
   });
   if (!event) return null;
-  return { id: event.id, name: event.name, tasks: toBoardTasks(event.tasks) };
+  return { id: event.id, name: event.name, standing: event.standing, tasks: toBoardTasks(event.tasks) };
 }
 
 /** One published event's board, or null if it doesn't exist or isn't published. */
@@ -107,14 +107,14 @@ export async function getEventBoard(eventId: string): Promise<
 }
 
 export interface PublishedEventSummary {
-  id: string; name: string; slug: string | null; startDate: Date; endDate: Date;
+  id: string; name: string; slug: string | null; startDate: Date | null; endDate: Date | null;
   covered: number; total: number;
 }
 
 /** Published events, newest first, each with its coverage (full tasks / total). */
 export async function listPublishedEvents(): Promise<PublishedEventSummary[]> {
   const events = await prisma.event.findMany({
-    where: { status: "published" },
+    where: { status: "published", standing: false },
     // id tiebreak keeps the order deterministic for same-instant creations
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     include: { tasks: { select: { neededCount: true, _count: { select: { signups: true } } } } },

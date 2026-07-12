@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { releaseSignup } from "@/app/actions/signups";
+import { releaseSignup, organizerReleaseSignup } from "@/app/actions/signups";
 import { getClaimToken, forgetClaim } from "@/lib/client/ownership";
 
 // Cross-tab ownership changes arrive via the storage event.
@@ -15,10 +15,12 @@ export function Claimant({
   signupId,
   name,
   group,
+  isOrganizer = false,
 }: {
   signupId: string;
   name: string;
   group: string | null;
+  isOrganizer?: boolean;
 }) {
   // Read device-local ownership without a hydration mismatch: the server (and
   // first paint) sees null; after mount the client snapshot reveals ownership.
@@ -33,9 +35,11 @@ export function Claimant({
 
   function onRemove() {
     startTransition(async () => {
-      const result = await releaseSignup(signupId, token);
+      const result = owned
+        ? await releaseSignup(signupId, token)
+        : await organizerReleaseSignup(signupId);
       if (result.ok) {
-        forgetClaim(signupId);
+        if (owned) forgetClaim(signupId);
         router.refresh();
       }
     });
@@ -52,7 +56,7 @@ export function Claimant({
       <span aria-hidden className="text-[0.95em] leading-none">🐸</span>
       <span className="font-medium">{name}</span>
       {group && <span className="text-ink-soft">· {group}</span>}
-      {owned && (
+      {(owned || isOrganizer) && (
         <button
           type="button"
           onClick={onRemove}

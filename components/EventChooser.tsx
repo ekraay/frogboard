@@ -1,13 +1,14 @@
 import Link from "next/link";
 
 export interface ChooserEvent {
-  id: string; name: string; slug: string | null; startDate: Date; endDate: Date;
+  id: string; name: string; slug: string | null; startDate: Date | null; endDate: Date | null;
   covered: number; total: number;
 }
 
 const day = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
-function dateRange(start: Date, end: Date): string {
+function dateRange(start: Date | null, end: Date | null): string | null {
+  if (!start || !end) return null;
   const a = day.format(start);
   const b = day.format(end);
   return a === b ? a : `${a} – ${b}`;
@@ -33,7 +34,9 @@ export function EventChooser({ events }: { events: ChooserEvent[] }) {
               className="pad-rise flex items-baseline justify-between gap-4 rounded-2xl border border-lily-line bg-white px-5 py-4 shadow-sm transition hover:border-reed hover:shadow-md">
               <span>
                 <span className="font-display text-xl font-bold text-ink">{e.name}</span>
-                <span className="mt-0.5 block text-sm text-ink-soft">{dateRange(e.startDate, e.endDate)}</span>
+                {dateRange(e.startDate, e.endDate) && (
+                  <span className="mt-0.5 block text-sm text-ink-soft">{dateRange(e.startDate, e.endDate)}</span>
+                )}
               </span>
               <span className="shrink-0 rounded-full bg-lily px-3 py-1 text-sm font-bold text-pond-deep">
                 {e.covered} of {e.total} covered

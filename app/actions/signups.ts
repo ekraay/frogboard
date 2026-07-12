@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createSignupWithAudit, deleteSignupWithAudit } from "@/lib/repository/signups";
+import { cookies } from "next/headers";
+import { isValidSession, SESSION_COOKIE } from "@/lib/security/session";
+import { createSignupWithAudit, deleteSignupWithAudit, deleteSignupAsOrganizer } from "@/lib/repository/signups";
 
 export type ClaimActionResult =
   | { ok: true; signupId: string; claimToken: string }
@@ -31,6 +33,16 @@ export async function releaseSignup(
   claimToken: string | null,
 ): Promise<ReleaseActionResult> {
   const result = await deleteSignupWithAudit(signupId, claimToken);
+  if (!result.ok) return { ok: false, error: result.error };
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/** Organizer-only: clear any claim and reopen the frog. */
+export async function organizerReleaseSignup(signupId: string): Promise<ReleaseActionResult> {
+  const jar = await cookies();
+  if (!isValidSession(jar.get(SESSION_COOKIE)?.value)) return { ok: false, error: "Please sign in." };
+  const result = await deleteSignupAsOrganizer(signupId);
   if (!result.ok) return { ok: false, error: result.error };
   revalidatePath("/");
   return { ok: true };

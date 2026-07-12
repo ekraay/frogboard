@@ -86,3 +86,26 @@ export async function deleteSignupWithAudit(
     return { ok: true as const };
   });
 }
+
+/** Organizer override: remove a signup without the volunteer's token, so an
+ *  abandoned frog on an evergreen board can be reopened. Audited as a release. */
+export async function deleteSignupAsOrganizer(signupId: string): Promise<VoidResult> {
+  return prisma.$transaction(async (tx) => {
+    const signup = await tx.signup.findUnique({
+      where: { id: signupId },
+      include: { task: { select: { eventId: true } } },
+    });
+    if (!signup) return { ok: false as const, error: "That signup is no longer here." };
+    await tx.auditLog.create({
+      data: {
+        eventId: signup.task.eventId, taskId: signup.taskId, action: "release", actorName: signup.name,
+        details: releaseAuditDetails({
+          signupId: signup.id, name: signup.name, group: signup.group,
+          email: signup.email, phone: signup.phone, minor: signup.minor,
+        }),
+      },
+    });
+    await tx.signup.delete({ where: { id: signupId } });
+    return { ok: true as const };
+  });
+}

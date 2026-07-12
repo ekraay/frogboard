@@ -9,6 +9,7 @@ import {
 import {
   createEvent, setEventStatus, deleteEvent,
   upsertTaskWithAudit, deleteTaskWithAudit, deleteTasks, renumberTasks, revertAuditEntry,
+  createStandingBoard,
 } from "@/lib/repository/organize";
 import { updateEventSlug } from "@/lib/repository/events";
 import { prisma } from "@/lib/db";
@@ -75,6 +76,18 @@ export async function createEventAction(
   return { ok: true, eventId: event.id };
 }
 
+export async function createStandingBoardAction(
+  formData: FormData,
+): Promise<{ ok: true; eventId: string } | Err> {
+  const gate = await requireOrganizer();
+  if (!gate.ok) return gate;
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { ok: false, error: "Give the board a name." };
+  const board = await createStandingBoard(name);
+  revalidatePath("/organize");
+  return { ok: true, eventId: board.id };
+}
+
 export async function setEventStatusAction(
   eventId: string,
   status: "draft" | "published" | "archived",
@@ -120,6 +133,11 @@ function toParts(d: Date): DateParts {
 async function eventCtx(eventId: string): Promise<EventCtx | null> {
   const event = await prisma.event.findUnique({ where: { id: eventId } });
   if (!event) return null;
+  if (!event.startDate || !event.endDate) {
+    // A standing board carries no date range; use a harmless calendar-year context.
+    const year = new Date().getUTCFullYear();
+    return { year, start: { year, month: 1, day: 1 }, end: { year, month: 12, day: 31 } };
+  }
   return { year: event.startDate.getUTCFullYear(), start: toParts(event.startDate), end: toParts(event.endDate) };
 }
 
@@ -133,6 +151,10 @@ export async function saveTask(input: SaveTaskInput): Promise<SaveTaskResult> {
   if (!ctx) return { ok: false, error: "That event no longer exists." };
   const parsed = parseRow(input.cells, ctx);
   if (!parsed.ok) return { ok: false, error: parsed.error, field: parsed.field };
+  const board = await prisma.event.findUnique({ where: { id: input.eventId }, select: { standing: true } });
+  if (board?.standing && parsed.value.kind === "shift") {
+    return { ok: false, error: "Standing boards hold frogs only." };
+  }
   const result = await upsertTaskWithAudit(input.eventId, input.taskId, parsed.value, await organizerName());
   if (!result.ok) return { ok: false, error: result.error, field: result.field };
   revalidatePath("/");

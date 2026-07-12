@@ -9,13 +9,20 @@ export async function createEvent(name: string, startDate: Date, endDate: Date):
   return prisma.event.create({ data: { name, slug, startDate, endDate, orgId: "org_bcsf" } });
 }
 
+/** An evergreen board of frogs: no dates, drafted until the organizer publishes it. */
+export async function createStandingBoard(name: string): Promise<Event> {
+  const slug = await generateUniqueSlug(name);
+  return prisma.event.create({ data: { name, slug, standing: true, orgId: "org_bcsf" } });
+}
+
 export interface EventListItem {
-  id: string; name: string; startDate: Date; endDate: Date;
+  id: string; name: string; startDate: Date | null; endDate: Date | null;
   status: EventStatus; taskCount: number;
 }
 
 export async function listEvents(): Promise<EventListItem[]> {
   const events = await prisma.event.findMany({
+    where: { standing: false },
     // id tiebreak keeps the order deterministic for same-instant creations
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     include: { _count: { select: { tasks: true } } },
@@ -48,7 +55,7 @@ export interface GridTask {
 }
 
 export async function getEventGrid(eventId: string): Promise<
-  { id: string; name: string; slug: string | null; startDate: Date; endDate: Date; status: EventStatus; tasks: GridTask[] } | null
+  { id: string; name: string; slug: string | null; startDate: Date | null; endDate: Date | null; standing: boolean; status: EventStatus; tasks: GridTask[] } | null
 > {
   const event = await prisma.event.findUnique({
     where: { id: eventId },
@@ -61,7 +68,7 @@ export async function getEventGrid(eventId: string): Promise<
   });
   if (!event) return null;
   return {
-    id: event.id, name: event.name, slug: event.slug, startDate: event.startDate, endDate: event.endDate, status: event.status,
+    id: event.id, name: event.name, slug: event.slug, startDate: event.startDate, endDate: event.endDate, standing: event.standing, status: event.status,
     tasks: event.tasks.map((t) => ({
       id: t.id, kind: t.kind, title: t.title, category: t.category,
       requestedGroup: t.requestedGroup, neededCount: t.neededCount,

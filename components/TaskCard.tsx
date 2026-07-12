@@ -4,7 +4,7 @@ import type { BoardTask } from "@/lib/domain/types";
 import { ClaimForm } from "@/components/ClaimForm";
 import { Claimant } from "@/components/Claimant";
 
-export function TaskCard({ task, index = 0 }: { task: BoardTask; index?: number }) {
+export function TaskCard({ task, index = 0, isOrganizer = false }: { task: BoardTask; index?: number; isOrganizer?: boolean }) {
   const slot = getSlotInfo(task);
   const isFrog = task.kind === "frog";
   // Board-wide cascade as the pads surface, capped so the last one isn't slow.
@@ -72,7 +72,7 @@ export function TaskCard({ task, index = 0 }: { task: BoardTask; index?: number 
         {task.signups.length > 0 && (
           <ul className="mt-4 flex flex-wrap gap-2">
             {task.signups.map((s) => (
-              <Claimant key={s.id} signupId={s.id} name={s.name} group={s.group} />
+              <Claimant key={s.id} signupId={s.id} name={s.name} group={s.group} isOrganizer={isOrganizer} />
             ))}
           </ul>
         )}

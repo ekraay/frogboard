@@ -39,8 +39,9 @@ model Event {
   id        String      @id @default(cuid())
   name      String
   slug      String? // human-readable URL, e.g. "ginza-2026"; null until set
-  startDate DateTime
-  endDate   DateTime
+  startDate DateTime? // null on a standing (evergreen) board
+  endDate   DateTime? // null on a standing (evergreen) board
+  standing  Boolean     @default(false) // an evergreen board of frogs, no dates
   status    EventStatus @default(draft)
   orgId     String
   org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)

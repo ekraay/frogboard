@@ -53,3 +53,18 @@ test("active facet with no matching tasks shows a friendly empty state", () => {
   );
   expect(screen.getByText(/no matching shifts/i)).toBeInTheDocument();
 });
+
+function frog(over: Partial<BoardTask> = {}): BoardTask {
+  return {
+    id: "f1", kind: "frog", title: "Trim hedges", category: "Grounds", requestedGroup: null,
+    neededCount: 1, date: null, startAt: null, endAt: null, dueBy: null,
+    pointOfContact: null, location: null, definitionOfDone: null,
+    position: 0, status: "todo", waiting: false, signups: [], ...over,
+  };
+}
+
+test("a standing board shows the frog without a 'No set date' header", () => {
+  render(<Board eventName="Temple needs" tasks={[frog()]} standing />);
+  expect(screen.getByRole("heading", { level: 3, name: "Trim hedges" })).toBeInTheDocument();
+  expect(screen.queryByText("No set date")).not.toBeInTheDocument();
+});

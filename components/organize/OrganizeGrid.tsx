@@ -14,7 +14,8 @@ import { HelpPopover } from "@/components/organize/HelpPopover";
 import { SlugEditor } from "@/components/organize/SlugEditor";
 
 interface GridEvent {
-  id: string; name: string; status: "draft" | "published" | "archived"; slug: string | null; startDate: Date; endDate: Date;
+  id: string; name: string; status: "draft" | "published" | "archived"; slug: string | null;
+  startDate: Date | null; endDate: Date | null; standing: boolean;
 }
 
 type Pending =
@@ -28,10 +29,13 @@ function toParts(d: Date) {
 }
 
 export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initialTasks: GridTask[] }) {
-  const ctx: EventCtx = {
-    year: event.startDate.getUTCFullYear(),
-    start: toParts(event.startDate), end: toParts(event.endDate),
-  };
+  const ctx: EventCtx = event.startDate && event.endDate
+    ? { year: event.startDate.getUTCFullYear(), start: toParts(event.startDate), end: toParts(event.endDate) }
+    : (() => {
+        const year = new Date().getUTCFullYear();
+        return { year, start: { year, month: 1, day: 1 }, end: { year, month: 12, day: 31 } };
+      })();
+  const newCells = () => ({ ...emptyCells(), kind: event.standing ? "frog" : "shift" });
   const [rows, setRows] = useState<RowState[]>(() =>
     initialTasks.map((t) => ({
       key: crypto.randomUUID(), taskId: t.id, cells: taskToCells(t),
@@ -139,7 +143,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     toManual();
     flushPending(); // adding a row is the "next action" that commits a pending Clear-all
     setRows((rs) => [...rs, {
-      key: crypto.randomUUID(), taskId: null, cells: emptyCells(),
+      key: crypto.randomUUID(), taskId: null, cells: newCells(),
       signupCount: 0, state: "dirty", problem: null, expanded: false,
     }]);
   }
@@ -303,7 +307,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
       parseTsv(text),
       { row: anchorRow, col: anchorCol },
       order,
-      emptyCells,
+      newCells,
     );
 
     // Map cells back to rows: keep key/taskId/signups for rows the paste
@@ -352,6 +356,11 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
 
   return (
     <div onPaste={onPaste}>
+      <datalist id="grid-areas">
+        {[...new Set(rows.map((r) => r.cells.category.trim()).filter(Boolean))].map((c) => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
       <div className={`mb-4 flex items-start justify-between gap-3 rounded-2xl border px-4 py-3 ${
         status === "published" ? "border-amber/50 bg-amber/10" : "border-lily-line bg-lily/50"
       }`}>
@@ -424,7 +433,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
         )}
       </div>
 
-      {pasting && <PasteTasksDialog onAdd={addManyTasks} onClose={() => setPasting(false)} />}
+      {pasting && <PasteTasksDialog onAdd={addManyTasks} onClose={() => setPasting(false)} blank={newCells} />}
 
       {pending?.kind === "clear" && (
         <div role="status"

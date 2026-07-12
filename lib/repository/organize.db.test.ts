@@ -5,8 +5,9 @@ import { resetDb } from "@/test/db";
 import {
   createEvent, listEvents, setEventStatus, deleteEvent, getEventGrid,
   upsertTaskWithAudit, deleteTaskWithAudit, deleteTasks, renumberTasks,
-  getEventHistory, revertAuditEntry,
+  getEventHistory, revertAuditEntry, createStandingBoard,
 } from "@/lib/repository/organize";
+import { listPublishedEvents } from "@/lib/repository/events";
 import type { ParsedTaskFields } from "@/lib/domain/gridRow";
 
 function fields(overrides: Partial<ParsedTaskFields>): ParsedTaskFields {
@@ -303,5 +304,30 @@ describe("renumberTasks", () => {
     expect((await prisma.task.findUnique({ where: { id: b.id } }))!.position).toBe(1024);
     expect((await prisma.task.findUnique({ where: { id: a.id } }))!.position).toBe(2048);
     expect(await prisma.auditLog.count({ where: { action: "move" } })).toBe(2);
+  });
+});
+
+describe("createStandingBoard", () => {
+  test("creates an evergreen board with a slug and no dates", async () => {
+    const board = await createStandingBoard("Temple needs");
+    expect(board.standing).toBe(true);
+    expect(board.startDate).toBeNull();
+    expect(board.endDate).toBeNull();
+    expect(board.slug).toBeTruthy();
+    expect(board.status).toBe("draft");
+    expect(board.orgId).toBe("org_bcsf");
+  });
+});
+
+describe("standing boards stay out of the event lists", () => {
+  test("listEvents and listPublishedEvents exclude standing boards", async () => {
+    await prisma.event.create({
+      data: { name: "Ginza", orgId: "org_bcsf", startDate: new Date(), endDate: new Date(), status: "published" },
+    });
+    await prisma.event.create({
+      data: { name: "Temple needs", orgId: "org_bcsf", standing: true, status: "published" },
+    });
+    expect((await listEvents()).map((e) => e.name)).toEqual(["Ginza"]);
+    expect((await listPublishedEvents()).map((e) => e.name)).toEqual(["Ginza"]);
   });
 });

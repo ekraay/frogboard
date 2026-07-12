@@ -24,6 +24,7 @@ import type { GridTask } from "@/lib/repository/organize";
 const event = {
   id: "e1", name: "Ginza", status: "draft" as const, slug: "ginza-2026",
   startDate: new Date("2026-07-24T00:00:00Z"), endDate: new Date("2026-07-26T00:00:00Z"),
+  standing: false,
 };
 
 function gridTask(overrides: Partial<GridTask>): GridTask {
@@ -154,6 +155,31 @@ test("pasting inside the Paste-a-list modal does not leak into the grid", async 
   expect(screen.getByRole("button", { name: /add 2 tasks/i })).toBeInTheDocument();
   // …and the grid did NOT create rows from the modal's paste
   expect(screen.queryByLabelText("Title, row 1")).toBeNull();
+});
+
+const standing = { ...event, standing: true, startDate: null, endDate: null };
+
+test("on a standing board, a pasted column defaults new rows to frog", async () => {
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={standing} initialTasks={[]} />);
+  await user.click(screen.getByRole("button", { name: /add row/i })); // anchor row (already frog)
+  await user.click(screen.getByLabelText("Title, row 1"));
+  await user.paste("Trim hedges\nRake leaves"); // two titles: row 1 filled, row 2 appended
+  expect(screen.getByLabelText("Kind, row 1")).toHaveValue("frog");
+  expect(screen.getByLabelText("Kind, row 2")).toHaveValue("frog"); // the appended row, not shift
+});
+
+test("on a standing board, the Paste-a-list modal defaults tasks to frog", async () => {
+  saveTask.mockResolvedValue({ ok: true, taskId: "t-x" });
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={standing} initialTasks={[]} />);
+  await user.click(screen.getByRole("button", { name: "📋 Paste a list" }));
+  const box = screen.getByLabelText(/tasks, one per line/i);
+  await user.click(box);
+  await user.paste("Trim hedges\nRake leaves");
+  await user.click(screen.getByRole("button", { name: /add 2 tasks/i }));
+  expect(screen.getByLabelText("Kind, row 1")).toHaveValue("frog");
+  expect(screen.getByLabelText("Kind, row 2")).toHaveValue("frog");
 });
 
 test("delete is deferred; undo cancels it and restores the row intact (signups included)", () => {
@@ -417,6 +443,7 @@ const baseTask = (over: Partial<GridTask>): GridTask => ({
 const sortEvent = {
   id: "e1", name: "E", status: "draft" as const, slug: null,
   startDate: new Date("2026-07-24"), endDate: new Date("2026-07-26"),
+  standing: false,
 };
 function titlesInOrder(): string[] {
   return screen.getAllByLabelText(/^Title, row/i).map((el) => (el as HTMLInputElement).value);
@@ -442,4 +469,14 @@ test("reorder buttons disable while sorted", async () => {
   ]} />);
   await user.click(screen.getByRole("button", { name: /sort by title/i }));
   expect(screen.getAllByRole("button", { name: /move up/i })[0]).toBeDisabled();
+});
+
+test("offers existing categories as datalist suggestions", () => {
+  render(<OrganizeGrid
+    event={{ id: "e1", name: "Temple", status: "draft", slug: null, startDate: null, endDate: null, standing: true }}
+    initialTasks={[{ id: "t1", kind: "frog", title: "Trim hedges", category: "Grounds", requestedGroup: null,
+      neededCount: 1, date: null, startAt: null, endAt: null, dueBy: null, location: null, description: null,
+      definitionOfDone: null, pointOfContact: null, position: 1024, signupCount: 0 }]} />);
+  const option = document.querySelector('datalist option[value="Grounds"]');
+  expect(option).not.toBeNull();
 });
