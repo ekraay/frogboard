@@ -52,6 +52,18 @@ test("importRosterAction parses and imports, gated", async () => {
   expect(await prisma.person.count({ where: { orgId: ORG, group: "Scouts" } })).toBe(1);
 });
 
+test("importRosterAction returns a clean error instead of crashing on a config failure", async () => {
+  authenticate();
+  vi.stubEnv("NODE_ENV", "production");
+  vi.stubEnv("ROSTER_ID_SALT", "");
+  const e = await event();
+  const raw = "First Name\tLast Name\tScout ID\nSimon\tKraay\t135291163";
+  const r = await importRosterAction(e.id, "Scouts", raw, true);
+  expect(r.ok).toBe(false);
+  expect(await prisma.person.count({ where: { orgId: ORG } })).toBe(0);
+  vi.unstubAllEnvs();
+});
+
 test("remove and regenerate are gated and effective", async () => {
   authenticate();
   const e = await event();
