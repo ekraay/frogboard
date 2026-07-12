@@ -58,32 +58,35 @@ Nothing about `/[slug]` or `/organize` changes.
 
 ## Architecture
 
-A new server route renders a new client board component. All reads flow through a
-new repository function; the only write is claiming, which reuses the existing
-claim server action. The board re-renders via the existing `revalidatePath`
-pattern.
+A new server route renders a new client board component. Reads reuse the existing
+`getEventBoardByParam` repository function unchanged; the only write is claiming,
+which reuses the existing `claimSlot` action. That action already runs
+`revalidatePath("/")`, but the board updates on the client through
+`router.refresh()` inside the reused claim form, exactly as `/[slug]` does today.
 
 ```
 app/b/[slug]/page.tsx  (server)
-  -> flagEnabled("task_board", { cookies })   // env + preview cookie; notFound() when off
-  -> getTaskBoard(param)                       // lib/repository/taskBoard.ts
+  -> flagEnabled("task_board", { param })      // env + preview query flag; notFound() when off
+  -> getEventBoardByParam(slug)                // lib/repository/events.ts, reused as-is
   -> isOrganizer from session                  // reuse isValidSession/SESSION_COOKIE
   -> <TaskBoard event tasks isOrganizer />     // client
-       -> groupByAvailability(tasks)           // lib/domain/availability.ts (pure)
+       -> partitionByAvailability(tasks)       // lib/domain/board.ts, built on getSlotInfo
        -> <BoardCard/> per task
        -> opens <TaskPanel/> (overlay) via openId + URL hash #task-<id>
-            -> claim block (reuses ClaimForm) + read-only details + Share
-            -> existing claim server action
+            -> claim block + read-only details + Share
+            -> claimSlot action (via the reused claim form)
 ```
 
 ## Components and units
 
 ### `lib/flags.ts` (new)
-- `flagEnabled(name: string, opts: { cookies: ReadonlyRequestCookies }): boolean`.
+- `flagEnabled(name: string, opts: { cookies: { get(name: string): { value: string } | undefined } }): boolean`.
 - True when env `FLAG_<NAME_UPPER>` is a truthy value (`"1"`/`"true"`), OR the
   request carries the preview cookie `ff_<name>` set to `"1"`. Default off in
   production, on in development (`NODE_ENV !== "production"`).
-- Pure over its inputs (env + the passed cookies); no global state.
+- Pure over its inputs (env + the passed cookies accessor); no global state. The
+  `cookies` param is structurally satisfied by Next's `ReadonlyRequestCookies`,
+  and a `{ get }` stub in tests.
 - **Preview opt-in.** Cookies can only be written from a Route Handler or Server
   Action in this Next version, not during a page render. So persistence uses a
   tiny Route Handler `app/b/[slug]/preview/route.ts`: `GET .../preview?on=1`
@@ -92,39 +95,44 @@ app/b/[slug]/page.tsx  (server)
   The page render only reads cookies, never writes them. (Confirm the cookie and
   redirect APIs against `node_modules/next/dist/docs/` when implementing.)
 
-### `lib/domain/availability.ts` (new, pure)
-- `groupByAvailability(tasks: BoardTask[]): { available: BoardTask[]; claimed: BoardTask[] }`.
-- Available = `signups.length < neededCount`; Claimed = `signups.length >= neededCount`.
+### `lib/domain/board.ts` (extend, pure)
+- Add `partitionByAvailability(tasks: BoardTask[]): { available: BoardTask[]; claimed: BoardTask[] }`
+  next to the existing `getSlotInfo`/`coverageFor` it builds on.
+- Available = `!getSlotInfo(t).isFull`; Claimed = `getSlotInfo(t).isFull`. Reuse
+  `getSlotInfo` so the fill rule lives in one place; do not re-inline the
+  `signups.length` vs `neededCount` comparison.
 - Order within each bucket preserves the incoming order (already position-sorted).
 
-### `lib/repository/taskBoard.ts` (new)
-- `getTaskBoard(param: string): Promise<TaskBoardData | null>`.
-- Resolves a **published** event by slug or id, scoped to `org_bcsf` (mirror
-  `getEventBoardByParam`; do not modify that function).
-- Returns `{ id, name, slug, standing, tasks }`, where each task is the existing
-  `BoardTask` shape (so `boardDisplayName` abbreviates minors and no raw minor
-  flag leaks). Coverage is derived client-side from `signups.length` vs
-  `neededCount`, as the board already does.
-- Returns null when the event is missing or not published (the route then
-  `notFound()`s).
+### Reads reuse `getEventBoardByParam` (no new repository function)
+- `getEventBoardByParam(param)` (`lib/repository/events.ts`) already resolves a
+  **published** event by slug or id scoped to `org_bcsf`, runs tasks through
+  `toBoardTasks` (so `boardDisplayName` abbreviates minors and no raw minor flag
+  leaks), and returns `{ id, name, standing, tasks }`. The board needs nothing
+  more, so call it directly and add no clone. Links derive from
+  `window.location`, so the board never needs `slug` in the data.
+- It returns null when the event is missing or unpublished; the route
+  `notFound()`s. Its existing DB tests already cover scoping and minor safety.
 
 ### `app/b/[slug]/page.tsx` (new, server component)
 - `export const dynamic = "force-dynamic"` (per-request session + flag).
-- Read cookies once (read-only; the preview cookie is set by the
-  `preview` Route Handler above, not here).
+- Read cookies once (read-only; the preview cookie is set by the `preview` Route
+  Handler below, not here).
 - If `!flagEnabled("task_board", { cookies })` -> `notFound()`.
-- `const board = await getTaskBoard(slug); if (!board) notFound();`
-- `const isOrganizer = isValidSession(cookies.get(SESSION_COOKIE)?.value)`.
+- `const board = await getEventBoardByParam(slug); if (!board) notFound();`
+- `const isOrganizer = isValidSession((await cookies()).get(SESSION_COOKIE)?.value)`.
 - Render `<TaskBoard event={board} tasks={board.tasks} isOrganizer={isOrganizer} />`.
 
 ### `components/board/TaskBoard.tsx` (new, client)
-- Props: `{ event: { id; name; slug; standing }, tasks: BoardTask[], isOrganizer: boolean }`.
+- Props: `{ event: { name: string }, tasks: BoardTask[], isOrganizer: boolean }`.
+  The header reads only `name`; do not thread `id`/`slug`/`standing` the board
+  never renders. Links come from `window.location`, tasks carry their own ids,
+  and Availability grouping is date-agnostic, so none are needed this phase.
 - State: `openId: string | null`.
 - Header: 🐸 + event name (display serif) + a muted subline ("Grab a task to help
   out"). For organizers only: a "🔗 Copy public link" button and a "Live · N
   tasks" pill (append "· N archived" only once archiving exists; omit for now).
 - Body: the two Availability columns (Available accent lantern `#e25325`, Claimed
-  accent reed `#0e5e36`) via `groupByAvailability`. Each column: dot + uppercase
+  accent reed `#0e5e36`) via `partitionByAvailability`. Each column: dot + uppercase
   label + count pill, then the cards.
 - No controls row this phase (the view switcher and group-by are inert without
   other views/groupings; they arrive in Phase 2/4).
@@ -144,6 +152,10 @@ app/b/[slug]/page.tsx  (server)
     sessions with the flag on; it becomes publicly usable once the flag opens.
 
 ### `components/board/BoardCard.tsx` (new, client)
+- Deliberately parallels the existing `components/TaskCard.tsx` (which embeds the
+  claim form on the current board). `BoardCard` is its high-fidelity successor;
+  the two coexist during the dark launch and `BoardCard` replaces `TaskCard` when
+  `/[slug]` flips. Keeping both is intentional, not a duplication to fold now.
 - The new card look from the handoff section 6, minus the deferred bits: header
   (kind tag), coverage pill (Covered / "N of M"), title (display serif), time
   label, meta chips (category 🏷️, location 📍), coverage bar (fill = filled/needed
@@ -162,24 +174,32 @@ app/b/[slug]/page.tsx  (server)
 - Header: kind tag (read-only) + a "🔗 Share" button (copies
   `origin + pathname + "#task-<id>"`, flips to "Copied ✓") + close ×.
 - Title: read-only display-serif heading.
-- **Claim block** (shown when not full): **reuses the existing `ClaimForm`
-  component**, themed to sit in the panel (a reed-tinted container). `ClaimForm`
-  already collects the required name, the optional email/phone with the reminder
-  helper, and the under-18 handling, and calls the existing claim server action;
-  reuse it as-is so claim semantics never diverge from the current board. Around
-  it the panel adds the copy: "{Grab this frog | Claim a spot}, no account
-  needed, just add your name," and for `neededCount >= 2` with open spots the
-  nudge "👥 More fun in a pair, grab it with a friend." On a successful claim the
-  board refreshes and coverage advances. When full, the block is replaced by "🐸
-  All set, this one's covered."
+- **Claim block** (shown when not full): reuses the claim semantics without
+  inheriting `ClaimForm`'s collapsed-button presentation. Today `ClaimForm`
+  (`components/ClaimForm.tsx`) is a button labeled "🐸 Grab a frog" that expands
+  into the fields on click, so dropping it in whole would put a second frog
+  button inside the panel and ignore the per-kind CTA labels. Instead, extract
+  the form body into a shared `ClaimFields` unit: the honeypot, name, group,
+  email, phone, under-18 checkbox, submit, `claimSlot` call, `rememberClaim` /
+  `rememberProfile`, and `router.refresh()`. `ClaimForm` becomes a thin wrapper
+  (button + `open` state) around `ClaimFields` so the current board is unchanged;
+  the panel renders `ClaimFields` directly, already open, in a reed-tinted
+  container. Claim semantics live in one place and never diverge. Around it the
+  panel adds the copy: "{Grab this frog | Claim a spot}, no account needed, just
+  add your name," and for `neededCount >= 2` with open spots the nudge "👥 More
+  fun in a pair, grab it with a friend." `router.refresh()` inside `ClaimFields`
+  re-fetches the server data (the action's `revalidatePath("/")` alone does not
+  cover this route), so on success coverage advances, the task re-buckets from
+  Available to Claimed, and the block is replaced by "🐸 All set, this one's
+  covered."
 - **Details** (read-only grid): When (the existing time label), Location (📍),
   Category (🏷️), Requested group (👥); plus Definition of done, Description, and
   Point of contact when present.
 
 ## Data model
 
-No schema change in Phase 1. `lib/flags.ts` reads env + a cookie. `getTaskBoard`
-reads existing `Event`/`Task`/`Signup`. The `--color-tatami` token and the
+No schema change in Phase 1. `lib/flags.ts` reads env + a cookie. Reads reuse
+`getEventBoardByParam` over existing `Event`/`Task`/`Signup`. The `--color-tatami` token and the
 `backlog`/`completed`/`archived`/`Comment` additions are deferred to the phases
 that need them.
 
@@ -188,7 +208,7 @@ that need them.
 - Route is dark by default (`FLAG_TASK_BOARD` unset in production). Preview via
   `/b/<slug>/preview?on=1` (the Route Handler sets the cookie, then redirects to
   the board), which lets the organizer test in real production without exposing
-  it.
+  it broadly.
 - Add `"b"` to `RESERVED_SLUGS` so no event can take that slug and shadow the
   route.
 - Open publicly later by setting `FLAG_TASK_BOARD=1`. Flip `/[slug]` to the new
@@ -205,13 +225,16 @@ that need them.
 ## Testing (strict TDD)
 
 - **Unit (jsdom):**
-  - `groupByAvailability`: partial -> available, full -> claimed, boundary
+  - `partitionByAvailability`: partial -> available, full -> claimed, boundary
     (`signups.length === neededCount`) -> claimed, order preserved.
   - `flagEnabled`: env truthy -> true; cookie `ff_task_board=1` -> true; neither
     in production -> false; dev default -> true.
   - `BoardCard`: coverage pill states (Covered vs "N of M"), CTA label per kind
     and per `neededCount >= 2`, "No one yet" when empty, no CTA when full.
-  - `TaskPanel`: claim block (the reused `ClaimForm`) shows when not full and is
+  - `ClaimFields`: renders the fields open (no collapsed button), a successful
+    submit calls `claimSlot` then `router.refresh()`; `ClaimForm` still renders
+    its collapsed button and expands (guards the extraction).
+  - `TaskPanel`: the claim block (`ClaimFields`) shows open when not full and is
     replaced by "All set" when full; the pair nudge shows only for `neededCount
     >= 2` with open spots; read-only details render only present optional fields.
   - `TaskBoard`: the copy-link control renders for an organizer and not for a
@@ -220,9 +243,9 @@ that need them.
     panel; rendering with an initial `#task-<id>` opens that panel; closing
     clears the hash; an unknown id opens nothing. The Share button copies a URL
     ending in `#task-<id>` (assert against a stubbed `location`/clipboard).
-- **DB (`*.db.test.ts`):** `getTaskBoard` returns a published event scoped to
-  `org_bcsf`, abbreviates a minor's name, excludes an unpublished event (null),
-  and never leaks the raw minor flag.
+- **DB (`*.db.test.ts`):** none new. Reads reuse `getEventBoardByParam`, whose
+  existing DB tests already cover `org_bcsf` scoping, published-only, slug-or-id,
+  minor abbreviation, and no raw minor flag leaking.
 - **Accessibility:** axe on `/b/<slug>` (a published event, flag on) reports
   zero violations, including the open panel (focusable, labeled, backdrop and Esc
   close).

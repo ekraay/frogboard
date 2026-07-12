@@ -6,6 +6,16 @@ export function getSlotInfo(task: BoardTask): SlotInfo {
   return { filled, needed, isFull: filled >= needed };
 }
 
+/** Split tasks into those still needing people and those already full, built on
+ *  the same fill rule as `getSlotInfo` so "full" means one thing board-wide.
+ *  Order within each bucket follows the incoming (position-sorted) order. */
+export function partitionByAvailability(tasks: BoardTask[]): { available: BoardTask[]; claimed: BoardTask[] } {
+  const available: BoardTask[] = [];
+  const claimed: BoardTask[] = [];
+  for (const t of tasks) (getSlotInfo(t).isFull ? claimed : available).push(t);
+  return { available, claimed };
+}
+
 export interface Facets { date?: string; group?: string; category?: string; location?: string }
 export interface FacetOptions {
   date: { value: string; label: string }[];

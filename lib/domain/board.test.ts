@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { getSlotInfo, groupTasksByDay, filterTasksByGroup, coverageFor, filterTasks, facetOptions } from "@/lib/domain/board";
+import { getSlotInfo, groupTasksByDay, filterTasksByGroup, coverageFor, filterTasks, facetOptions, partitionByAvailability } from "@/lib/domain/board";
 import type { BoardTask } from "@/lib/domain/types";
 
 function task(overrides: Partial<BoardTask>): BoardTask {
@@ -29,6 +29,35 @@ describe("getSlotInfo", () => {
       signups: [{ id: "s1", name: "Ann", group: null }],
     });
     expect(getSlotInfo(t)).toEqual({ filled: 1, needed: 1, isFull: true });
+  });
+});
+
+describe("partitionByAvailability", () => {
+  const sign = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `s${i}`, name: `V${i}`, group: null }));
+
+  test("a partially filled task is available", () => {
+    const t = task({ id: "a", neededCount: 3, signups: sign(1) });
+    expect(partitionByAvailability([t])).toEqual({ available: [t], claimed: [] });
+  });
+
+  test("a full task is claimed", () => {
+    const t = task({ id: "a", neededCount: 2, signups: sign(2) });
+    expect(partitionByAvailability([t])).toEqual({ available: [], claimed: [t] });
+  });
+
+  test("an over-filled task is claimed", () => {
+    const t = task({ id: "a", neededCount: 1, signups: sign(3) });
+    expect(partitionByAvailability([t])).toEqual({ available: [], claimed: [t] });
+  });
+
+  test("preserves the incoming order within each bucket", () => {
+    const a1 = task({ id: "a1", neededCount: 2, signups: sign(0) });
+    const c1 = task({ id: "c1", neededCount: 1, signups: sign(1) });
+    const a2 = task({ id: "a2", neededCount: 2, signups: sign(1) });
+    const c2 = task({ id: "c2", neededCount: 2, signups: sign(2) });
+    const { available, claimed } = partitionByAvailability([a1, c1, a2, c2]);
+    expect(available.map((t) => t.id)).toEqual(["a1", "a2"]);
+    expect(claimed.map((t) => t.id)).toEqual(["c1", "c2"]);
   });
 });
 
