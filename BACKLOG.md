@@ -165,6 +165,15 @@ so design them together.
     → roster (no open API, so a CSV-export script POSTs to
     `/api/v1/rosters/import`). Open Q: which integration first, and whether to do
     full Google OAuth or start with the script-fed import endpoint.
+- **Trello-style agnostic columns (Task Board Status grouping).** The Task Board
+  redesign (`2026-07-11-task-board-phase-1-design.md`) defaults to Availability
+  grouping and defers Status. When Status grouping lands (Phase 2), decide the
+  model: keep a fixed status spine (Backlog / Next / In process / Waiting / Done)
+  or go Trello-agnostic with **user-defined columns** per board (a `Column`
+  entity with a name + order; a card belongs to a column). The user prefers the
+  agnostic model. Bigger schema, but the board's grouping is already pluggable,
+  so custom columns become one more grouping dimension. Decide at Phase 2, not
+  before.
 
 ## Shipped
 
