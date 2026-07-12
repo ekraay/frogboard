@@ -63,7 +63,7 @@ describe("combineWhen", () => {
   });
   test("shift with a 'by …' deadline is an error (deadlines are for frogs)", () => {
     const r = combineWhen("shift", { year: 2026, month: 7, day: 25 }, { kind: "dueBy", dateText: null, time: 600 }, ctx);
-    expect(r).toEqual({ ok: false, field: "time", error: "Shifts take a time range — 'by …' is for frogs." });
+    expect(r).toEqual({ ok: false, field: "time", error: "A shift takes a time range. A 'by ...' deadline is for frogs." });
   });
   test("frog with no time cell at all is fine — an anytime frog", () => {
     const r = combineWhen("frog", null, { kind: "none" }, ctx);
@@ -79,5 +79,33 @@ describe("combineWhen", () => {
   test("frog with a single start time is rejected like a range", () => {
     const r = combineWhen("frog", null, { kind: "start", start: 600 }, ctx);
     expect(r.ok).toBe(false);
+  });
+  test("frog with a date and a bare time is a deadline at that date and time", () => {
+    // the row's Date cell supplies the day; "5pm" (1020) is the deadline clock
+    const r = combineWhen("frog", { year: 2026, month: 7, day: 25 }, { kind: "start", start: 1020 }, ctx);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.dueBy?.toISOString()).toBe("2026-07-26T00:00:00.000Z"); // 5pm PDT
+    expect(r.value.date).toBeNull();
+    expect(r.value.startAt).toBeNull();
+  });
+  test("frog with a bare time but no day asks for a due date, no em dash", () => {
+    const r = combineWhen("frog", null, { kind: "start", start: 1020 }, ctx);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.field).toBe("time");
+    expect(r.error).not.toContain("—");
+  });
+  test("frog with a date and no time is due at the end of that day", () => {
+    const r = combineWhen("frog", { year: 2026, month: 7, day: 25 }, { kind: "none" }, ctx);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.dueBy?.toISOString()).toBe("2026-07-26T06:59:00.000Z"); // 11:59 PM PDT
+  });
+  test("frog error messages carry no em dash", () => {
+    const range = combineWhen("frog", null, { kind: "range", start: 600, end: 780 }, ctx);
+    expect(range.ok).toBe(false);
+    if (range.ok) return;
+    expect(range.error).not.toContain("—");
   });
 });

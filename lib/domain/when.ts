@@ -49,11 +49,20 @@ export function combineWhen(
   ctx: EventCtx,
 ): WhenResult {
   if (kind === "frog") {
-    if (time.kind === "range" || time.kind === "start") {
-      return { ok: false, field: "time", error: "Frogs take a deadline — try 'by Sat 10am'." };
+    if (time.kind === "range") {
+      return { ok: false, field: "time", error: "A frog takes a deadline, not a time range. Try 'by 5pm' or a due date." };
+    }
+    if (time.kind === "start") {
+      // A bare time ("5pm") is a deadline. The day comes from the row's Date cell.
+      if (!date) {
+        return { ok: false, field: "time", error: "Add a due date for that time, or type 'by Sat 5pm'." };
+      }
+      return { ok: true, value: { date: null, startAt: null, endAt: null, dueBy: pacificToUtc(date, time.start) } };
     }
     if (time.kind === "none") {
-      return { ok: true, value: { date: null, startAt: null, endAt: null, dueBy: null } };
+      // A Date cell with no time is due at the end of that day; no date is an anytime frog.
+      const dueBy = date ? pacificToUtc(date, END_OF_DAY_MINUTES) : null;
+      return { ok: true, value: { date: null, startAt: null, endAt: null, dueBy } };
     }
     let day: DateParts | null = date;
     if (time.dateText) {
@@ -70,7 +79,7 @@ export function combineWhen(
 
   // shift
   if (time.kind === "dueBy") {
-    return { ok: false, field: "time", error: "Shifts take a time range — 'by …' is for frogs." };
+    return { ok: false, field: "time", error: "A shift takes a time range. A 'by ...' deadline is for frogs." };
   }
   if (time.kind !== "none" && !date) {
     return { ok: false, field: "date", error: "A timed shift needs a date." };
