@@ -6,12 +6,13 @@ import { TaskCard } from "@/components/TaskCard";
 import { FilterBar } from "@/components/FilterBar";
 
 export function Board({
-  eventName, tasks, filter, standing = false,
+  eventName, tasks, filter, standing = false, isOrganizer = false,
 }: {
   eventName: string;
   tasks: BoardTask[];
   filter?: { options: FacetOptions; activeLabels: string[]; covered: number; total: number };
   standing?: boolean;
+  isOrganizer?: boolean;
 }) {
   const groups = groupTasksByDay(tasks);
   let cardIndex = 0; // running count for a board-wide staggered reveal
@@ -75,7 +76,7 @@ export function Board({
           )}
           <div className="space-y-4">
             {g.tasks.map((t) => (
-              <TaskCard key={t.id} task={t} index={cardIndex++} />
+              <TaskCard key={t.id} task={t} index={cardIndex++} isOrganizer={isOrganizer} />
             ))}
           </div>
         </section>
