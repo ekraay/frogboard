@@ -30,9 +30,12 @@ mobile-first.
   "Show all tasks" clear. The Filter button carries a count badge.
 - **Permanent shareable links.** Filter state lives in the query string, so any
   filtered view is a copy-and-send link. This is the group-link mechanism.
-- **Greatest need is derived, not curated.** A "Needs the most help" badge marks
-  the single most-urgent available task, computed from coverage gap and
-  deadline. No new field. Manual "star one task" is deferred to Phase 6.
+- **Greatest need is derived, not curated.** A single derived badge marks the
+  task in view that needs attention most, computed without a new field. Manual
+  "star one task" is deferred to Phase 6. **Open:** whether that signal is "most
+  urgent" (soonest deadline) or "biggest gap" (largest unfilled need), and whether
+  the two ship as one badge or as two separate filters, awaits a human call. See
+  [Open decisions](#open-decisions).
 - **Grouping engine deferred.** Reshaping columns by Day/Category/etc. waits for
   a later phase. No schema change in Phase 2.
 
@@ -42,22 +45,28 @@ On the volunteer board, a **Filter** button opens a flyout to narrow tasks by
 keyword, requested group, category, location, day, and "due soon." Filtering is
 instant (client-side) and its state rides in the URL, so a filtered view is a
 permanent link an organizer hands to a group. When any filter is active, a chip
-bar shows what is applied and clears it in one tap. The most-needed available
-task wears a "Needs the most help" badge and sits first in its column.
+bar shows what is applied and clears it in one tap. A derived badge marks the
+task needing attention most and sits it first in its column. Its exact meaning,
+"most urgent" versus "biggest gap," is an open decision (below).
 
 ## Architecture
 
 The page parses the query into initial filters and passes them, with the full
-task list, to the client board. Filtering runs client-side over data already in
-the browser, so it is instant; the client mirrors filter state back into the URL
-for sharing. Filters use the query string; the Phase 1 panel keeps using the
+task list and a server-stamped clock, to the client board. Filtering runs
+client-side over data already in the browser, so it is instant; the client
+mirrors filter state back into the URL for sharing. The server hands the client
+one `nowMs`, so the SSR pass and hydration read the same instant and the
+time-relative badge never mismatches. Filters use the query string, sharing the
+`date` key with the legacy `/[slug]` board; the Phase 1 panel keeps using the
 hash, so the two coexist.
 
 ```
 app/b/[slug]/page.tsx  (server)
   -> parseBoardFilters(searchParams)          // lib/domain/boardFilters.ts (pure)
   -> getEventBoardByParam(slug)               // reused, unchanged
-  -> <TaskBoard tasks initialFilters ... />   // client
+  -> nowMs = Date.now()                        // server clock, handed to the client
+  -> <TaskBoard tasks initialFilters nowMs ... />   // client
+       -> now = new Date(nowMs)                     // one clock: SSR and hydration agree
        -> applyBoardFilters(tasks, filters, now)   // lib/domain/boardFilters.ts (pure)
        -> mostNeededId(visibleTasks, now)          // lib/domain/boardFilters.ts (pure)
        -> partitionByAvailability(visible)         // Phase 1, reused
@@ -71,8 +80,12 @@ app/b/[slug]/page.tsx  (server)
 
 ### `lib/domain/boardFilters.ts` (new, pure)
 
-The filter model and every rule over it, so the two boards never diverge and the
-logic is unit-testable without a DOM.
+The multi-select filter model and every rule over it, in one pure, DOM-free unit.
+This board keeps its own richer model on purpose: the legacy `/[slug]` board stays
+on the single-select `filterTasks(Facets)`, and Phase 2 does not unify the two.
+What they share is the low-level primitives. `fieldEq` (matching), `tzIsoDate`
+(calendar day), and `facetOptions` (option lists) live once in `board.ts`, so
+match, date, and option rules never fork.
 
 - **Model.**
   ```ts
@@ -81,7 +94,7 @@ logic is unit-testable without a DOM.
     group: string[];     // requestedGroup values (OR within)
     category: string[];
     location: string[];
-    day: string[];       // ISO calendar days (YYYY-MM-DD)
+    date: string[];      // ISO calendar days (YYYY-MM-DD), query key `date`
     dueSoon: boolean;
   }
   ```
@@ -89,28 +102,39 @@ logic is unit-testable without a DOM.
 - `applyBoardFilters(tasks, f, now: Date): BoardTask[]`.
   - AND across sections, OR within a multi-select section.
   - `keyword`: case-insensitive substring of `title`.
-  - `group`/`category`/`location`: case- and space-insensitive match on the
-    task's `requestedGroup`/`category`/`location` (reuse the existing `fieldEq`
-    from `board.ts`; export it).
-  - `day`: `tzIsoDate(task.date)` is in `f.day` (reuse `tzIsoDate`; export it).
+  - `group`/`category`/`location`: trimmed, case-insensitive match on the task's
+    `requestedGroup`/`category`/`location` (reuse the existing `fieldEq` from
+    `board.ts`; export it, no behavior change). Internal spaces are significant,
+    so values match as stored.
+  - `date`: `tzIsoDate(task.date)` is in `f.date` (reuse `tzIsoDate`; export it).
   - `dueSoon`: `isDueSoon(task, now)`.
   - `now` is passed in, never read from the clock inside, so tests are
     deterministic.
 - `effectiveWhen(task): Date | null` = `task.dueBy ?? task.date`. The urgency
   date: a frog's deadline, else its calendar day, else none (standing/undated).
-- `isDueSoon(task, now): boolean` = `effectiveWhen(task)` exists and is at or
-  before `now + 3 days`. Overdue counts as due soon.
+- `isDueSoon(task, now): boolean`: `effectiveWhen(task)` exists and its calendar
+  day is at or before the calendar day three days after `now`. Compare on ISO day
+  strings, `tzIsoDate(effectiveWhen) <= tzIsoDate(now + 3 days)`, so the window is
+  a whole-day count, not a wall-clock instant, and the boundary is deterministic.
+  Days use the same UTC calendar basis as the rest of the board (`tzIsoDate`), so
+  a `dueBy` timestamp counts by its calendar day. Overdue (any earlier day) counts
+  as due soon.
 - `mostNeededId(tasks, now): string | null` = the id of the top not-full task by
   this total order, or null when none is available:
   1. dated before undated (`effectiveWhen` present first),
   2. earlier `effectiveWhen` first,
   3. larger unfilled gap (`neededCount - signups.length`) first,
   4. lower `position` first.
-- `parseBoardFilters(searchParams): BoardFilters` and
-  `filtersToQuery(f): string`. Round-trip stable. Multi-select values are
-  comma-joined and URL-encoded under keys `group`, `category`, `location`,
-  `day`; `keyword` is a string; `dueSoon` is `due=soon`. Unknown or empty keys
-  are ignored. `filtersToQuery(emptyFilters())` is `""`.
+- `parseBoardFilters(searchParams): BoardFilters` and `filtersToQuery(f):
+  string`. Each multi-select section serializes as a repeated key, never a
+  comma-joined value, so a value that itself contains a comma (a category like
+  "Food, Drink") round-trips intact: `group=Scouts&group=Parents`, under keys
+  `group`, `category`, `location`, and `date` (the `date` key matches the legacy
+  `/[slug]` board). `keyword` is a string; `dueSoon` is `due=soon`. `parse`
+  accepts Next's `string | string[]` for every key. Round-trip stable: within a
+  section, emit values in the order received, so `parse(toQuery(f))` equals `f`.
+  Unknown or empty keys are ignored, parsing never throws, and
+  `filtersToQuery(emptyFilters())` is `""`.
 
 ### `lib/domain/board.ts` (touch)
 
@@ -143,27 +167,33 @@ logic is unit-testable without a DOM.
   item?): void; onClear(): void }`. Removing the keyword clears it; removing a
   multi-select chip drops that one value. `facets` supplies the friendly day
   label (ISO to "Sat Jul 25"); group/category/location chips show the raw value.
+  When a filtered day is no longer in `facets` (its tasks are gone), the chip
+  falls back to the raw ISO day so it still clears, matching the legacy board.
 - Doubles as context for a shared group link: opening `?group=Scouts` shows the
   `👥 Scouts` chip, so a volunteer sees "you're viewing Scouts' tasks."
 
 ### `components/board/BoardCard.tsx` (touch)
 
-- New optional prop `needsMostHelp?: boolean`. When true, render a small
-  `⭐ Needs the most help` badge in the card header. Purely presentational; the
-  ranking lives in the domain. No other card change.
+- New optional prop `needsMostHelp?: boolean`. When true, render a small badge in
+  the card header. The label is provisional, pending the open decision below
+  ("⭐ Most urgent" or "⭐ Biggest gap"). Purely presentational; the ranking lives
+  in the domain. No other card change.
 
 ### `components/board/TaskBoard.tsx` (touch)
 
-- New prop `initialFilters: BoardFilters`. New state `filters` seeded from it,
-  and `flyoutOpen: boolean`.
+- New props `initialFilters: BoardFilters` and `nowMs: number` (the server
+  clock). New state `filters` seeded from `initialFilters`, and `flyoutOpen:
+  boolean`. Build `const now = new Date(nowMs)` once and pass it to both domain
+  calls, so SSR and hydration read the same instant and the badge never flickers
+  or triggers a hydration mismatch.
 - Controls row above the columns: a **Filter** button showing an active-value
   count badge, and (reused) the organizer copy-link. The button opens
   `FilterFlyout`; `ActiveFilterBar` renders under the header when filters are
   active.
-- `const visible = applyBoardFilters(tasks, filters, new Date())`. Partition
-  `visible` into the two columns as in Phase 1. `const mostId =
-  mostNeededId(visible, new Date())`; in the Available column, render that task
-  first with `needsMostHelp`, then the rest in position order.
+- `const visible = applyBoardFilters(tasks, filters, now)`. Partition `visible`
+  into the two columns as in Phase 1. `const mostId = mostNeededId(visible,
+  now)`; in the Available column, render that task first with `needsMostHelp`,
+  then the rest in position order.
 - On every filter change, `history.replaceState` to
   `pathname + (filtersToQuery(next) ? "?" + query : "")`, preserving any
   `#task-<id>` hash. No page reload, no server round-trip.
@@ -175,20 +205,23 @@ logic is unit-testable without a DOM.
 
 ### `app/b/[slug]/page.tsx` (touch)
 
-- Accept `searchParams`, `const initialFilters =
-  parseBoardFilters(await searchParams)`, and pass it to `TaskBoard`. A shared
-  link renders already-filtered on first paint, no flash. Everything else
-  (flag, session, reused repository read) is unchanged.
+- Accept `searchParams`, `const initialFilters = parseBoardFilters(await
+  searchParams)`, read `const nowMs = Date.now()`, and pass both to `TaskBoard`.
+  The page is already `dynamic = "force-dynamic"`, so the server renders the
+  filtered board with one clock and hands that same `nowMs` to the client. A
+  shared link renders already-filtered on first paint, no flash and no hydration
+  mismatch. Everything else (flag, session, reused repository read) is unchanged.
 
 ## Filter semantics
 
 - OR within a section, AND across sections, matching Trello.
 - `keyword` matches the task title, case-insensitive substring.
-- `group`/`category`/`location` match the task's field case- and
-  space-insensitively.
-- `day` matches the task's calendar day.
-- `dueSoon` keeps tasks whose deadline or day is at or before three days from
-  now, including overdue.
+- `group`/`category`/`location` match the task's field trimmed and
+  case-insensitively; internal spaces are significant.
+- `date` matches the task's calendar day (query key `date`, shared with
+  `/[slug]`).
+- `dueSoon` keeps tasks whose deadline or day falls on or before the calendar day
+  three days out, counted in whole days, including overdue.
 
 ## Data model
 
@@ -201,13 +234,25 @@ deferred to Phase 6.
 Same route, same flag (already on in production). No new flag. The controls ship
 to the live board. `/[slug]` and `/organize` stay unchanged.
 
+## Open decisions
+
+- **The derived badge: "most urgent" vs "biggest gap."** `mostNeededId` orders by
+  deadline first, then unfilled gap, so a nearly-covered task due tomorrow
+  outranks a wide-open task due next week. The phrase "needs the most help" reads
+  as coverage gap, which the ranking does not lead with. These are two distinct
+  signals. A human should decide whether the board surfaces "most urgent" (soonest
+  deadline), "biggest gap" (largest unfilled need), or both, and whether they ship
+  as one badge or as two separate filters in the flyout. Until then the badge
+  label and `mostNeededId`'s tie-order stay provisional. Keep the domain function
+  and its tests structured so either ranking, or a split into two, is a small
+  change.
+
 ## Error handling and edge cases
 
 - Unknown or malformed query values are ignored; parsing never throws.
 - A filter value no longer present on any task simply matches nothing; its chip
   still shows so the user can clear it.
-- No available task (all full or none match) means no "Needs the most help"
-  badge.
+- No available task (all full or none match) means no derived badge.
 - A standing board (undated tasks) hides the Day and Due soon sections, since
   neither has values.
 - Filtering to an empty set renders the empty state with a clear-all, never a
@@ -217,14 +262,19 @@ to the live board. `/[slug]` and `/organize` stay unchanged.
 
 - **Unit (jsdom):**
   - `applyBoardFilters`: each dimension in isolation; OR within a section; AND
-    across sections; keyword substring and case-insensitivity; `dueSoon`
-    boundary at exactly three days and an overdue task; empty filters return all.
+    across sections; keyword substring and case-insensitivity; group/category/
+    location match trimmed and case-insensitive with internal spaces significant;
+    `dueSoon` boundary at exactly three calendar days (now+3 is due soon, now+4 is
+    not) and an overdue task; empty filters return all.
   - `isDueSoon` / `effectiveWhen`: deadline vs day precedence; undated returns
-    null and is never due soon; the three-day boundary.
+    null and is never due soon; the three-calendar-day boundary; a `dueBy`
+    timestamp counts by its calendar day.
   - `mostNeededId`: nearest deadline wins; gap breaks a deadline tie; undated
     ranks last; a full task is skipped; all-full or empty returns null.
   - `parseBoardFilters` / `filtersToQuery`: round-trip for multi-select, keyword,
-    and `due=soon`; empty filters serialize to `""`; unknown keys ignored.
+    and `due=soon`; a value containing a comma survives (repeated keys, not
+    comma-join); `parse` accepts `string | string[]`; empty filters serialize to
+    `""`; unknown keys ignored.
   - `FilterFlyout`: toggling a value calls `onChange` with it added/removed; the
     keyword input reports changes; a section with no values does not render; Esc
     and backdrop close; clear-all resets.
@@ -234,7 +284,8 @@ to the live board. `/[slug]` and `/organize` stay unchanged.
   - `TaskBoard`: applying a filter narrows the columns; the Filter button count
     reflects active values; a filter change updates the URL query (assert
     against a stubbed `history`); the most-needed task renders first in Available
-    with the badge; copy-link includes the active query.
+    with the badge; copy-link includes the active query; a fixed `nowMs` yields
+    the same badge and visible set on SSR and after hydration.
 - **DB (`*.db.test.ts`):** none new. No repository change.
 - **e2e (`e2e/task-board.spec.ts`, extend):** open `/b/<slug>?group=<value>` and
   see only that group's tasks with the group chip present; set a filter in the
