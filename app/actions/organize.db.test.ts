@@ -296,3 +296,22 @@ describe("deleteTask + reorderTasks", () => {
     expect(await prisma.task.count()).toBe(1);
   });
 });
+
+describe("saveTask frog-only guard on standing boards", () => {
+  test("rejects a shift on a standing board", async () => {
+    authenticate();
+    const board = await prisma.event.create({ data: { name: "Temple", orgId: "org_bcsf", standing: true } });
+    const cells = { ...emptyCells(), title: "Trim hedges", kind: "shift" };
+    expect(await saveTask({ eventId: board.id, taskId: null, cells }))
+      .toEqual({ ok: false, error: "Standing boards hold frogs only." });
+    expect(await prisma.task.count({ where: { eventId: board.id } })).toBe(0);
+  });
+  test("accepts a frog on a standing board", async () => {
+    authenticate();
+    const board = await prisma.event.create({ data: { name: "Temple", orgId: "org_bcsf", standing: true } });
+    const cells = { ...emptyCells(), title: "Trim hedges", kind: "frog" };
+    const r = await saveTask({ eventId: board.id, taskId: null, cells });
+    expect(r.ok).toBe(true);
+    expect(await prisma.task.count({ where: { eventId: board.id, kind: "frog" } })).toBe(1);
+  });
+});

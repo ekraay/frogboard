@@ -35,6 +35,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
         const year = new Date().getUTCFullYear();
         return { year, start: { year, month: 1, day: 1 }, end: { year, month: 12, day: 31 } };
       })();
+  const newCells = () => ({ ...emptyCells(), kind: event.standing ? "frog" : "shift" });
   const [rows, setRows] = useState<RowState[]>(() =>
     initialTasks.map((t) => ({
       key: crypto.randomUUID(), taskId: t.id, cells: taskToCells(t),
@@ -142,7 +143,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
     toManual();
     flushPending(); // adding a row is the "next action" that commits a pending Clear-all
     setRows((rs) => [...rs, {
-      key: crypto.randomUUID(), taskId: null, cells: emptyCells(),
+      key: crypto.randomUUID(), taskId: null, cells: newCells(),
       signupCount: 0, state: "dirty", problem: null, expanded: false,
     }]);
   }
