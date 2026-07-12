@@ -1,6 +1,6 @@
 // Forgiving parser for the two event-window date fields. Unlike the grid's
-// parseDateCell (which resolves dates *within* an event), this stands alone —
-// an event defines its own window, so it needs explicit years and no
+// parseDateCell (which resolves dates *within* an event), this stands alone.
+// An event defines its own window, so it needs explicit years and no
 // weekday-in-window logic. Pure; no Date.now (the reference year is passed in).
 import { utcMidnight } from "@/lib/domain/when";
 import type { DateParts } from "@/lib/domain/cells";
@@ -23,7 +23,7 @@ type One = { ok: true; value: DateParts } | { ok: false; error: string };
 
 function parseOne(text: string, defaultYear: number): One {
   const t = text.trim();
-  if (t === "") return { ok: false, error: "Add a date — like 9/25/2026." };
+  if (t === "") return { ok: false, error: "Add a date, like 9/25/2026." };
 
   const isoM = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(t);
   if (isoM) {
