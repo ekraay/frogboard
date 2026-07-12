@@ -356,6 +356,11 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
 
   return (
     <div onPaste={onPaste}>
+      <datalist id="grid-areas">
+        {[...new Set(rows.map((r) => r.cells.category.trim()).filter(Boolean))].map((c) => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
       <div className={`mb-4 flex items-start justify-between gap-3 rounded-2xl border px-4 py-3 ${
         status === "published" ? "border-amber/50 bg-amber/10" : "border-lily-line bg-lily/50"
       }`}>
