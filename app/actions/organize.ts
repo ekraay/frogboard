@@ -120,6 +120,11 @@ function toParts(d: Date): DateParts {
 async function eventCtx(eventId: string): Promise<EventCtx | null> {
   const event = await prisma.event.findUnique({ where: { id: eventId } });
   if (!event) return null;
+  if (!event.startDate || !event.endDate) {
+    // A standing board carries no date range; use a harmless calendar-year context.
+    const year = new Date().getUTCFullYear();
+    return { year, start: { year, month: 1, day: 1 }, end: { year, month: 12, day: 31 } };
+  }
   return { year: event.startDate.getUTCFullYear(), start: toParts(event.startDate), end: toParts(event.endDate) };
 }
 

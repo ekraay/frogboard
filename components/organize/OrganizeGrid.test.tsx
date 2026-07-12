@@ -24,6 +24,7 @@ import type { GridTask } from "@/lib/repository/organize";
 const event = {
   id: "e1", name: "Ginza", status: "draft" as const, slug: "ginza-2026",
   startDate: new Date("2026-07-24T00:00:00Z"), endDate: new Date("2026-07-26T00:00:00Z"),
+  standing: false,
 };
 
 function gridTask(overrides: Partial<GridTask>): GridTask {
@@ -417,6 +418,7 @@ const baseTask = (over: Partial<GridTask>): GridTask => ({
 const sortEvent = {
   id: "e1", name: "E", status: "draft" as const, slug: null,
   startDate: new Date("2026-07-24"), endDate: new Date("2026-07-26"),
+  standing: false,
 };
 function titlesInOrder(): string[] {
   return screen.getAllByLabelText(/^Title, row/i).map((el) => (el as HTMLInputElement).value);

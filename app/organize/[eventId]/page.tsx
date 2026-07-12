@@ -47,7 +47,7 @@ export default async function OrganizeEventPage({
         <LeadsPanel eventId={grid.id} groups={groups} leads={leads} />
       </div>
       <OrganizeGrid
-        event={{ id: grid.id, name: grid.name, status: grid.status, slug: grid.slug, startDate: grid.startDate, endDate: grid.endDate }}
+        event={{ id: grid.id, name: grid.name, status: grid.status, slug: grid.slug, startDate: grid.startDate, endDate: grid.endDate, standing: grid.standing }}
         initialTasks={grid.tasks}
       />
     </main>

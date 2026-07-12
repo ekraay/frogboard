@@ -86,8 +86,8 @@ describe("createEventAction + setEventStatusAction", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     const e = (await prisma.event.findUnique({ where: { id: r.eventId } }))!;
-    expect(e.startDate.getUTCMonth()).toBe(8); // September
-    expect(e.endDate.getUTCDate()).toBe(27);
+    expect(e.startDate!.getUTCMonth()).toBe(8); // September
+    expect(e.endDate!.getUTCDate()).toBe(27);
   });
   test("rejects an end before the start with a clear, field-tagged message", async () => {
     authenticate();

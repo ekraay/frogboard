@@ -14,7 +14,8 @@ import { HelpPopover } from "@/components/organize/HelpPopover";
 import { SlugEditor } from "@/components/organize/SlugEditor";
 
 interface GridEvent {
-  id: string; name: string; status: "draft" | "published" | "archived"; slug: string | null; startDate: Date; endDate: Date;
+  id: string; name: string; status: "draft" | "published" | "archived"; slug: string | null;
+  startDate: Date | null; endDate: Date | null; standing: boolean;
 }
 
 type Pending =
@@ -28,10 +29,12 @@ function toParts(d: Date) {
 }
 
 export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initialTasks: GridTask[] }) {
-  const ctx: EventCtx = {
-    year: event.startDate.getUTCFullYear(),
-    start: toParts(event.startDate), end: toParts(event.endDate),
-  };
+  const ctx: EventCtx = event.startDate && event.endDate
+    ? { year: event.startDate.getUTCFullYear(), start: toParts(event.startDate), end: toParts(event.endDate) }
+    : (() => {
+        const year = new Date().getUTCFullYear();
+        return { year, start: { year, month: 1, day: 1 }, end: { year, month: 12, day: 31 } };
+      })();
   const [rows, setRows] = useState<RowState[]>(() =>
     initialTasks.map((t) => ({
       key: crypto.randomUUID(), taskId: t.id, cells: taskToCells(t),

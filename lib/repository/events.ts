@@ -107,14 +107,14 @@ export async function getEventBoard(eventId: string): Promise<
 }
 
 export interface PublishedEventSummary {
-  id: string; name: string; slug: string | null; startDate: Date; endDate: Date;
+  id: string; name: string; slug: string | null; startDate: Date | null; endDate: Date | null;
   covered: number; total: number;
 }
 
 /** Published events, newest first, each with its coverage (full tasks / total). */
 export async function listPublishedEvents(): Promise<PublishedEventSummary[]> {
   const events = await prisma.event.findMany({
-    where: { status: "published" },
+    where: { status: "published", standing: false },
     // id tiebreak keeps the order deterministic for same-instant creations
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     include: { tasks: { select: { neededCount: true, _count: { select: { signups: true } } } } },
