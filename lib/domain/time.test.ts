@@ -48,4 +48,12 @@ describe("formatWhen", () => {
       formatWhen(task({ kind: "frog", date: null, dueBy: null })),
     ).toBe("Anytime");
   });
+  test("a frog shows its deadline, or 'Anytime' when it has none", () => {
+    expect(
+      formatWhen(task({ kind: "frog", date: null, dueBy: new Date("2026-07-25T12:00:00Z") })),
+    ).toMatch(/^By /);
+    expect(
+      formatWhen(task({ kind: "frog", date: null, dueBy: null })),
+    ).toBe("Anytime");
+  });
 });
