@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a filter flyout to the volunteer board whose state rides in the URL, so any filtered view (for example one group's tasks) is a copy-and-send link, plus a chip bar for active filters and a derived "needs most help" badge.
+**Goal:** Add a filter flyout to the volunteer board whose state rides in the URL, so any filtered view (for example one group's tasks) is a copy-and-send link, plus a chip bar for active filters.
 
 **Architecture:** The page parses the query string into `BoardFilters` and passes them, the full task list, and one server clock (`nowMs`) to the client `TaskBoard`. Filtering runs client-side over data already in the browser (instant), and the client mirrors filter state back into the URL via `history.replaceState`. All filter rules live in one pure, DOM-free unit (`lib/domain/boardFilters.ts`) built on the primitives already in `lib/domain/board.ts`. No schema change; reads still reuse `getEventBoardByParam`.
 
@@ -12,12 +12,12 @@
 
 - Spec: `docs/superpowers/specs/2026-07-12-task-board-phase-2-design.md`.
 - Source every color and font from the existing `@theme` tokens in `app/globals.css` ("Matsuri at Dusk"). The board is mobile-first.
-- Filter semantics: **OR within a section, AND across sections.** `keyword` is a case-insensitive substring of the title. `group`/`category`/`location` match the task field trimmed and case-insensitively, internal spaces significant (reuse `fieldEq`). `date` matches the task's calendar day (reuse `tzIsoDate`). `dueSoon` keeps tasks whose deadline-or-day is on or before the calendar day three days out, counted in whole days, overdue included.
+- Filter semantics: **OR within a section, AND across sections.** `keyword` is a case-insensitive substring of the title. `group`/`category`/`location` match the task field trimmed and case-insensitively, internal spaces significant (reuse `fieldEq`). `date` matches the task's calendar day (reuse `tzIsoDate`). `dueSoon` keeps tasks whose deadline-or-day is on or before the calendar day three days out, counted in whole days, overdue included. `bigGap` keeps tasks that still need **2 or more** people (`neededCount - signups.length >= 2`).
+- **The two derived signals ship as two flyout filters, not a card badge** (decision 2026-07-12). "Most urgent" is the `dueSoon` time filter; "Biggest gap" is the `bigGap` need filter. There is no derived badge and no `mostNeededId`.
 - `now` is always passed into domain functions, never read from the clock inside them, so tests are deterministic and SSR/hydration read one instant.
-- Query serialization uses **repeated keys, never comma-joined values**, so a value containing a comma (e.g. a category "Food, Drink") round-trips. Keys: `group`, `category`, `location`, `date` (the `date` key is shared with the legacy `/[slug]` board), keyword as `q`, `dueSoon` as `due=soon`. `parseBoardFilters` accepts Next's `string | string[]`, never throws, ignores unknown/empty keys, and `filtersToQuery(emptyFilters())` is `""`.
+- Query serialization uses **repeated keys, never comma-joined values**, so a value containing a comma (e.g. a category "Food, Drink") round-trips. Keys: `group`, `category`, `location`, `date` (the `date` key is shared with the legacy `/[slug]` board), keyword as `q`, `dueSoon` as `due=soon`, `bigGap` as `gap=big`. `parseBoardFilters` accepts Next's `string | string[]`, never throws, ignores unknown/empty keys, and `filtersToQuery(emptyFilters())` is `""`.
 - No schema change. No repository change. No new flag (the route flag is already on in production). `/[slug]` and `/organize` stay unchanged.
 - Reuse, do not fork: `partitionByAvailability`, `getSlotInfo`, `facetOptions`, `fieldEq`, `tzIsoDate` all live in `board.ts`; `boardFilters.ts` imports them.
-- **OPEN DECISION (provisional in this plan):** the derived badge's meaning ("most urgent" = soonest deadline vs "biggest gap" = largest unfilled need), whether it ships as one badge or two flyout filters, and the exact label. This plan implements `mostNeededId` deadline-first per the spec and labels the badge "⭐ Most urgent", both isolated behind one function and one label constant so a change is small. A human resolves this before Task 6 ships; if the answer changes, only `mostNeededId`'s comparator and the `MOST_NEEDED_LABEL` constant change.
 - Before done: `npm test`, `npm run test:db`, `npx tsc --noEmit`, `npm run lint`, and the e2e suite all green.
 
 ---
@@ -31,7 +31,7 @@
 
 **Interfaces:**
 - Consumes: `fieldEq(actual: string | null, wanted: string): boolean` and `tzIsoDate(d: Date): string` from `board.ts`; `BoardTask` from `lib/domain/types`.
-- Produces: `interface BoardFilters { keyword: string; group: string[]; category: string[]; location: string[]; date: string[]; dueSoon: boolean }`; `emptyFilters(): BoardFilters`; `hasAnyFilter(f: BoardFilters): boolean`; `effectiveWhen(task: BoardTask): Date | null`; `isDueSoon(task: BoardTask, now: Date): boolean`; `applyBoardFilters(tasks: BoardTask[], f: BoardFilters, now: Date): BoardTask[]`.
+- Produces: `interface BoardFilters { keyword: string; group: string[]; category: string[]; location: string[]; date: string[]; dueSoon: boolean; bigGap: boolean }`; `emptyFilters(): BoardFilters`; `hasAnyFilter(f: BoardFilters): boolean`; `effectiveWhen(task: BoardTask): Date | null`; `isDueSoon(task: BoardTask, now: Date): boolean`; `hasBigGap(task: BoardTask): boolean`; `sortByGap(tasks: BoardTask[]): BoardTask[]`; `applyBoardFilters(tasks: BoardTask[], f: BoardFilters, now: Date): BoardTask[]`.
 
 - [ ] **Step 1: Export the two primitives from `board.ts`**
 
@@ -60,10 +60,10 @@ export function tzIsoDate(d: Date): string {
 Create `lib/domain/boardFilters.test.ts`:
 
 ```ts
-import { describe, expect, test } from "vitest";
+import { expect, test } from "vitest";
 import type { BoardTask } from "@/lib/domain/types";
 import {
-  emptyFilters, hasAnyFilter, effectiveWhen, isDueSoon, applyBoardFilters,
+  emptyFilters, hasAnyFilter, effectiveWhen, isDueSoon, hasBigGap, sortByGap, applyBoardFilters,
 } from "@/lib/domain/boardFilters";
 
 function task(over: Partial<BoardTask>): BoardTask {
@@ -83,6 +83,7 @@ test("any populated section is an active filter", () => {
   expect(hasAnyFilter({ ...emptyFilters(), group: ["Scouts"] })).toBe(true);
   expect(hasAnyFilter({ ...emptyFilters(), keyword: "cup" })).toBe(true);
   expect(hasAnyFilter({ ...emptyFilters(), dueSoon: true })).toBe(true);
+  expect(hasAnyFilter({ ...emptyFilters(), bigGap: true })).toBe(true);
 });
 
 test("effectiveWhen prefers a deadline, then the day, else null", () => {
@@ -100,8 +101,14 @@ test("isDueSoon: within three calendar days, overdue included, undated never", (
   expect(isDueSoon(task({ date: null, dueBy: null }), NOW)).toBe(false);
 });
 test("isDueSoon counts a dueBy by its calendar day", () => {
-  // 2026-07-25 late evening UTC is still the 25th by UTC calendar => within now+3
   expect(isDueSoon(task({ dueBy: new Date("2026-07-25T23:00:00Z") }), NOW)).toBe(true);
+});
+
+test("hasBigGap: needs two or more still-open spots", () => {
+  expect(hasBigGap(task({ neededCount: 3, signups: [] }))).toBe(true);              // gap 3
+  expect(hasBigGap(task({ neededCount: 2, signups: [{ id: "s", name: "A", group: null }] }))).toBe(false); // gap 1
+  expect(hasBigGap(task({ neededCount: 1, signups: [] }))).toBe(false);             // gap 1
+  expect(hasBigGap(task({ neededCount: 2, signups: [] }))).toBe(true);              // gap 2
 });
 
 test("applyBoardFilters: empty filters return all", () => {
@@ -119,7 +126,7 @@ test("group matches trimmed and case-insensitive, internal spaces significant (O
     task({ id: "c", requestedGroup: "Troop29" }),
   ];
   const got = applyBoardFilters(ts, { ...emptyFilters(), group: [" troop 29 ", "yao"] }, NOW);
-  expect(got.map((t) => t.id)).toEqual(["a", "b"]); // "Troop29" excluded: internal space matters
+  expect(got.map((t) => t.id)).toEqual(["a", "b"]);
 });
 test("date matches the task calendar day; AND across sections", () => {
   const ts = [
@@ -135,6 +142,26 @@ test("dueSoon keeps only tasks due within three days", () => {
     task({ id: "b", date: new Date("2026-07-30T00:00:00Z") }),
   ];
   expect(applyBoardFilters(ts, { ...emptyFilters(), dueSoon: true }, NOW).map((t) => t.id)).toEqual(["a"]);
+});
+test("bigGap keeps only tasks still needing two or more", () => {
+  const ts = [
+    task({ id: "a", neededCount: 3, signups: [] }),
+    task({ id: "b", neededCount: 1, signups: [] }),
+  ];
+  expect(applyBoardFilters(ts, { ...emptyFilters(), bigGap: true }, NOW).map((t) => t.id)).toEqual(["a"]);
+});
+test("sortByGap orders by the largest unfilled gap first, then position", () => {
+  const ts = [
+    task({ id: "small", neededCount: 2, signups: [], position: 1 }),        // gap 2
+    task({ id: "big", neededCount: 5, signups: [], position: 2 }),          // gap 5
+    task({ id: "tie", neededCount: 2, signups: [], position: 0 }),          // gap 2, lower position
+  ];
+  expect(sortByGap(ts).map((t) => t.id)).toEqual(["big", "tie", "small"]);
+});
+test("sortByGap does not mutate its input", () => {
+  const ts = [task({ id: "a", neededCount: 1 }), task({ id: "b", neededCount: 3 })];
+  sortByGap(ts);
+  expect(ts.map((t) => t.id)).toEqual(["a", "b"]);
 });
 ```
 
@@ -157,17 +184,18 @@ export interface BoardFilters {
   category: string[];
   location: string[];
   date: string[];    // ISO calendar days (YYYY-MM-DD)
-  dueSoon: boolean;
+  dueSoon: boolean;  // "most urgent" signal
+  bigGap: boolean;   // "biggest gap" signal
 }
 
 export function emptyFilters(): BoardFilters {
-  return { keyword: "", group: [], category: [], location: [], date: [], dueSoon: false };
+  return { keyword: "", group: [], category: [], location: [], date: [], dueSoon: false, bigGap: false };
 }
 
 export function hasAnyFilter(f: BoardFilters): boolean {
   return (
     f.keyword.trim() !== "" || f.group.length > 0 || f.category.length > 0 ||
-    f.location.length > 0 || f.date.length > 0 || f.dueSoon
+    f.location.length > 0 || f.date.length > 0 || f.dueSoon || f.bigGap
   );
 }
 
@@ -188,6 +216,19 @@ export function isDueSoon(task: BoardTask, now: Date): boolean {
   return tzIsoDate(when) <= cutoff;
 }
 
+/** True when the task still needs two or more people. */
+export function hasBigGap(task: BoardTask): boolean {
+  return task.neededCount - task.signups.length >= 2;
+}
+
+/** Order tasks by the largest unfilled gap first, then lower position. Pure
+ *  (returns a new array). Used to float the biggest needs up when the Biggest
+ *  gap filter is on. */
+export function sortByGap(tasks: BoardTask[]): BoardTask[] {
+  const gap = (t: BoardTask) => t.neededCount - t.signups.length;
+  return [...tasks].sort((a, b) => gap(b) - gap(a) || a.position - b.position);
+}
+
 /** AND across sections, OR within a multi-select section. `now` is passed in. */
 export function applyBoardFilters(tasks: BoardTask[], f: BoardFilters, now: Date): BoardTask[] {
   const kw = f.keyword.trim().toLowerCase();
@@ -198,6 +239,7 @@ export function applyBoardFilters(tasks: BoardTask[], f: BoardFilters, now: Date
     if (f.location.length && !f.location.some((l) => fieldEq(t.location, l))) return false;
     if (f.date.length && !(t.date && f.date.includes(tzIsoDate(t.date)))) return false;
     if (f.dueSoon && !isDueSoon(t, now)) return false;
+    if (f.bigGap && !hasBigGap(t)) return false;
     return true;
   });
 }
@@ -212,7 +254,7 @@ Expected: PASS.
 
 ```bash
 git add lib/domain/board.ts lib/domain/boardFilters.ts lib/domain/boardFilters.test.ts
-git commit -m "feat(board): BoardFilters model + applyBoardFilters, reusing board primitives"
+git commit -m "feat(board): BoardFilters model + applyBoardFilters (due-soon, big-gap)"
 ```
 
 ---
@@ -262,10 +304,11 @@ test("a value containing a comma survives (repeated keys, not comma-join)", () =
   const f: BoardFilters = { ...emptyFilters(), category: ["Food, Drink", "Games"] };
   expect(roundTrip(f)).toEqual(f);
 });
-test("keyword and dueSoon round-trip", () => {
-  const f: BoardFilters = { ...emptyFilters(), keyword: "cups", dueSoon: true };
+test("keyword, dueSoon and bigGap round-trip", () => {
+  const f: BoardFilters = { ...emptyFilters(), keyword: "cups", dueSoon: true, bigGap: true };
   expect(filtersToQuery(f)).toContain("q=cups");
   expect(filtersToQuery(f)).toContain("due=soon");
+  expect(filtersToQuery(f)).toContain("gap=big");
   expect(roundTrip(f)).toEqual(f);
 });
 test("parse accepts a bare string or an array and ignores unknown/empty keys", () => {
@@ -299,17 +342,20 @@ function first(v: string | string[] | undefined): string {
   if (v == null) return "";
   return (Array.isArray(v) ? v[0] ?? "" : v).trim();
 }
+function has(v: string | string[] | undefined, wanted: string): boolean {
+  return (Array.isArray(v) ? v : v == null ? [] : [v]).includes(wanted);
+}
 
 /** Parse Next's searchParams into filters. Never throws; ignores unknown/empty keys. */
 export function parseBoardFilters(sp: RawQuery): BoardFilters {
-  const due = Array.isArray(sp.due) ? sp.due : sp.due == null ? [] : [sp.due];
   return {
     keyword: first(sp.q),
     group: list(sp.group),
     category: list(sp.category),
     location: list(sp.location),
     date: list(sp.date),
-    dueSoon: due.includes("soon"),
+    dueSoon: has(sp.due, "soon"),
+    bigGap: has(sp.gap, "big"),
   };
 }
 
@@ -323,6 +369,7 @@ export function filtersToQuery(f: BoardFilters): string {
   for (const l of f.location) p.append("location", l);
   for (const d of f.date) p.append("date", d);
   if (f.dueSoon) p.set("due", "soon");
+  if (f.bigGap) p.set("gap", "big");
   return p.toString();
 }
 ```
@@ -341,124 +388,15 @@ git commit -m "feat(board): URL round-trip for board filters (repeated keys, com
 
 ---
 
-### Task 3: Derived "needs most help" ranking (`mostNeededId`)
-
-**Files:**
-- Modify: `lib/domain/boardFilters.ts`
-- Test: `lib/domain/boardFilters.test.ts`
-
-**Interfaces:**
-- Consumes: `getSlotInfo` from `board.ts`; `effectiveWhen` (Task 1).
-- Produces: `mostNeededId(tasks: BoardTask[], now: Date): string | null`.
-
-**Note (open decision):** the comparator below is deadline-first per the spec. It is the single place the "most urgent vs biggest gap" decision changes. Keep it and its tests structured so swapping the order, or splitting into two signals, is a small edit.
-
-- [ ] **Step 1: Write the failing tests**
-
-Append to `lib/domain/boardFilters.test.ts`:
-
-```ts
-import { mostNeededId } from "@/lib/domain/boardFilters";
-
-test("mostNeededId: nearest deadline wins", () => {
-  const ts = [
-    task({ id: "far", date: new Date("2026-07-30T00:00:00Z") }),
-    task({ id: "near", date: new Date("2026-07-24T00:00:00Z") }),
-  ];
-  expect(mostNeededId(ts, NOW)).toBe("near");
-});
-test("mostNeededId: a larger gap breaks a deadline tie", () => {
-  const day = new Date("2026-07-24T00:00:00Z");
-  const ts = [
-    task({ id: "small", date: day, neededCount: 2, signups: [{ id: "s", name: "A", group: null }] }), // gap 1
-    task({ id: "big", date: day, neededCount: 3, signups: [] }), // gap 3
-  ];
-  expect(mostNeededId(ts, NOW)).toBe("big");
-});
-test("mostNeededId: undated ranks last", () => {
-  const ts = [
-    task({ id: "undated", date: null, dueBy: null }),
-    task({ id: "dated", date: new Date("2026-08-01T00:00:00Z") }),
-  ];
-  expect(mostNeededId(ts, NOW)).toBe("dated");
-});
-test("mostNeededId: full tasks are skipped; all-full or empty is null", () => {
-  const full = task({ id: "f", neededCount: 1, signups: [{ id: "s", name: "A", group: null }] });
-  expect(mostNeededId([full], NOW)).toBeNull();
-  expect(mostNeededId([], NOW)).toBeNull();
-  const ts = [full, task({ id: "open", date: new Date("2026-07-24T00:00:00Z") })];
-  expect(mostNeededId(ts, NOW)).toBe("open");
-});
-test("mostNeededId: lower position breaks a full tie", () => {
-  const day = new Date("2026-07-24T00:00:00Z");
-  const ts = [
-    task({ id: "b", date: day, neededCount: 2, signups: [], position: 5 }),
-    task({ id: "a", date: day, neededCount: 2, signups: [], position: 1 }),
-  ];
-  expect(mostNeededId(ts, NOW)).toBe("a");
-});
-```
-
-- [ ] **Step 2: Run the tests to verify they fail**
-
-Run: `npm test -- lib/domain/boardFilters.test.ts`
-Expected: FAIL (`mostNeededId` not exported).
-
-- [ ] **Step 3: Implement `mostNeededId`**
-
-Add `getSlotInfo` to the existing `board.ts` import at the top of `lib/domain/boardFilters.ts`:
-
-```ts
-import { fieldEq, tzIsoDate, getSlotInfo } from "@/lib/domain/board";
-```
-
-Append:
-
-```ts
-/** The id of the not-full task most needing attention, or null when none is open.
- *  Total order (OPEN DECISION lives here): dated before undated, then earlier
- *  deadline/day, then larger unfilled gap, then lower position. */
-export function mostNeededId(tasks: BoardTask[], _now: Date): string | null {
-  const open = tasks.filter((t) => !getSlotInfo(t).isFull);
-  if (open.length === 0) return null;
-  const gap = (t: BoardTask) => t.neededCount - t.signups.length;
-  const ranked = [...open].sort((a, b) => {
-    const wa = effectiveWhen(a), wb = effectiveWhen(b);
-    if (wa && !wb) return -1;
-    if (!wa && wb) return 1;
-    if (wa && wb && wa.getTime() !== wb.getTime()) return wa.getTime() - wb.getTime();
-    if (gap(a) !== gap(b)) return gap(b) - gap(a);
-    return a.position - b.position;
-  });
-  return ranked[0].id;
-}
-```
-
-(The `_now` parameter is part of the interface for future rankings that weight recency; it is intentionally unused today.)
-
-- [ ] **Step 4: Run the tests to verify they pass**
-
-Run: `npm test -- lib/domain/boardFilters.test.ts`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add lib/domain/boardFilters.ts lib/domain/boardFilters.test.ts
-git commit -m "feat(board): mostNeededId derived ranking (deadline-first, provisional)"
-```
-
----
-
-### Task 4: `FilterFlyout` component
+### Task 3: `FilterFlyout` component
 
 **Files:**
 - Create: `components/board/FilterFlyout.tsx`
 - Test: `components/board/FilterFlyout.test.tsx`
 
 **Interfaces:**
-- Consumes: `BoardFilters` (Task 1); `FacetOptions` from `board.ts`.
-- Produces: `FilterFlyout` with props `{ facets: FacetOptions; showDueSoon: boolean; value: BoardFilters; onChange(next: BoardFilters): void; onClose(): void }`. Controlled: renders `value`, holds no filter state.
+- Consumes: `BoardFilters`, `emptyFilters` (Task 1); `FacetOptions` from `board.ts`.
+- Produces: `FilterFlyout` with props `{ facets: FacetOptions; showDueSoon: boolean; showBigGap: boolean; value: BoardFilters; onChange(next: BoardFilters): void; onClose(): void }`. Controlled: renders `value`, holds no filter state.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -480,43 +418,53 @@ const facets: FacetOptions = {
 test("checking a group value calls onChange with it added", async () => {
   const onChange = vi.fn();
   const user = userEvent.setup();
-  render(<FilterFlyout facets={facets} showDueSoon value={emptyFilters()} onChange={onChange} onClose={vi.fn()} />);
+  render(<FilterFlyout facets={facets} showDueSoon showBigGap value={emptyFilters()} onChange={onChange} onClose={vi.fn()} />);
   await user.click(screen.getByLabelText("Scouts"));
   expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ group: ["Scouts"] }));
 });
 test("unchecking a selected value removes it", async () => {
   const onChange = vi.fn();
   const user = userEvent.setup();
-  render(<FilterFlyout facets={facets} showDueSoon value={{ ...emptyFilters(), group: ["Scouts"] }} onChange={onChange} onClose={vi.fn()} />);
+  render(<FilterFlyout facets={facets} showDueSoon showBigGap value={{ ...emptyFilters(), group: ["Scouts"] }} onChange={onChange} onClose={vi.fn()} />);
   await user.click(screen.getByLabelText("Scouts"));
   expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ group: [] }));
 });
 test("the keyword input reports changes", async () => {
   const onChange = vi.fn();
   const user = userEvent.setup();
-  render(<FilterFlyout facets={facets} showDueSoon value={emptyFilters()} onChange={onChange} onClose={vi.fn()} />);
+  render(<FilterFlyout facets={facets} showDueSoon showBigGap value={emptyFilters()} onChange={onChange} onClose={vi.fn()} />);
   await user.type(screen.getByLabelText(/keyword/i), "c");
   expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ keyword: "c" }));
 });
+test("the Due soon and Biggest gap toggles report changes", async () => {
+  const onChange = vi.fn();
+  const user = userEvent.setup();
+  render(<FilterFlyout facets={facets} showDueSoon showBigGap value={emptyFilters()} onChange={onChange} onClose={vi.fn()} />);
+  await user.click(screen.getByLabelText(/due soon/i));
+  expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ dueSoon: true }));
+  await user.click(screen.getByLabelText(/biggest gap/i));
+  expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ bigGap: true }));
+});
 test("a section with no values does not render (Location empty)", () => {
-  render(<FilterFlyout facets={facets} showDueSoon value={emptyFilters()} onChange={vi.fn()} onClose={vi.fn()} />);
+  render(<FilterFlyout facets={facets} showDueSoon showBigGap value={emptyFilters()} onChange={vi.fn()} onClose={vi.fn()} />);
   expect(screen.queryByText(/location/i)).not.toBeInTheDocument();
 });
-test("Due soon is hidden when showDueSoon is false", () => {
-  render(<FilterFlyout facets={facets} showDueSoon={false} value={emptyFilters()} onChange={vi.fn()} onClose={vi.fn()} />);
+test("Due soon hides when showDueSoon is false; Biggest gap hides when showBigGap is false", () => {
+  render(<FilterFlyout facets={facets} showDueSoon={false} showBigGap={false} value={emptyFilters()} onChange={vi.fn()} onClose={vi.fn()} />);
   expect(screen.queryByLabelText(/due soon/i)).not.toBeInTheDocument();
+  expect(screen.queryByLabelText(/biggest gap/i)).not.toBeInTheDocument();
 });
 test("Escape closes the flyout", async () => {
   const onClose = vi.fn();
   const user = userEvent.setup();
-  render(<FilterFlyout facets={facets} showDueSoon value={emptyFilters()} onChange={vi.fn()} onClose={onClose} />);
+  render(<FilterFlyout facets={facets} showDueSoon showBigGap value={emptyFilters()} onChange={vi.fn()} onClose={onClose} />);
   await user.keyboard("{Escape}");
   expect(onClose).toHaveBeenCalled();
 });
 test("Show all tasks clears every section", async () => {
   const onChange = vi.fn();
   const user = userEvent.setup();
-  render(<FilterFlyout facets={facets} showDueSoon value={{ ...emptyFilters(), group: ["Scouts"] }} onChange={onChange} onClose={vi.fn()} />);
+  render(<FilterFlyout facets={facets} showDueSoon showBigGap value={{ ...emptyFilters(), group: ["Scouts"] }} onChange={onChange} onClose={vi.fn()} />);
   await user.click(screen.getByRole("button", { name: /show all tasks/i }));
   expect(onChange).toHaveBeenCalledWith(emptyFilters());
 });
@@ -571,10 +519,11 @@ function CheckList({
 // A controlled filter panel: it renders `value` and reports every change through
 // `onChange`, holding no state of its own. Sections with no values do not render.
 export function FilterFlyout({
-  facets, showDueSoon, value, onChange, onClose,
+  facets, showDueSoon, showBigGap, value, onChange, onClose,
 }: {
   facets: FacetOptions;
   showDueSoon: boolean;
+  showBigGap: boolean;
   value: BoardFilters;
   onChange: (next: BoardFilters) => void;
   onClose: () => void;
@@ -584,8 +533,6 @@ export function FilterFlyout({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
-
-  const dayLabels = new Map(facets.date.map((d) => [d.value, d.label]));
 
   return (
     <div className="fixed inset-0 z-40 flex items-start justify-center sm:items-center">
@@ -621,17 +568,28 @@ export function FilterFlyout({
           <CheckList legend="Day" options={facets.date.map((d) => d.value)} selected={value.date}
             onToggle={(v) => onChange({ ...value, date: toggle(value.date, v) })} />
 
-          {showDueSoon && (
-            <label className="flex items-center gap-2 text-sm text-ink">
-              <input
-                type="checkbox"
-                checked={value.dueSoon}
-                onChange={(e) => onChange({ ...value, dueSoon: e.target.checked })}
-                aria-label="Due soon"
-                className="h-4 w-4 rounded border-lily-line text-reed focus:ring-pond"
-              />
-              ⏰ Due soon
-            </label>
+          {(showDueSoon || showBigGap) && (
+            <fieldset className="border-0 p-0">
+              <legend className="mb-2 text-xs font-bold uppercase tracking-[0.15em] text-ink-soft">Needs attention</legend>
+              <div className="flex flex-col gap-2">
+                {showDueSoon && (
+                  <label className="flex items-center gap-2 text-sm text-ink">
+                    <input type="checkbox" checked={value.dueSoon} aria-label="Due soon"
+                      onChange={(e) => onChange({ ...value, dueSoon: e.target.checked })}
+                      className="h-4 w-4 rounded border-lily-line text-reed focus:ring-pond" />
+                    ⏰ Due soon
+                  </label>
+                )}
+                {showBigGap && (
+                  <label className="flex items-center gap-2 text-sm text-ink">
+                    <input type="checkbox" checked={value.bigGap} aria-label="Biggest gap"
+                      onChange={(e) => onChange({ ...value, bigGap: e.target.checked })}
+                      className="h-4 w-4 rounded border-lily-line text-reed focus:ring-pond" />
+                    🙌 Biggest gap
+                  </label>
+                )}
+              </div>
+            </fieldset>
           )}
         </div>
 
@@ -647,7 +605,7 @@ export function FilterFlyout({
 }
 ```
 
-(The `dayLabels` map is used by the Day options' visible labels in a later refinement; the checkbox list currently shows the ISO value. If you prefer the friendly label on the Day checkboxes, map `facets.date` to `{value,label}` and render the label. Keep the ISO value as the toggled key either way. This is a presentation choice, not a behavior change; leaving ISO labels is acceptable for this task since `ActiveFilterBar` shows the friendly label.)
+(The Day checkboxes show the ISO value as their label; the friendly "Sat Jul 25" label appears on the chip in `ActiveFilterBar`. Keeping ISO here is acceptable; the toggled key is the ISO value either way.)
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
@@ -661,12 +619,12 @@ Expected: clean.
 
 ```bash
 git add components/board/FilterFlyout.tsx components/board/FilterFlyout.test.tsx
-git commit -m "feat(board): controlled FilterFlyout (multi-select sections, a11y)"
+git commit -m "feat(board): controlled FilterFlyout (multi-select + due-soon/big-gap, a11y)"
 ```
 
 ---
 
-### Task 5: `ActiveFilterBar` component
+### Task 4: `ActiveFilterBar` component
 
 **Files:**
 - Create: `components/board/ActiveFilterBar.tsx`
@@ -699,14 +657,15 @@ test("renders nothing when no filter is active", () => {
   );
   expect(container).toBeEmptyDOMElement();
 });
-test("renders one chip per active value with a friendly day label", () => {
+test("renders one chip per active value, with a friendly day label and the two toggles", () => {
   render(<ActiveFilterBar
-    value={{ ...emptyFilters(), group: ["Scouts"], date: ["2026-07-25"], keyword: "cups", dueSoon: true }}
+    value={{ ...emptyFilters(), group: ["Scouts"], date: ["2026-07-25"], keyword: "cups", dueSoon: true, bigGap: true }}
     facets={facets} onRemove={vi.fn()} onClear={vi.fn()} />);
   expect(screen.getByText(/Scouts/)).toBeInTheDocument();
-  expect(screen.getByText(/Sat/i)).toBeInTheDocument(); // friendly day label, not the ISO
+  expect(screen.getByText(/Sat/i)).toBeInTheDocument();
   expect(screen.getByText(/cups/)).toBeInTheDocument();
   expect(screen.getByText(/due soon/i)).toBeInTheDocument();
+  expect(screen.getByText(/biggest gap/i)).toBeInTheDocument();
 });
 test("removing a chip calls onRemove for just that value", async () => {
   const onRemove = vi.fn();
@@ -714,6 +673,13 @@ test("removing a chip calls onRemove for just that value", async () => {
   render(<ActiveFilterBar value={{ ...emptyFilters(), group: ["Scouts"] }} facets={facets} onRemove={onRemove} onClear={vi.fn()} />);
   await user.click(screen.getByRole("button", { name: /remove .*scouts/i }));
   expect(onRemove).toHaveBeenCalledWith("group", "Scouts");
+});
+test("removing the Biggest gap chip targets the bigGap section", async () => {
+  const onRemove = vi.fn();
+  const user = userEvent.setup();
+  render(<ActiveFilterBar value={{ ...emptyFilters(), bigGap: true }} facets={facets} onRemove={onRemove} onClear={vi.fn()} />);
+  await user.click(screen.getByRole("button", { name: /remove .*biggest gap/i }));
+  expect(onRemove).toHaveBeenCalledWith("bigGap");
 });
 test("a filtered day missing from facets falls back to the ISO value and still clears", async () => {
   const onRemove = vi.fn();
@@ -758,6 +724,7 @@ function chips(value: BoardFilters, facets: FacetOptions): Chip[] {
   for (const l of value.location) out.push({ section: "location", item: l, label: `📍 ${l}` });
   for (const d of value.date) out.push({ section: "date", item: d, label: `📅 ${dayLabel.get(d) ?? d}` });
   if (value.dueSoon) out.push({ section: "dueSoon", label: "⏰ Due soon" });
+  if (value.bigGap) out.push({ section: "bigGap", label: "🙌 Biggest gap" });
   return out;
 }
 
@@ -808,101 +775,35 @@ git commit -m "feat(board): ActiveFilterBar removable chips + clear-all"
 
 ---
 
-### Task 6: `BoardCard` "needs most help" badge
-
-**Files:**
-- Modify: `components/board/BoardCard.tsx`
-- Test: `components/board/BoardCard.test.tsx`
-
-**Interfaces:**
-- Consumes: existing `BoardCard` props.
-- Produces: `BoardCard` gains an optional prop `needsMostHelp?: boolean`.
-
-**Note (open decision):** `MOST_NEEDED_LABEL` is the single label constant. It is provisional ("⭐ Most urgent"); a human may change it. Keep it one constant.
-
-- [ ] **Step 1: Write the failing tests**
-
-Append to `components/board/BoardCard.test.tsx` (the file already has the `task()` helper):
-
-```tsx
-test("shows the needs-most-help badge only when flagged", () => {
-  const { rerender } = render(<BoardCard task={task({})} onOpen={vi.fn()} needsMostHelp />);
-  expect(screen.getByText(/most urgent/i)).toBeInTheDocument();
-  rerender(<BoardCard task={task({})} onOpen={vi.fn()} />);
-  expect(screen.queryByText(/most urgent/i)).not.toBeInTheDocument();
-});
-```
-
-- [ ] **Step 2: Run the test to verify it fails**
-
-Run: `npm test -- components/board/BoardCard.test.tsx`
-Expected: FAIL (`needsMostHelp` unknown / badge not rendered).
-
-- [ ] **Step 3: Add the badge**
-
-In `components/board/BoardCard.tsx`, add the constant near the top (after the imports):
-
-```ts
-// Provisional label; the "most urgent vs biggest gap" decision is open (see the
-// Phase 2 spec). Change this one string if the decision lands differently.
-const MOST_NEEDED_LABEL = "⭐ Most urgent";
-```
-
-Change the component signature to accept the prop:
-
-```tsx
-export function BoardCard({ task, onOpen, needsMostHelp = false }: { task: BoardTask; onOpen: (id: string) => void; needsMostHelp?: boolean }) {
-```
-
-Inside the `<header>`, in the left `<div className="min-w-0">`, render the badge above the kind line when flagged:
-
-```tsx
-        <div className="min-w-0">
-          {needsMostHelp && (
-            <p className="mb-1 inline-block rounded-full bg-lantern/20 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-[0.1em] text-lantern-deep">
-              {MOST_NEEDED_LABEL}
-            </p>
-          )}
-          <p className="mb-0.5 text-[0.7rem] font-bold uppercase tracking-[0.15em] text-ink-soft">
-```
-
-(Leave the rest of the header unchanged.)
-
-- [ ] **Step 4: Run the test to verify it passes**
-
-Run: `npm test -- components/board/BoardCard.test.tsx`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add components/board/BoardCard.tsx components/board/BoardCard.test.tsx
-git commit -m "feat(board): needs-most-help badge on BoardCard (provisional label)"
-```
-
----
-
-### Task 7: Wire filters into `TaskBoard`
+### Task 5: Wire filters into `TaskBoard`
 
 **Files:**
 - Modify: `components/board/TaskBoard.tsx`
 - Test: `components/board/TaskBoard.test.tsx`
 
 **Interfaces:**
-- Consumes: `BoardFilters`, `emptyFilters`, `applyBoardFilters`, `mostNeededId`, `filtersToQuery`, `effectiveWhen` (Tasks 1-3); `facetOptions` from `board.ts`; `FilterFlyout` (Task 4); `ActiveFilterBar` (Task 5); `BoardCard` `needsMostHelp` (Task 6).
+- Consumes: `BoardFilters`, `emptyFilters`, `applyBoardFilters`, `filtersToQuery`, `effectiveWhen`, `sortByGap` (Tasks 1-2); `facetOptions`, `partitionByAvailability` from `board.ts`; `FilterFlyout` (Task 3); `ActiveFilterBar` (Task 4).
 - Produces: `TaskBoard` gains props `initialFilters: BoardFilters` and `nowMs: number`.
 
 - [ ] **Step 1: Write the failing tests**
 
-Append to `components/board/TaskBoard.test.tsx`. Reuse the file's existing task fixture/import style; if it lacks a fixture helper, add one mirroring `BoardCard.test.tsx`. Add near the top of the file a `history.replaceState` spy setup inside these tests. Add:
+Append to `components/board/TaskBoard.test.tsx`. If the file has no `boardTask()` helper, add the one below near the top. Add:
 
 ```tsx
 import { emptyFilters } from "@/lib/domain/boardFilters";
+import type { BoardTask } from "@/lib/domain/types";
 
+function boardTask(over: Partial<BoardTask>): BoardTask {
+  return {
+    id: "t1", kind: "shift", title: "Task", category: null, requestedGroup: null,
+    neededCount: 3, date: null, startAt: null, endAt: null, dueBy: null,
+    pointOfContact: null, location: null, definitionOfDone: null, status: "todo",
+    waiting: false, position: 0, signups: [], ...over,
+  };
+}
 const NOW_MS = Date.parse("2026-07-22T12:00:00Z");
 
-test("applying a group filter narrows the visible tasks", async () => {
-  const user = userEvent.setup();
+test("applying a group filter narrows the visible tasks", () => {
   const tasks = [
     boardTask({ id: "a", title: "Cups", requestedGroup: "Scouts" }),
     boardTask({ id: "b", title: "Grill", requestedGroup: "Parents" }),
@@ -915,8 +816,8 @@ test("applying a group filter narrows the visible tasks", async () => {
 
 test("the Filter button shows the active-value count", () => {
   render(<TaskBoard event={{ name: "Ginza" }} tasks={[boardTask({ id: "a" })]} isOrganizer={false}
-    initialFilters={{ ...emptyFilters(), group: ["Scouts", "Parents"] }} nowMs={NOW_MS} />);
-  expect(screen.getByRole("button", { name: /filter/i })).toHaveTextContent("2");
+    initialFilters={{ ...emptyFilters(), group: ["Scouts", "Parents"], bigGap: true }} nowMs={NOW_MS} />);
+  expect(screen.getByRole("button", { name: /filter/i })).toHaveTextContent("3");
 });
 
 test("a filter change writes the query to the URL", async () => {
@@ -931,19 +832,6 @@ test("a filter change writes the query to the URL", async () => {
   spy.mockRestore();
 });
 
-test("the most-needed available task renders first with the badge", () => {
-  const tasks = [
-    boardTask({ id: "far", title: "Later", date: new Date("2026-07-30T00:00:00Z") }),
-    boardTask({ id: "near", title: "Sooner", date: new Date("2026-07-24T00:00:00Z") }),
-  ];
-  render(<TaskBoard event={{ name: "Ginza" }} tasks={tasks} isOrganizer={false}
-    initialFilters={emptyFilters()} nowMs={NOW_MS} />);
-  const available = screen.getByRole("region", { name: "Available" });
-  const titles = [...available.querySelectorAll("p.font-display")].map((p) => p.textContent);
-  expect(titles[0]).toBe("Sooner");
-  expect(screen.getByText(/most urgent/i)).toBeInTheDocument();
-});
-
 test("copy-link includes the active filter query (organizer)", async () => {
   const write = vi.fn().mockResolvedValue(undefined);
   Object.defineProperty(navigator, "clipboard", { value: { writeText: write }, configurable: true });
@@ -952,30 +840,34 @@ test("copy-link includes the active filter query (organizer)", async () => {
   await userEvent.setup().click(screen.getByRole("button", { name: /copy public link/i }));
   expect(write).toHaveBeenCalledWith(expect.stringContaining("group=Scouts"));
 });
-```
 
-If `TaskBoard.test.tsx` has no `boardTask()` helper, add this near the top:
+test("empty result shows the clear-all empty state", () => {
+  render(<TaskBoard event={{ name: "Ginza" }} tasks={[boardTask({ id: "a", requestedGroup: "Parents" })]} isOrganizer={false}
+    initialFilters={{ ...emptyFilters(), group: ["Nobody"] }} nowMs={NOW_MS} />);
+  expect(screen.getByText(/no tasks match/i)).toBeInTheDocument();
+});
 
-```tsx
-import type { BoardTask } from "@/lib/domain/types";
-function boardTask(over: Partial<BoardTask>): BoardTask {
-  return {
-    id: "t1", kind: "shift", title: "Task", category: null, requestedGroup: null,
-    neededCount: 3, date: null, startAt: null, endAt: null, dueBy: null,
-    pointOfContact: null, location: null, definitionOfDone: null, status: "todo",
-    waiting: false, position: 0, signups: [], ...over,
-  };
-}
+test("with Biggest gap on, the Available column sorts the largest gap first", () => {
+  const tasks = [
+    boardTask({ id: "small", title: "Small", neededCount: 2, signups: [], position: 0 }), // gap 2
+    boardTask({ id: "big", title: "Big", neededCount: 5, signups: [], position: 1 }),      // gap 5
+  ];
+  render(<TaskBoard event={{ name: "Ginza" }} tasks={tasks} isOrganizer={false}
+    initialFilters={{ ...emptyFilters(), bigGap: true }} nowMs={NOW_MS} />);
+  const available = screen.getByRole("region", { name: "Available" });
+  const titles = [...available.querySelectorAll("p.font-display")].map((p) => p.textContent);
+  expect(titles).toEqual(["Big", "Small"]);
+});
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `npm test -- components/board/TaskBoard.test.tsx`
-Expected: FAIL (new props unknown; no Filter button; no badge ordering).
+Expected: FAIL (new props unknown; no Filter button).
 
 - [ ] **Step 3: Implement the wiring**
 
-Rewrite `components/board/TaskBoard.tsx`. Keep the existing `Column`, hash/`openTask`/`closeTask`/panel logic; add filters, the controls row, the flyout, the chip bar, the most-needed-first ordering, and the URL sync. The `Column` now takes an optional `mostId` to flag the first card:
+Rewrite `components/board/TaskBoard.tsx`, keeping the existing `Column`, hash/`openTask`/`closeTask`/panel logic, and adding filters, the Filter button, the flyout, the chip bar, the URL sync, and the query-aware copy-link:
 
 ```tsx
 "use client";
@@ -984,8 +876,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { partitionByAvailability, facetOptions } from "@/lib/domain/board";
 import {
-  applyBoardFilters, mostNeededId, filtersToQuery, effectiveWhen,
-  hasAnyFilter, emptyFilters, type BoardFilters,
+  applyBoardFilters, filtersToQuery, effectiveWhen, sortByGap,
+  emptyFilters, type BoardFilters,
 } from "@/lib/domain/boardFilters";
 import type { BoardTask } from "@/lib/domain/types";
 import { BoardCard } from "@/components/board/BoardCard";
@@ -994,9 +886,9 @@ import { FilterFlyout } from "@/components/board/FilterFlyout";
 import { ActiveFilterBar } from "@/components/board/ActiveFilterBar";
 
 function Column({
-  label, dot, tasks, onOpen, mostId,
+  label, dot, tasks, onOpen,
 }: {
-  label: string; dot: string; tasks: BoardTask[]; onOpen: (id: string) => void; mostId: string | null;
+  label: string; dot: string; tasks: BoardTask[]; onOpen: (id: string) => void;
 }) {
   return (
     <section aria-label={label} className="flex flex-col gap-4">
@@ -1006,7 +898,7 @@ function Column({
         <span className="rounded-full bg-lily px-2 py-0.5 text-xs font-bold text-ink-soft">{tasks.length}</span>
       </div>
       {tasks.map((t) => (
-        <BoardCard key={t.id} task={t} onOpen={onOpen} needsMostHelp={t.id === mostId} />
+        <BoardCard key={t.id} task={t} onOpen={onOpen} />
       ))}
     </section>
   );
@@ -1029,24 +921,20 @@ export function TaskBoard({
   const now = new Date(nowMs); // one clock: SSR and hydration agree
   const facets = facetOptions(tasks);
   const showDueSoon = tasks.some((t) => effectiveWhen(t) !== null);
+  const showBigGap = tasks.some((t) => t.neededCount >= 2);
 
   const visible = applyBoardFilters(tasks, filters, now);
-  const mostId = mostNeededId(visible, now);
   const { available, claimed } = partitionByAvailability(visible);
-  // The most-needed task leads its Available column.
-  const orderedAvailable = mostId
-    ? [available.find((t) => t.id === mostId), ...available.filter((t) => t.id !== mostId)].filter(Boolean) as BoardTask[]
-    : available;
+  // When the Biggest gap filter is on, float the largest needs to the top of Available.
+  const availableOrdered = filters.bigGap ? sortByGap(available) : available;
 
   const activeCount =
     (filters.keyword.trim() ? 1 : 0) + filters.group.length + filters.category.length +
-    filters.location.length + filters.date.length + (filters.dueSoon ? 1 : 0);
+    filters.location.length + filters.date.length + (filters.dueSoon ? 1 : 0) + (filters.bigGap ? 1 : 0);
 
-  // Mirror filter state into the URL for sharing, preserving any #task hash.
   function syncUrl(next: BoardFilters) {
     const q = filtersToQuery(next);
-    const url = window.location.pathname + (q ? `?${q}` : "") + window.location.hash;
-    window.history.replaceState(null, "", url);
+    window.history.replaceState(null, "", window.location.pathname + (q ? `?${q}` : "") + window.location.hash);
   }
   function changeFilters(next: BoardFilters) {
     setFilters(next);
@@ -1055,6 +943,7 @@ export function TaskBoard({
   function removeFilter(section: keyof BoardFilters, item?: string) {
     if (section === "keyword") return changeFilters({ ...filters, keyword: "" });
     if (section === "dueSoon") return changeFilters({ ...filters, dueSoon: false });
+    if (section === "bigGap") return changeFilters({ ...filters, bigGap: false });
     const list = filters[section] as string[];
     changeFilters({ ...filters, [section]: list.filter((v) => v !== item) });
   }
@@ -1132,13 +1021,13 @@ export function TaskBoard({
         </p>
       ) : (
         <div className="grid gap-8 sm:grid-cols-2">
-          <Column label="Available" dot="bg-lantern" tasks={orderedAvailable} onOpen={openTask} mostId={mostId} />
-          <Column label="Claimed" dot="bg-reed" tasks={claimed} onOpen={openTask} mostId={null} />
+          <Column label="Available" dot="bg-lantern" tasks={availableOrdered} onOpen={openTask} />
+          <Column label="Claimed" dot="bg-reed" tasks={claimed} onOpen={openTask} />
         </div>
       )}
 
       {flyoutOpen && (
-        <FilterFlyout facets={facets} showDueSoon={showDueSoon} value={filters}
+        <FilterFlyout facets={facets} showDueSoon={showDueSoon} showBigGap={showBigGap} value={filters}
           onChange={changeFilters} onClose={() => setFlyoutOpen(false)} />
       )}
 
@@ -1148,10 +1037,12 @@ export function TaskBoard({
 }
 ```
 
+(Every import is used: `effectiveWhen` drives `showDueSoon`, `sortByGap` orders Available when `bigGap` is on. `showBigGap` is derived inline from `neededCount`.)
+
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `npm test -- components/board/TaskBoard.test.tsx`
-Expected: PASS. (If the existing Phase 1 `TaskBoard` tests now fail for missing `initialFilters`/`nowMs`, update those render calls to pass `initialFilters={emptyFilters()}` and `nowMs={Date.parse("2026-07-22T12:00:00Z")}`.)
+Expected: PASS. If the existing Phase 1 `TaskBoard` tests fail for missing `initialFilters`/`nowMs`, update those render calls to pass `initialFilters={emptyFilters()}` and `nowMs={Date.parse("2026-07-22T12:00:00Z")}`.
 
 - [ ] **Step 5: Type-check and commit**
 
@@ -1160,28 +1051,28 @@ Expected: clean.
 
 ```bash
 git add components/board/TaskBoard.tsx components/board/TaskBoard.test.tsx
-git commit -m "feat(board): filter flyout, chip bar, URL sync, most-needed-first"
+git commit -m "feat(board): filter flyout, chip bar, URL sync, query-aware copy-link"
 ```
 
 ---
 
-### Task 8: Feed filters and the clock from the page
+### Task 6: Feed filters and the clock from the page
 
 **Files:**
 - Modify: `app/b/[slug]/page.tsx`
 - Test: `app/b/[slug]/page.test.tsx`
 
 **Interfaces:**
-- Consumes: `parseBoardFilters` (Task 2); the extended `TaskBoard` (Task 7).
+- Consumes: `parseBoardFilters` (Task 2); the extended `TaskBoard` (Task 5).
 - Produces: the page passes `initialFilters` and `nowMs` to `TaskBoard`.
 
 - [ ] **Step 1: Write the failing test**
 
-Read `app/b/[slug]/page.test.tsx` first to match its mock style (it already mocks `getEventBoardByParam`, `flagEnabled`, session, and `next/navigation`). Add a test that a `group` query narrows what the board renders. Append:
+Read `app/b/[slug]/page.test.tsx` first to match its mock style (it already mocks `getEventBoardByParam`, `flagEnabled`, session, and `next/navigation`). Add a test that a `group` query narrows the rendered board, matching the file's existing helpers:
 
 ```tsx
 test("a group query renders the board filtered to that group", async () => {
-  // arrange: two tasks, one Scouts one Parents (match the file's existing mock setup)
+  // Match the file's existing arrange helpers for a flag-on, published board.
   mockBoard({
     name: "Ginza",
     tasks: [
@@ -1189,7 +1080,7 @@ test("a group query renders the board filtered to that group", async () => {
       boardTask({ id: "b", title: "Grill", requestedGroup: "Parents" }),
     ],
   });
-  flagOn(); // however the file enables the flag in its passing tests
+  flagOn();
   const ui = await TaskBoardPage({
     params: Promise.resolve({ slug: "ginza-2026" }),
     searchParams: Promise.resolve({ group: "Scouts" }),
@@ -1200,7 +1091,7 @@ test("a group query renders the board filtered to that group", async () => {
 });
 ```
 
-(Match the helper names the file already uses. If it renders the returned server component another way, follow that pattern. The key assertions: `searchParams` flows in and the board renders filtered.)
+(Use the helper names the file already defines. If it renders the server component differently, follow that pattern. The key: `searchParams` flows in and the board renders filtered.)
 
 - [ ] **Step 2: Run the test to verify it fails**
 
@@ -1209,7 +1100,7 @@ Expected: FAIL (`searchParams` not accepted; board not filtered).
 
 - [ ] **Step 3: Update the page**
 
-Edit `app/b/[slug]/page.tsx` to accept `searchParams`, parse filters, and pass the clock. Read the relevant App Router page-props guide in `node_modules/next/dist/docs/` first to confirm the `searchParams` promise shape:
+Edit `app/b/[slug]/page.tsx`. Read the App Router page-props guide in `node_modules/next/dist/docs/` first to confirm the `searchParams` promise shape:
 
 ```tsx
 import { notFound } from "next/navigation";
@@ -1269,7 +1160,7 @@ git commit -m "feat(board): page parses filters from the query and hands one clo
 
 ---
 
-### Task 9: e2e coverage and final verification
+### Task 7: e2e coverage and final verification
 
 **Files:**
 - Modify: `e2e/task-board.spec.ts`
@@ -1278,18 +1169,17 @@ git commit -m "feat(board): page parses filters from the query and hands one clo
 
 - [ ] **Step 1: Add e2e for the group link, flyout, copy-link, and axe**
 
-Append to `e2e/task-board.spec.ts` (reuse its `BOARD`/`PREVIEW` constants and the seeded event; the seed's tasks carry `requestedGroup` values, confirm one exists, e.g. by reading the seed):
+Read `prisma/seed.ts` to pick a `requestedGroup` value the seed actually carries (the example below assumes "Scouts"; adjust both assertions to a real seeded value). Append to `e2e/task-board.spec.ts`, reusing its `BOARD`/`PREVIEW` constants:
 
 ```ts
-test("a group query shows the group chip and only that group's tasks", async ({ page }) => {
-  await page.goto(PREVIEW);            // opt in via the cookie
+test("a group query shows the group chip and hides other groups", async ({ page }) => {
+  await page.goto(PREVIEW); // opt in via the cookie
   await page.goto(`${BOARD}?group=Scouts`);
   await expect(page.getByRole("button", { name: /remove .*scouts/i })).toBeVisible();
-  // Every visible requested-group chip on a card reads Scouts (no Parents-only task shows).
   await expect(page.getByText("👥 Parents")).toHaveCount(0);
 });
 
-test("setting a filter in the flyout updates the URL and copy-link", async ({ page }) => {
+test("setting a filter in the flyout updates the URL, with no axe violations", async ({ page }) => {
   await page.goto(PREVIEW);
   await page.getByRole("button", { name: /^⚙ Filter/ }).click();
   const dialog = page.getByRole("dialog", { name: /filter tasks/i });
@@ -1302,11 +1192,9 @@ test("setting a filter in the flyout updates the URL and copy-link", async ({ pa
 });
 ```
 
-(If the seed has no `Scouts` requested-group, use a value the seed does carry; read `prisma/seed.ts` to pick one and adjust both assertions.)
-
 - [ ] **Step 2: Run the e2e suite**
 
-Run: `npm run test:e2e` (or the project's documented Playwright command; check `package.json`).
+Run: the project's Playwright command (check `package.json`; e.g. `npm run test:e2e`).
 Expected: PASS, zero axe violations.
 
 - [ ] **Step 3: Run all four gates**
@@ -1326,19 +1214,20 @@ git commit -m "test(board): e2e for group link, flyout filter, copy-link, and ax
 ## Self-Review
 
 **Spec coverage:**
-- Filter flyout, multi-select, sections only when values exist → Task 4. ✓
-- Availability out of the filter (columns keep splitting it) → not added as a filter; Tasks 4/7 keep the two columns. ✓
-- Active chip bar + count badge → Tasks 5, 7. ✓
-- Permanent shareable links (query string, copy-link with query) → Tasks 2, 7, 8. ✓
-- Derived "needs most help" badge, first in its column → Tasks 3, 6, 7. ✓
-- One server clock (`nowMs`) for SSR/hydration agreement → Tasks 7, 8. ✓
-- `boardFilters.ts` pure, reuses `fieldEq`/`tzIsoDate`/`getSlotInfo`/`facetOptions` → Tasks 1, 3, 7. ✓
-- Repeated-key, comma-safe serialization; `date` key shared with `/[slug]`; parse accepts `string|string[]`, never throws, empty → `""` → Task 2. ✓
-- `dueSoon` three-calendar-day, overdue included; undated hides Day + Due soon → Tasks 1, 4, 7. ✓
-- Empty result state with clear-all → Task 7. ✓
+- Filter flyout, multi-select, sections only when values exist → Task 3. ✓
+- Availability stays as the two columns, not a filter → Tasks 3/5. ✓
+- Active chip bar + count badge → Tasks 4, 5. ✓
+- Permanent shareable links (query string, copy-link with query) → Tasks 2, 5, 6. ✓
+- Two derived filters (due-soon + big-gap), no badge → Tasks 1, 3, 4, 5 (decision 2026-07-12). ✓
+- Biggest-gap sort: when the `bigGap` filter is on, the Available column floats the largest unfilled needs first via `sortByGap` → Tasks 1, 5 (user-requested addition 2026-07-12, beyond the spec). ✓
+- One server clock (`nowMs`) for SSR/hydration agreement → Tasks 5, 6. ✓
+- `boardFilters.ts` pure, reuses `fieldEq`/`tzIsoDate`/`facetOptions`/`partitionByAvailability` → Tasks 1, 5. ✓
+- Repeated-key, comma-safe serialization; `date` key shared with `/[slug]`; `due=soon`, `gap=big`; parse accepts `string|string[]`, never throws, empty → `""` → Task 2. ✓
+- `dueSoon` three-calendar-day, overdue included; `bigGap` gap ≥ 2; undated hides Day + Due soon; all-solo hides Biggest gap → Tasks 1, 3, 5. ✓
+- Empty result state with clear-all → Task 5. ✓
 - No schema, no repository, no new flag; `/[slug]` and `/organize` untouched → whole plan. ✓
-- e2e: group link, flyout, URL update, axe → Task 9. ✓
+- e2e: group link, flyout, URL update, axe → Task 7. ✓
 
-**Placeholder scan:** every code step carries complete code; no TBD/TODO. The one deliberate variability is the OPEN DECISION (badge label + `mostNeededId` order), isolated to one comparator and one constant and called out in Global Constraints and Tasks 3/6. ✓
+**Placeholder scan:** every code step carries complete code; no TBD/TODO. Task 6's test uses the page test file's existing helper names (`mockBoard`/`flagOn`/`boardTask`); the implementer matches them to the file, which is a fidelity instruction, not a placeholder. ✓
 
-**Type consistency:** `BoardFilters`, `emptyFilters`, `applyBoardFilters(tasks, f, now)`, `mostNeededId(tasks, now)`, `parseBoardFilters(RawQuery)`, `filtersToQuery(f)` names and signatures match across Tasks 1-3, 7, 8. `FilterFlyout` props `{ facets, showDueSoon, value, onChange, onClose }` and `ActiveFilterBar` props `{ value, facets, onRemove, onClear }` match their consumers in Task 7. `BoardCard` `needsMostHelp?: boolean` matches Task 7's usage. `TaskBoard` new props `initialFilters`/`nowMs` match Task 8's page call. ✓
+**Type consistency:** `BoardFilters` (with `dueSoon`, `bigGap`), `emptyFilters`, `applyBoardFilters(tasks, f, now)`, `hasBigGap(task)`, `parseBoardFilters(RawQuery)`, `filtersToQuery(f)` names and signatures match across Tasks 1-2, 5, 6. `FilterFlyout` props `{ facets, showDueSoon, showBigGap, value, onChange, onClose }` and `ActiveFilterBar` props `{ value, facets, onRemove, onClear }` match Task 5's usage. `TaskBoard` new props `initialFilters`/`nowMs` match Task 6's page call. No `mostNeededId`, no badge, no `needsMostHelp` prop anywhere. ✓
