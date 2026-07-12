@@ -307,7 +307,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
       parseTsv(text),
       { row: anchorRow, col: anchorCol },
       order,
-      emptyCells,
+      newCells,
     );
 
     // Map cells back to rows: keep key/taskId/signups for rows the paste
@@ -433,7 +433,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
         )}
       </div>
 
-      {pasting && <PasteTasksDialog onAdd={addManyTasks} onClose={() => setPasting(false)} />}
+      {pasting && <PasteTasksDialog onAdd={addManyTasks} onClose={() => setPasting(false)} blank={newCells} />}
 
       {pending?.kind === "clear" && (
         <div role="status"

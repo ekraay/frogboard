@@ -14,9 +14,11 @@ import { emptyCells, type RawCells } from "@/lib/domain/gridRow";
 export function PasteTasksDialog({
   onAdd,
   onClose,
+  blank = emptyCells,
 }: {
   onAdd: (rows: RawCells[]) => void;
   onClose: () => void;
+  blank?: () => RawCells;
 }) {
   const [text, setText] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -32,8 +34,8 @@ export function PasteTasksDialog({
     if (text.trim() === "") return [];
     const grid = parseTsv(text);
     const { headerRow, fields } = detectColumns(grid);
-    return buildImportRows(grid, fields, headerRow, emptyCells);
-  }, [text]);
+    return buildImportRows(grid, fields, headerRow, blank);
+  }, [text, blank]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[10vh]">

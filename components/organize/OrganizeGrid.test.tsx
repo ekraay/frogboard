@@ -157,6 +157,31 @@ test("pasting inside the Paste-a-list modal does not leak into the grid", async 
   expect(screen.queryByLabelText("Title, row 1")).toBeNull();
 });
 
+const standing = { ...event, standing: true, startDate: null, endDate: null };
+
+test("on a standing board, a pasted column defaults new rows to frog", async () => {
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={standing} initialTasks={[]} />);
+  await user.click(screen.getByRole("button", { name: /add row/i })); // anchor row (already frog)
+  await user.click(screen.getByLabelText("Title, row 1"));
+  await user.paste("Trim hedges\nRake leaves"); // two titles: row 1 filled, row 2 appended
+  expect(screen.getByLabelText("Kind, row 1")).toHaveValue("frog");
+  expect(screen.getByLabelText("Kind, row 2")).toHaveValue("frog"); // the appended row, not shift
+});
+
+test("on a standing board, the Paste-a-list modal defaults tasks to frog", async () => {
+  saveTask.mockResolvedValue({ ok: true, taskId: "t-x" });
+  const user = userEvent.setup();
+  render(<OrganizeGrid event={standing} initialTasks={[]} />);
+  await user.click(screen.getByRole("button", { name: "📋 Paste a list" }));
+  const box = screen.getByLabelText(/tasks, one per line/i);
+  await user.click(box);
+  await user.paste("Trim hedges\nRake leaves");
+  await user.click(screen.getByRole("button", { name: /add 2 tasks/i }));
+  expect(screen.getByLabelText("Kind, row 1")).toHaveValue("frog");
+  expect(screen.getByLabelText("Kind, row 2")).toHaveValue("frog");
+});
+
 test("delete is deferred; undo cancels it and restores the row intact (signups included)", () => {
   vi.useFakeTimers();
   render(<OrganizeGrid event={event} initialTasks={[gridTask({})]} />);
