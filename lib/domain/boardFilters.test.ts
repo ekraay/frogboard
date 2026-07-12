@@ -101,3 +101,50 @@ test("sortByGap does not mutate its input", () => {
   sortByGap(ts);
   expect(ts.map((t) => t.id)).toEqual(["a", "b"]);
 });
+
+import { parseBoardFilters, filtersToQuery, type BoardFilters } from "@/lib/domain/boardFilters";
+
+// Turn a query string into the object shape Next hands a page (repeated keys -> array).
+function record(query: string): Record<string, string | string[]> {
+  const out: Record<string, string | string[]> = {};
+  for (const [k, v] of new URLSearchParams(query)) {
+    const prev = out[k];
+    if (prev === undefined) out[k] = v;
+    else out[k] = Array.isArray(prev) ? [...prev, v] : [prev, v];
+  }
+  return out;
+}
+function roundTrip(f: BoardFilters): BoardFilters {
+  return parseBoardFilters(record(filtersToQuery(f)));
+}
+
+test("empty filters serialize to an empty string and round-trip", () => {
+  expect(filtersToQuery(emptyFilters())).toBe("");
+  expect(roundTrip(emptyFilters())).toEqual(emptyFilters());
+});
+test("multi-select uses repeated keys and round-trips", () => {
+  const f: BoardFilters = { ...emptyFilters(), group: ["Scouts", "Parents"], date: ["2026-07-25"] };
+  expect(filtersToQuery(f)).toContain("group=Scouts");
+  expect(filtersToQuery(f)).toContain("group=Parents");
+  expect(roundTrip(f)).toEqual(f);
+});
+test("a value containing a comma survives (repeated keys, not comma-join)", () => {
+  const f: BoardFilters = { ...emptyFilters(), category: ["Food, Drink", "Games"] };
+  expect(roundTrip(f)).toEqual(f);
+});
+test("keyword, dueSoon and bigGap round-trip", () => {
+  const f: BoardFilters = { ...emptyFilters(), keyword: "cups", dueSoon: true, bigGap: true };
+  expect(filtersToQuery(f)).toContain("q=cups");
+  expect(filtersToQuery(f)).toContain("due=soon");
+  expect(filtersToQuery(f)).toContain("gap=big");
+  expect(roundTrip(f)).toEqual(f);
+});
+test("parse accepts a bare string or an array and ignores unknown/empty keys", () => {
+  expect(parseBoardFilters({ group: "Scouts", junk: "x", category: "" })).toEqual({
+    ...emptyFilters(), group: ["Scouts"],
+  });
+  expect(parseBoardFilters({ group: ["A", "B"] }).group).toEqual(["A", "B"]);
+});
+test("parse never throws on odd input", () => {
+  expect(() => parseBoardFilters({ due: ["soon", "soon"], date: [] })).not.toThrow();
+});

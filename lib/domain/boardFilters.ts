@@ -66,3 +66,44 @@ export function applyBoardFilters(tasks: BoardTask[], f: BoardFilters, now: Date
     return true;
   });
 }
+
+export type RawQuery = Record<string, string | string[] | undefined>;
+
+function list(v: string | string[] | undefined): string[] {
+  if (v == null) return [];
+  return (Array.isArray(v) ? v : [v]).map((s) => s.trim()).filter((s) => s !== "");
+}
+function first(v: string | string[] | undefined): string {
+  if (v == null) return "";
+  return (Array.isArray(v) ? v[0] ?? "" : v).trim();
+}
+function has(v: string | string[] | undefined, wanted: string): boolean {
+  return (Array.isArray(v) ? v : v == null ? [] : [v]).includes(wanted);
+}
+
+/** Parse Next's searchParams into filters. Never throws; ignores unknown/empty keys. */
+export function parseBoardFilters(sp: RawQuery): BoardFilters {
+  return {
+    keyword: first(sp.q),
+    group: list(sp.group),
+    category: list(sp.category),
+    location: list(sp.location),
+    date: list(sp.date),
+    dueSoon: has(sp.due, "soon"),
+    bigGap: has(sp.gap, "big"),
+  };
+}
+
+/** Serialize filters to a query string, one repeated key per multi-select value
+ *  (so a comma inside a value survives). Order within a section is preserved. */
+export function filtersToQuery(f: BoardFilters): string {
+  const p = new URLSearchParams();
+  if (f.keyword.trim()) p.set("q", f.keyword.trim());
+  for (const g of f.group) p.append("group", g);
+  for (const c of f.category) p.append("category", c);
+  for (const l of f.location) p.append("location", l);
+  for (const d of f.date) p.append("date", d);
+  if (f.dueSoon) p.set("due", "soon");
+  if (f.bigGap) p.set("gap", "big");
+  return p.toString();
+}
