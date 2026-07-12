@@ -30,5 +30,5 @@ export default async function EventBoardPage({
     facets.group, facets.category, facets.location,
   ].filter((s) => s !== "");
   const { covered, total } = coverageFor(tasks);
-  return <Board eventName={board.name} tasks={tasks} filter={{ options, activeLabels, covered, total }} />;
+  return <Board eventName={board.name} tasks={tasks} standing={board.standing} filter={{ options, activeLabels, covered, total }} />;
 }
