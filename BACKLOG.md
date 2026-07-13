@@ -48,6 +48,17 @@ so design them together.
   a "this event isn't open yet" page instead, like the lead page's friendly invalid state.
   Open Q: should the organizer see a preview of their own draft board while signed in?
 
+- **Add one person without a spreadsheet paste.** Adding a single person to a roster
+  today forces the bulk importer: it needs a **header row** plus a **tab-separated**
+  data row, so a typed name shows "0 people detected" and saves nothing. The
+  **group vs patrol** split also trips people up (the group is e.g. `Troop 29`; the
+  patrol is the `Patrol`/sub-group column, not the group). Want a one-line "add a
+  person" field on the roster panel: name + patrol (+ optional Scout ID), calling the
+  same `importPeople` under the hood so privacy invariants hold. This is the concrete
+  quick-add slice of the planned **groups directory** (add/remove/edit a person
+  directly), referenced in the email-as-identity card below. Open Q: also inline
+  edit/remove a person, and does this live in `LeadsPanel` or a small roster view?
+
 - **Full undo/redo history** — v1 ships single-level undo (last delete/clear via
   ⟲ button + Cmd/Ctrl+Z). A bigger card: multi-step history, **redo** (↷ /
   Cmd+Shift+Z), and undo of **cell edits** and **row reorders**. Hard because the
