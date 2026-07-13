@@ -55,3 +55,22 @@ test("task board has no WCAG A/AA violations, panel included", async ({ page }) 
     .analyze();
   expect(withPanel.violations).toEqual([]);
 });
+
+test("a group query shows the group chip and hides non-matching tasks", async ({ page }) => {
+  await page.goto(PREVIEW); // opt in via the cookie
+  await page.goto(`${BOARD}?group=Scouts`);
+  await expect(page.getByRole("button", { name: /remove .*scouts/i })).toBeVisible();
+  await expect(page.getByText("Bingo")).toHaveCount(0); // non-Scouts task hidden by the filter
+});
+
+test("setting a filter in the flyout updates the URL, with no axe violations", async ({ page }) => {
+  await page.goto(PREVIEW);
+  await page.getByRole("button", { name: /^⚙ Filter/ }).click();
+  const dialog = page.getByRole("dialog", { name: /filter tasks/i });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel("Scouts").check();
+  await expect(page).toHaveURL(/group=Scouts/);
+
+  const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
+  expect(results.violations).toEqual([]);
+});

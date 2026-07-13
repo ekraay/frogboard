@@ -2,21 +2,21 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { partitionByAvailability } from "@/lib/domain/board";
+import { partitionByAvailability, facetOptions } from "@/lib/domain/board";
+import {
+  applyBoardFilters, filtersToQuery, effectiveWhen, sortByGap,
+  emptyFilters, type BoardFilters,
+} from "@/lib/domain/boardFilters";
 import type { BoardTask } from "@/lib/domain/types";
 import { BoardCard } from "@/components/board/BoardCard";
 import { TaskPanel } from "@/components/board/TaskPanel";
+import { FilterFlyout } from "@/components/board/FilterFlyout";
+import { ActiveFilterBar } from "@/components/board/ActiveFilterBar";
 
 function Column({
-  label,
-  dot,
-  tasks,
-  onOpen,
+  label, dot, tasks, onOpen,
 }: {
-  label: string;
-  dot: string;
-  tasks: BoardTask[];
-  onOpen: (id: string) => void;
+  label: string; dot: string; tasks: BoardTask[]; onOpen: (id: string) => void;
 }) {
   return (
     <section aria-label={label} className="flex flex-col gap-4">
@@ -35,19 +35,51 @@ function Column({
 // The volunteer board: tasks split into Available and Claimed, each card opening
 // a detail/claim panel. The open panel mirrors the URL hash (#task-<id>) so a
 // card is shareable and back/forward works. Links come from window.location, so
-// they stay correct wherever the board is mounted.
+// they stay correct wherever the board is mounted. Filters narrow which tasks
+// show and stay in sync with the URL query, so a filtered link is shareable too.
 export function TaskBoard({
-  event,
-  tasks,
-  isOrganizer,
+  event, tasks, isOrganizer, initialFilters, nowMs,
 }: {
   event: { name: string };
   tasks: BoardTask[];
   isOrganizer: boolean;
+  initialFilters: BoardFilters;
+  nowMs: number;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const { available, claimed } = partitionByAvailability(tasks);
+  const [filters, setFilters] = useState<BoardFilters>(initialFilters);
+  const [flyoutOpen, setFlyoutOpen] = useState(false);
+
+  const now = new Date(nowMs); // one clock: SSR and hydration agree
+  const facets = facetOptions(tasks);
+  const showDueSoon = tasks.some((t) => effectiveWhen(t) !== null);
+  const showBigGap = tasks.some((t) => t.neededCount >= 2);
+
+  const visible = applyBoardFilters(tasks, filters, now);
+  const { available, claimed } = partitionByAvailability(visible);
+  // When the Biggest gap filter is on, float the largest needs to the top of Available.
+  const availableOrdered = filters.bigGap ? sortByGap(available) : available;
+
+  const activeCount =
+    (filters.keyword.trim() ? 1 : 0) + filters.group.length + filters.category.length +
+    filters.location.length + filters.date.length + (filters.dueSoon ? 1 : 0) + (filters.bigGap ? 1 : 0);
+
+  function syncUrl(next: BoardFilters) {
+    const q = filtersToQuery(next);
+    window.history.replaceState(null, "", window.location.pathname + (q ? `?${q}` : "") + window.location.hash);
+  }
+  function changeFilters(next: BoardFilters) {
+    setFilters(next);
+    syncUrl(next);
+  }
+  function removeFilter(section: keyof BoardFilters, item?: string) {
+    if (section === "keyword") return changeFilters({ ...filters, keyword: "" });
+    if (section === "dueSoon") return changeFilters({ ...filters, dueSoon: false });
+    if (section === "bigGap") return changeFilters({ ...filters, bigGap: false });
+    const list = filters[section] as string[];
+    changeFilters({ ...filters, [section]: list.filter((v) => v !== item) });
+  }
 
   useEffect(() => {
     const ids = new Set(tasks.map((t) => t.id));
@@ -72,7 +104,8 @@ export function TaskBoard({
   }
 
   function copyLink() {
-    void navigator.clipboard.writeText(window.location.origin + window.location.pathname);
+    const q = filtersToQuery(filters);
+    void navigator.clipboard.writeText(window.location.origin + window.location.pathname + (q ? `?${q}` : ""));
     setCopied(true);
   }
 
@@ -80,7 +113,7 @@ export function TaskBoard({
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
-      <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl font-bold text-ink">
             <span aria-hidden className="mr-2">🐸</span>
@@ -111,10 +144,42 @@ export function TaskBoard({
         )}
       </header>
 
-      <div className="grid gap-8 sm:grid-cols-2">
-        <Column label="Available" dot="bg-lantern" tasks={available} onOpen={openTask} />
-        <Column label="Claimed" dot="bg-reed" tasks={claimed} onOpen={openTask} />
+      <div className="mb-4">
+        <button
+          type="button"
+          onClick={() => setFlyoutOpen(true)}
+          className="rounded-full border border-lily-line bg-white px-4 py-2 text-sm font-semibold text-ink shadow-sm hover:border-pond"
+        >
+          ⚙ Filter{activeCount > 0 ? ` · ${activeCount}` : ""}
+        </button>
       </div>
+
+      <ActiveFilterBar value={filters} facets={facets} onRemove={removeFilter} onClear={() => changeFilters(emptyFilters())} />
+
+      {visible.length === 0 ? (
+        <p className="rounded-2xl border border-lily-line bg-white p-8 text-center text-ink-soft">
+          No tasks match.{" "}
+          <button type="button" onClick={() => changeFilters(emptyFilters())} className="font-semibold text-pond hover:underline">
+            Show all tasks
+          </button>
+        </p>
+      ) : (
+        <div className="grid gap-8 sm:grid-cols-2">
+          <Column label="Available" dot="bg-lantern" tasks={availableOrdered} onOpen={openTask} />
+          <Column label="Claimed" dot="bg-reed" tasks={claimed} onOpen={openTask} />
+        </div>
+      )}
+
+      {flyoutOpen && (
+        <FilterFlyout
+          facets={facets}
+          showDueSoon={showDueSoon}
+          showBigGap={showBigGap}
+          value={filters}
+          onChange={changeFilters}
+          onClose={() => setFlyoutOpen(false)}
+        />
+      )}
 
       {open && <TaskPanel task={open} onClose={closeTask} />}
     </main>

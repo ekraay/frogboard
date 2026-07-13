@@ -45,8 +45,8 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-async function render(slug = "bon-odori") {
-  return Page({ params: Promise.resolve({ slug }) });
+async function render(slug = "bon-odori", searchParams: Record<string, string | string[] | undefined> = {}) {
+  return Page({ params: Promise.resolve({ slug }), searchParams: Promise.resolve(searchParams) });
 }
 
 test("notFound when the flag is off", async () => {
@@ -83,4 +83,12 @@ test("opens the flag from the preview cookie even in production", async () => {
   isValidSession.mockReturnValue(false);
   const el = await render();
   expect(el.type).toBe(TaskBoard);
+});
+
+test("parses filters from the query into initialFilters and passes a clock", async () => {
+  getEventBoardByParam.mockResolvedValue(sampleBoard);
+  isValidSession.mockReturnValue(false);
+  const el = await render("bon-odori", { group: "Scouts" });
+  expect(el.props.initialFilters.group).toEqual(["Scouts"]);
+  expect(typeof el.props.nowMs).toBe("number");
 });

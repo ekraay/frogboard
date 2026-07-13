@@ -22,7 +22,7 @@ export interface FacetOptions {
   group: string[]; category: string[]; location: string[];
 }
 
-function fieldEq(actual: string | null, wanted: string): boolean {
+export function fieldEq(actual: string | null, wanted: string): boolean {
   return (actual ?? "").trim().toLowerCase() === wanted.trim().toLowerCase();
 }
 
@@ -72,7 +72,7 @@ export function coverageFor(tasks: BoardTask[]): { covered: number; total: numbe
  * Using "UTC" keeps "2026-07-25T00:00:00Z" as "2026-07-25" rather than
  * shifting it to "2026-07-24" in America/Los_Angeles (UTC-7 in summer).
  */
-function tzIsoDate(d: Date): string {
+export function tzIsoDate(d: Date): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     year: "numeric", month: "2-digit", day: "2-digit", timeZone: "UTC",
   }).formatToParts(d);
