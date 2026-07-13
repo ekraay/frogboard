@@ -48,6 +48,46 @@ so design them together.
   a "this event isn't open yet" page instead, like the lead page's friendly invalid state.
   Open Q: should the organizer see a preview of their own draft board while signed in?
 
+- **Add one person without a spreadsheet paste.** Adding a single person to a roster
+  today forces the bulk importer: it needs a **header row** plus a **tab-separated**
+  data row, so a typed name shows "0 people detected" and saves nothing. The
+  **group vs patrol** split also trips people up (the group is e.g. `Troop 29`; the
+  patrol is the `Patrol`/sub-group column, not the group). Want a one-line "add a
+  person" field on the roster panel: name + patrol (+ optional Scout ID), calling the
+  same `importPeople` under the hood so privacy invariants hold. This is the concrete
+  quick-add slice of the planned **groups directory** (add/remove/edit a person
+  directly), referenced in the email-as-identity card below. Open Q: also inline
+  edit/remove a person, and does this live in `LeadsPanel` or a small roster view?
+
+- **Non-blocking filter panel (see the board while filtering).** The `FilterFlyout`
+  is a **center-aligned** modal over a **blurred** backdrop (`bg-ink/40` +
+  `backdrop-blur-sm`), so you cannot see the cards it is filtering. Filtering is
+  already live (each toggle re-renders the board instantly); the overlay just hides
+  and blurs it. Want a non-blocking panel so the
+  board stays visible: a side drawer on desktop, a bottom sheet on mobile that leaves
+  the cards above it visible. Revisit the a11y bits that assumed a modal: drop
+  `aria-modal`/focus-trap for a non-modal panel, keep Escape-to-close, and rethink the
+  focus-on-open added in Phase 2 (grabbing focus into a non-modal panel may be wrong).
+  Open Q: desktop drawer vs. an inline filter bar, and whether the panel stays pinned
+  open while you work the board.
+
+- **Non-prod database wiring (Preview builds + local e2e).** Two related gaps, both
+  about which DB the non-production environments use:
+  - **Vercel Preview deploys fail.** The Preview `DATABASE_URL` is pinned to a single
+    git branch (`grid-column-aware-paste`), so a preview build on any other branch has
+    no URL and `prisma migrate deploy` fails (PR #7 saw this). Fix: add a Preview
+    `DATABASE_URL` with **no branch filter**, pointing at a **non-prod** database (a
+    dedicated Neon preview branch or a plain separate DB), plus `FLAG_TASK_BOARD` if
+    previews should show flagged work. Seed that DB once so preview boards have data.
+    Lock-in note: branching is Neon-specific convenience; the app/schema/migrations are
+    plain Postgres, so a plain separate database is the most portable option.
+  - **Local `npm run test:e2e` writes to the dev DB.** Playwright's `webServer` runs
+    `npm run start`, which loads `.env` (`frogboard`), not `.env.test` (`frogboard_test`).
+    So local e2e reads/writes the shared dev DB, and `organize.spec.ts` leaves an
+    "E2E Matsuri" event behind each run (later runs then hit strict-mode dup errors). CI
+    is safe (its own throwaway Postgres). Fix: give the `webServer` a `.env.test`
+    `DATABASE_URL` so local e2e uses `frogboard_test`, mirroring CI.
+
 - **Full undo/redo history** — v1 ships single-level undo (last delete/clear via
   ⟲ button + Cmd/Ctrl+Z). A bigger card: multi-step history, **redo** (↷ /
   Cmd+Shift+Z), and undo of **cell edits** and **row reorders**. Hard because the
