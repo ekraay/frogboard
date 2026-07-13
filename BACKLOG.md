@@ -59,6 +59,18 @@ so design them together.
   directly), referenced in the email-as-identity card below. Open Q: also inline
   edit/remove a person, and does this live in `LeadsPanel` or a small roster view?
 
+- **Non-blocking filter panel (see the board while filtering).** The `FilterFlyout`
+  is a **center-aligned** modal over a **blurred** backdrop (`bg-ink/40` +
+  `backdrop-blur-sm`), so you cannot see the cards it is filtering. Filtering is
+  already live (each toggle re-renders the board instantly); the overlay just hides
+  and blurs it. Want a non-blocking panel so the
+  board stays visible: a side drawer on desktop, a bottom sheet on mobile that leaves
+  the cards above it visible. Revisit the a11y bits that assumed a modal: drop
+  `aria-modal`/focus-trap for a non-modal panel, keep Escape-to-close, and rethink the
+  focus-on-open added in Phase 2 (grabbing focus into a non-modal panel may be wrong).
+  Open Q: desktop drawer vs. an inline filter bar, and whether the panel stays pinned
+  open while you work the board.
+
 - **Non-prod database wiring (Preview builds + local e2e).** Two related gaps, both
   about which DB the non-production environments use:
   - **Vercel Preview deploys fail.** The Preview `DATABASE_URL` is pinned to a single
