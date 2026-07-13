@@ -122,7 +122,13 @@ export function TaskBoard({
           <p className="mt-1 text-ink-soft">Grab a task to help out.</p>
         </div>
         {isOrganizer ? (
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/organize"
+              className="text-sm font-medium text-ink-soft underline-offset-2 transition hover:text-pond hover:underline"
+            >
+              Organize
+            </Link>
             <button
               type="button"
               onClick={copyLink}

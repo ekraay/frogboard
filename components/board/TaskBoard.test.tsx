@@ -170,3 +170,8 @@ test("with Biggest gap on, the Available column sorts the largest gap first", ()
   const titles = [...available.querySelectorAll("p.font-display")].map((p) => p.textContent);
   expect(titles).toEqual(["Big", "Small"]);
 });
+
+test("an organizer can open the organizer view from the board", () => {
+  renderBoard({ isOrganizer: true });
+  expect(screen.getByRole("link", { name: "Organize" })).toHaveAttribute("href", "/organize");
+});
