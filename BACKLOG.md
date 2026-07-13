@@ -59,6 +59,23 @@ so design them together.
   directly), referenced in the email-as-identity card below. Open Q: also inline
   edit/remove a person, and does this live in `LeadsPanel` or a small roster view?
 
+- **Non-prod database wiring (Preview builds + local e2e).** Two related gaps, both
+  about which DB the non-production environments use:
+  - **Vercel Preview deploys fail.** The Preview `DATABASE_URL` is pinned to a single
+    git branch (`grid-column-aware-paste`), so a preview build on any other branch has
+    no URL and `prisma migrate deploy` fails (PR #7 saw this). Fix: add a Preview
+    `DATABASE_URL` with **no branch filter**, pointing at a **non-prod** database (a
+    dedicated Neon preview branch or a plain separate DB), plus `FLAG_TASK_BOARD` if
+    previews should show flagged work. Seed that DB once so preview boards have data.
+    Lock-in note: branching is Neon-specific convenience; the app/schema/migrations are
+    plain Postgres, so a plain separate database is the most portable option.
+  - **Local `npm run test:e2e` writes to the dev DB.** Playwright's `webServer` runs
+    `npm run start`, which loads `.env` (`frogboard`), not `.env.test` (`frogboard_test`).
+    So local e2e reads/writes the shared dev DB, and `organize.spec.ts` leaves an
+    "E2E Matsuri" event behind each run (later runs then hit strict-mode dup errors). CI
+    is safe (its own throwaway Postgres). Fix: give the `webServer` a `.env.test`
+    `DATABASE_URL` so local e2e uses `frogboard_test`, mirroring CI.
+
 - **Full undo/redo history** — v1 ships single-level undo (last delete/clear via
   ⟲ button + Cmd/Ctrl+Z). A bigger card: multi-step history, **redo** (↷ /
   Cmd+Shift+Z), and undo of **cell edits** and **row reorders**. Hard because the
