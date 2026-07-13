@@ -13,10 +13,10 @@ test("organizer sets up an event and opens sign-ups", async ({ page }) => {
   await page.getByLabel(/last day/i).fill("2026-08-02");
   await page.getByRole("button", { name: /create event/i }).click();
 
-  await expect(page.getByText(/draft — only organizers/i)).toBeVisible();
+  await expect(page.getByText(/🌱 Draft/)).toBeVisible();
 
-  // the organizer can jump to the public signup page for this event
-  await expect(page.getByRole("link", { name: /view signup page/i })).toBeVisible();
+  // the organizer can grab the public link for this event from the banner
+  await expect(page.getByRole("button", { name: /copy link/i })).toBeVisible();
 
   await page.getByRole("button", { name: /add row/i }).click();
   await page.getByLabel("Title, row 1").fill("Lantern setup");
@@ -34,7 +34,7 @@ test("organizer sets up an event and opens sign-ups", async ({ page }) => {
   expect(axe.violations).toEqual([]);
 
   await page.getByRole("button", { name: /open sign-ups/i }).click();
-  await expect(page.getByText(/live — volunteers/i)).toBeVisible();
+  await expect(page.getByText(/🏮 Live/)).toBeVisible();
 
   // Two events are published now (this one + the seeded one), so the root is a
   // chooser. Open this event's board from it.
@@ -47,7 +47,7 @@ test("organizer sets up an event and opens sign-ups", async ({ page }) => {
   await page.getByRole("link", { name: /E2E Matsuri/ }).click();
   await page.getByRole("button", { name: /close sign-ups/i }).click();
   // Wait for the banner to confirm the status change before navigating away.
-  await expect(page.getByText(/draft — only organizers/i)).toBeVisible();
+  await expect(page.getByText(/🌱 Draft/)).toBeVisible();
   await page.goto("/");
   await expect(page.getByText("E2E Matsuri")).not.toBeVisible();
 });
