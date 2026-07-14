@@ -40,8 +40,8 @@ export function Board({
             <span aria-hidden className="text-xs transition group-open:rotate-180">▾</span>
           </summary>
           <p className="mt-2 leading-relaxed text-ink-soft">
-            A <strong className="text-ink">lily pad</strong> is a task that needs a volunteer. A{" "}
-            <strong className="text-ink">mission</strong> is a one-off, like “bring 50 paper cups” or
+            A <strong className="text-ink">lily pad</strong> is anything that needs a volunteer. A{" "}
+            <strong className="text-ink">task</strong> is a one-off, like “bring 50 paper cups” or
             “hang the banner by 4&nbsp;PM.” A <strong className="text-ink">shift</strong> is a scheduled
             time slot helping at a booth.
           </p>

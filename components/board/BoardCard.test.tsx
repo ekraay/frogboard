@@ -26,7 +26,7 @@ test("shows 'Covered' when full", () => {
 });
 
 test("a solo mission reads 'Hop to it'", () => {
-  render(<BoardCard task={task({ kind: "mission", neededCount: 1 })} onOpen={vi.fn()} />);
+  render(<BoardCard task={task({ kind: "errand", neededCount: 1 })} onOpen={vi.fn()} />);
   expect(screen.getByText(/hop to it/i)).toBeInTheDocument();
 });
 
@@ -36,12 +36,12 @@ test("a solo shift also reads 'Hop to it'", () => {
 });
 
 test("a task needing two or more reads 'Hop to it together'", () => {
-  render(<BoardCard task={task({ kind: "mission", neededCount: 2 })} onOpen={vi.fn()} />);
+  render(<BoardCard task={task({ kind: "errand", neededCount: 2 })} onOpen={vi.fn()} />);
   expect(screen.getByText(/hop to it together/i)).toBeInTheDocument();
 });
 
 test("a full task shows no claim CTA", () => {
-  render(<BoardCard task={task({ kind: "mission", neededCount: 1, signups: [{ id: "s1", name: "Ann", group: null }] })} onOpen={vi.fn()} />);
+  render(<BoardCard task={task({ kind: "errand", neededCount: 1, signups: [{ id: "s1", name: "Ann", group: null }] })} onOpen={vi.fn()} />);
   expect(screen.queryByText(/hop to it/i)).not.toBeInTheDocument();
 });
 
@@ -70,7 +70,7 @@ test("clicking the card opens the panel with the task id", async () => {
 test("clicking the CTA opens the panel", async () => {
   const onOpen = vi.fn();
   const user = userEvent.setup();
-  render(<BoardCard task={task({ id: "abc", kind: "mission", neededCount: 1 })} onOpen={onOpen} />);
+  render(<BoardCard task={task({ id: "abc", kind: "errand", neededCount: 1 })} onOpen={onOpen} />);
   await user.click(screen.getByText(/hop to it/i));
   expect(onOpen).toHaveBeenCalledWith("abc");
 });

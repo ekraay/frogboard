@@ -6,7 +6,7 @@ import { Claimant } from "@/components/Claimant";
 
 export function TaskCard({ task, index = 0, isOrganizer = false }: { task: BoardTask; index?: number; isOrganizer?: boolean }) {
   const slot = getSlotInfo(task);
-  const isMission = task.kind === "mission";
+  const isTask = task.kind === "errand";
   // Board-wide cascade as the pads surface, capped so the last one isn't slow.
   const delay = `${Math.min(index * 70, 480)}ms`;
 
@@ -26,7 +26,7 @@ export function TaskCard({ task, index = 0, isOrganizer = false }: { task: Board
         <span
           aria-hidden
           className={`absolute inset-y-0 left-0 w-1.5 ${
-            isMission
+            isTask
               ? "bg-gradient-to-b from-amber to-lantern"
               : "bg-gradient-to-b from-pond to-pond-deep"
           }`}
@@ -40,8 +40,8 @@ export function TaskCard({ task, index = 0, isOrganizer = false }: { task: Board
         <header className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="mb-0.5 text-[0.7rem] font-bold uppercase tracking-[0.15em] text-ink-soft">
-              <span aria-hidden className="mr-1">{isMission ? "🪷" : "🎐"}</span>
-              {isMission ? "Mission" : "Shift"}
+              <span aria-hidden className="mr-1">{isTask ? "🪷" : "🎐"}</span>
+              {isTask ? "Task" : "Shift"}
             </p>
             <h3 className="font-display text-xl font-bold leading-tight text-ink">
               {task.title}
