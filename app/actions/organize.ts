@@ -153,7 +153,7 @@ export async function saveTask(input: SaveTaskInput): Promise<SaveTaskResult> {
   if (!parsed.ok) return { ok: false, error: parsed.error, field: parsed.field };
   const board = await prisma.event.findUnique({ where: { id: input.eventId }, select: { standing: true } });
   if (board?.standing && parsed.value.kind === "shift") {
-    return { ok: false, error: "Standing boards hold missions only." };
+    return { ok: false, error: "Standing boards hold tasks only." };
   }
   const result = await upsertTaskWithAudit(input.eventId, input.taskId, parsed.value, await organizerName());
   if (!result.ok) return { ok: false, error: result.error, field: result.field };

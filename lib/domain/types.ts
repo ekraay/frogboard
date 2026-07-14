@@ -1,4 +1,5 @@
-export type TaskKind = "shift" | "mission";
+// "errand" is displayed as "Task"; stored as errand to avoid colliding with the Task entity
+export type TaskKind = "shift" | "errand";
 export type TaskStatus = "todo" | "in_progress" | "review" | "done";
 
 export interface BoardSignup {

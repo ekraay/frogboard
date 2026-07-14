@@ -6,7 +6,7 @@ import { EVENT_TZ, formatTime } from "@/lib/domain/time";
 
 export interface RawCells {
   title: string;
-  /** "shift" | "mission"; anything else normalizes to "shift" in parseRow. */
+  /** "shift" | "errand"; anything else normalizes to "shift" in parseRow. */
   kind: string;
   date: string; need: string; time: string;
   category: string; group: string; location: string;
@@ -22,7 +22,7 @@ export function emptyCells(): RawCells {
 }
 
 export interface ParsedTaskFields {
-  title: string; kind: "shift" | "mission";
+  title: string; kind: "shift" | "errand";
   category: string | null; requestedGroup: string | null; neededCount: number;
   date: Date | null; startAt: Date | null; endAt: Date | null; dueBy: Date | null;
   location: string | null; description: string | null;
@@ -49,7 +49,7 @@ export function parseRow(cells: RawCells, ctx: EventCtx): RowResult {
   if (tooLong(cells.group, 200)) return { ok: false, field: "group", error: "Group is too long (200 max)." };
   if (tooLong(cells.location, 200)) return { ok: false, field: "location", error: "Location is too long (200 max)." };
   if (tooLong(cells.pointOfContact, 200)) return { ok: false, field: "pointOfContact", error: "Point of contact is too long (200 max)." };
-  const kind = cells.kind === "mission" ? "mission" : "shift";
+  const kind = cells.kind === "errand" ? "errand" : "shift";
 
   const need = parseNeedCell(cells.need);
   if (!need.ok) return { ok: false, field: "need", error: need.error };
@@ -83,14 +83,14 @@ function monthDayPacific(d: Date): string {
 }
 
 export interface StoredTaskShape {
-  title: string; kind: "shift" | "mission"; category: string | null; requestedGroup: string | null;
+  title: string; kind: "shift" | "errand"; category: string | null; requestedGroup: string | null;
   neededCount: number; date: Date | null; startAt: Date | null; endAt: Date | null; dueBy: Date | null;
   location: string | null; description: string | null; definitionOfDone: string | null; pointOfContact: string | null;
 }
 
 export function taskToCells(t: StoredTaskShape): RawCells {
   let time = "";
-  if (t.kind === "mission" && t.dueBy) time = `by ${monthDayPacific(t.dueBy)} ${formatTime(t.dueBy)}`;
+  if (t.kind === "errand" && t.dueBy) time = `by ${monthDayPacific(t.dueBy)} ${formatTime(t.dueBy)}`;
   else if (t.startAt && t.endAt) time = `${formatTime(t.startAt)}–${formatTime(t.endAt)}`;
   else if (t.startAt) time = formatTime(t.startAt);
   return {

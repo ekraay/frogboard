@@ -133,7 +133,7 @@ export function buildImportRows(
       if (f === "skip") return;
       const v = (r[c] ?? "").trim();
       if (v === "") return;
-      cells[f] = f === "kind" ? (/frog|mission/i.test(v) ? "mission" : "shift") : v;
+      cells[f] = f === "kind" ? (/frog|task|errand/i.test(v) ? "errand" : "shift") : v;
     });
     if (cells.title.trim() === "") continue; // not a task — skip headers/blanks
     out.push(cells);

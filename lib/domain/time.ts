@@ -28,7 +28,7 @@ function monthDay(d: Date): string {
 }
 
 export function formatWhen(task: BoardTask): string {
-  if (task.kind === "mission") {
+  if (task.kind === "errand") {
     return task.dueBy ? `By ${monthDay(task.dueBy)}` : "Anytime";
   }
   if (task.startAt && task.endAt) {

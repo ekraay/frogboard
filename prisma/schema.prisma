@@ -9,7 +9,7 @@ datasource db {
 
 enum TaskKind {
   shift
-  mission
+  errand
 }
 
 enum TaskStatus {
