@@ -244,3 +244,4 @@ Membership, and home-group behavior.
   the org-wide, no-single-group case the breadcrumb's "All groups" state covers.
 - **Task Board** (`2026-07-12-task-board-phase-2-design.md`): the redesigned board
   at `/b/<slug>` is a volunteer-persona surface that renders the bar.
+						
