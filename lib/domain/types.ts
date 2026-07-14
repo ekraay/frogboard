@@ -1,4 +1,4 @@
-export type TaskKind = "shift" | "quick";
+export type TaskKind = "shift" | "mission";
 export type TaskStatus = "todo" | "in_progress" | "review" | "done";
 
 export interface BoardSignup {

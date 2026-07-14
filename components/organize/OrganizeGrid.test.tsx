@@ -474,7 +474,7 @@ test("reorder buttons disable while sorted", async () => {
 test("offers existing categories as datalist suggestions", () => {
   render(<OrganizeGrid
     event={{ id: "e1", name: "Temple", status: "draft", slug: null, startDate: null, endDate: null, standing: true }}
-    initialTasks={[{ id: "t1", kind: "quick", title: "Trim hedges", category: "Grounds", requestedGroup: null,
+    initialTasks={[{ id: "t1", kind: "mission", title: "Trim hedges", category: "Grounds", requestedGroup: null,
       neededCount: 1, date: null, startAt: null, endAt: null, dueBy: null, location: null, description: null,
       definitionOfDone: null, pointOfContact: null, position: 1024, signupCount: 0 }]} />);
   const option = document.querySelector('datalist option[value="Grounds"]');

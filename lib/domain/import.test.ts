@@ -63,13 +63,13 @@ describe("buildImportRows", () => {
     expect(rows.map((c) => c.title)).toEqual(["Games booth", "Bingo"]);
   });
 
-  test("legacy frog value in kind column normalizes to quick", () => {
+  test("legacy frog value in kind column normalizes to mission", () => {
     const grid = [
       ["Setup", "frog"],
-      ["Cleanup", "quick"],
+      ["Cleanup", "mission"],
     ];
     const fields: ImportField[] = ["title", "kind"];
     const rows = buildImportRows(grid, fields, false, emptyCells);
-    expect(rows.map((c) => c.kind)).toEqual(["quick", "quick"]);
+    expect(rows.map((c) => c.kind)).toEqual(["mission", "mission"]);
   });
 });

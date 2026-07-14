@@ -56,7 +56,7 @@ test("active facet with no matching tasks shows a friendly empty state", () => {
 
 function frog(over: Partial<BoardTask> = {}): BoardTask {
   return {
-    id: "f1", kind: "quick", title: "Trim hedges", category: "Grounds", requestedGroup: null,
+    id: "f1", kind: "mission", title: "Trim hedges", category: "Grounds", requestedGroup: null,
     neededCount: 1, date: null, startAt: null, endAt: null, dueBy: null,
     pointOfContact: null, location: null, definitionOfDone: null,
     position: 0, status: "todo", waiting: false, signups: [], ...over,

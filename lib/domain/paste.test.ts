@@ -93,14 +93,14 @@ describe("applyPaste (column-aware: lands at the focused cell)", () => {
   });
 
   test("a pasted Kind value normalizes to shift/frog", () => {
-    const r = applyPaste([emptyCells()], [["quick"]], { row: 0, col: ORDER.indexOf("kind") }, ORDER, emptyCells);
-    expect(r.cells[0].kind).toBe("quick");
+    const r = applyPaste([emptyCells()], [["mission"]], { row: 0, col: ORDER.indexOf("kind") }, ORDER, emptyCells);
+    expect(r.cells[0].kind).toBe("mission");
     const s = applyPaste([emptyCells()], [["whatever"]], { row: 0, col: ORDER.indexOf("kind") }, ORDER, emptyCells);
     expect(s.cells[0].kind).toBe("shift");
   });
 
-  test("legacy frog value normalizes to quick", () => {
+  test("legacy frog value normalizes to mission", () => {
     const r = applyPaste([emptyCells()], [["frog"]], { row: 0, col: ORDER.indexOf("kind") }, ORDER, emptyCells);
-    expect(r.cells[0].kind).toBe("quick");
+    expect(r.cells[0].kind).toBe("mission");
   });
 });

@@ -45,28 +45,28 @@ describe("combineWhen", () => {
     expect(r).toEqual({ ok: false, field: "date", error: "A timed shift needs a date." });
   });
   test("frog 'by Sat 10am' resolves the weekday inside the event window", () => {
-    const r = combineWhen("quick", null, { kind: "dueBy", dateText: "Sat", time: 600 }, ctx);
+    const r = combineWhen("mission", null, { kind: "dueBy", dateText: "Sat", time: 600 }, ctx);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.value.dueBy?.toISOString()).toBe("2026-07-25T17:00:00.000Z");
     expect(r.value.date).toBeNull();
   });
   test("frog 'by 3:00 PM' without a date uses the event's first day", () => {
-    const r = combineWhen("quick", null, { kind: "dueBy", dateText: null, time: 900 }, ctx);
+    const r = combineWhen("mission", null, { kind: "dueBy", dateText: null, time: 900 }, ctx);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.value.dueBy?.toISOString()).toBe("2026-07-24T22:00:00.000Z");
   });
   test("frog with a plain range is an error (frogs take deadlines)", () => {
-    const r = combineWhen("quick", null, { kind: "range", start: 600, end: 780 }, ctx);
+    const r = combineWhen("mission", null, { kind: "range", start: 600, end: 780 }, ctx);
     expect(r.ok).toBe(false);
   });
   test("shift with a 'by …' deadline is an error (deadlines are for frogs)", () => {
     const r = combineWhen("shift", { year: 2026, month: 7, day: 25 }, { kind: "dueBy", dateText: null, time: 600 }, ctx);
-    expect(r).toEqual({ ok: false, field: "time", error: "A shift takes a time range. A 'by ...' deadline is for quick tasks." });
+    expect(r).toEqual({ ok: false, field: "time", error: "A shift takes a time range. A 'by ...' deadline is for missions." });
   });
   test("frog with no time cell at all is fine — an anytime frog", () => {
-    const r = combineWhen("quick", null, { kind: "none" }, ctx);
+    const r = combineWhen("mission", null, { kind: "none" }, ctx);
     expect(r).toEqual({ ok: true, value: { date: null, startAt: null, endAt: null, dueBy: null } });
   });
   test("shift with a single start time sets startAt only", () => {
@@ -77,12 +77,12 @@ describe("combineWhen", () => {
     expect(r.value.endAt).toBeNull();
   });
   test("frog with a single start time is rejected like a range", () => {
-    const r = combineWhen("quick", null, { kind: "start", start: 600 }, ctx);
+    const r = combineWhen("mission", null, { kind: "start", start: 600 }, ctx);
     expect(r.ok).toBe(false);
   });
   test("frog with a date and a bare time is a deadline at that date and time", () => {
     // the row's Date cell supplies the day; "5pm" (1020) is the deadline clock
-    const r = combineWhen("quick", { year: 2026, month: 7, day: 25 }, { kind: "start", start: 1020 }, ctx);
+    const r = combineWhen("mission", { year: 2026, month: 7, day: 25 }, { kind: "start", start: 1020 }, ctx);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.value.dueBy?.toISOString()).toBe("2026-07-26T00:00:00.000Z"); // 5pm PDT
@@ -90,20 +90,20 @@ describe("combineWhen", () => {
     expect(r.value.startAt).toBeNull();
   });
   test("frog with a bare time but no day asks for a due date, no em dash", () => {
-    const r = combineWhen("quick", null, { kind: "start", start: 1020 }, ctx);
+    const r = combineWhen("mission", null, { kind: "start", start: 1020 }, ctx);
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.field).toBe("time");
     expect(r.error).not.toContain("—");
   });
   test("frog with a date and no time is due at the end of that day", () => {
-    const r = combineWhen("quick", { year: 2026, month: 7, day: 25 }, { kind: "none" }, ctx);
+    const r = combineWhen("mission", { year: 2026, month: 7, day: 25 }, { kind: "none" }, ctx);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.value.dueBy?.toISOString()).toBe("2026-07-26T06:59:00.000Z"); // 11:59 PM PDT
   });
   test("frog error messages carry no em dash", () => {
-    const range = combineWhen("quick", null, { kind: "range", start: 600, end: 780 }, ctx);
+    const range = combineWhen("mission", null, { kind: "range", start: 600, end: 780 }, ctx);
     expect(range.ok).toBe(false);
     if (range.ok) return;
     expect(range.error).not.toContain("—");

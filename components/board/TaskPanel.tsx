@@ -25,7 +25,7 @@ function Detail({ label, icon, value }: { label: string; icon: string; value: st
 // derive from window.location so they stay correct wherever the board mounts.
 export function TaskPanel({ task, onClose }: { task: BoardTask; onClose: () => void }) {
   const slot = getSlotInfo(task);
-  const isFrog = task.kind === "quick";
+  const isFrog = task.kind === "mission";
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);

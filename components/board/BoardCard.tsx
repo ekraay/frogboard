@@ -7,7 +7,7 @@ import type { BoardTask } from "@/lib/domain/types";
 /** The claim CTA wording: pairs read as a team, then per kind. */
 function ctaLabel(task: BoardTask): string {
   if (task.neededCount >= 2) return "👥 Grab with a friend";
-  return task.kind === "quick" ? "🐸 Grab a frog" : "🎐 Claim a spot";
+  return task.kind === "mission" ? "🐸 Grab a frog" : "🎐 Claim a spot";
 }
 
 // A single task as a card. The whole card opens the detail panel; the CTA is a
@@ -16,7 +16,7 @@ function ctaLabel(task: BoardTask): string {
 // while it still needs people.
 export function BoardCard({ task, onOpen }: { task: BoardTask; onOpen: (id: string) => void }) {
   const slot = getSlotInfo(task);
-  const isFrog = task.kind === "quick";
+  const isFrog = task.kind === "mission";
   const accentText = slot.isFull ? "text-reed-deep" : "text-lantern-deep";
   const accentBg = slot.isFull ? "bg-reed/15" : "bg-lantern/15";
   const barFill = slot.isFull ? "bg-reed" : "bg-lantern";

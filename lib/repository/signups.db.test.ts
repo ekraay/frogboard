@@ -101,7 +101,7 @@ describe("audit actor (volunteer's own name)", () => {
 
 test("deleteSignupAsOrganizer removes a claim without a token and reopens the frog", async () => {
   const event = await prisma.event.create({ data: { name: "Temple", orgId: "org_bcsf", standing: true } });
-  const task = await prisma.task.create({ data: { eventId: event.id, kind: "quick", title: "Trim hedges", neededCount: 1, position: 1024 } });
+  const task = await prisma.task.create({ data: { eventId: event.id, kind: "mission", title: "Trim hedges", neededCount: 1, position: 1024 } });
   const signup = await prisma.signup.create({ data: { taskId: task.id, name: "Sam", claimToken: "device-token" } });
 
   expect(await deleteSignupAsOrganizer(signup.id)).toEqual({ ok: true });

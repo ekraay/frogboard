@@ -10,7 +10,7 @@ import { TaskPanel } from "@/components/board/TaskPanel";
 
 function task(overrides: Partial<BoardTask>): BoardTask {
   return {
-    id: "t1", kind: "quick", title: "Set up tables", category: null,
+    id: "t1", kind: "mission", title: "Set up tables", category: null,
     requestedGroup: null, neededCount: 1, date: new Date("2026-07-25T00:00:00Z"),
     startAt: null, endAt: null, dueBy: null, pointOfContact: null,
     location: null, definitionOfDone: null, status: "todo", waiting: false,

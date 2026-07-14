@@ -89,7 +89,7 @@ export function applyPaste(
       const field = fieldOrder[col + c];
       if (!field) return; // nowhere to put it — past the last column
       cells[target][field] =
-        field === "kind" ? (/frog|quick/i.test(value) ? "quick" : "shift") : value.trim();
+        field === "kind" ? (/frog|mission/i.test(value) ? "mission" : "shift") : value.trim();
     });
     affected.add(target);
   });

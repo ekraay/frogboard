@@ -43,14 +43,14 @@ export type WhenResult =
   | { ok: false; field: "date" | "time"; error: string };
 
 export function combineWhen(
-  kind: "shift" | "quick",
+  kind: "shift" | "mission",
   date: DateParts | null,
   time: TimeCellValue,
   ctx: EventCtx,
 ): WhenResult {
-  if (kind === "quick") {
+  if (kind === "mission") {
     if (time.kind === "range") {
-      return { ok: false, field: "time", error: "A quick task takes a deadline, not a time range. Try 'by 5pm' or a due date." };
+      return { ok: false, field: "time", error: "A mission takes a deadline, not a time range. Try 'by 5pm' or a due date." };
     }
     if (time.kind === "start") {
       // A bare time ("5pm") is a deadline. The day comes from the row's Date cell.
@@ -60,7 +60,7 @@ export function combineWhen(
       return { ok: true, value: { date: null, startAt: null, endAt: null, dueBy: pacificToUtc(date, time.start) } };
     }
     if (time.kind === "none") {
-      // A Date cell with no time is due at the end of that day; no date is an anytime quick task.
+      // A Date cell with no time is due at the end of that day; no date is an anytime mission.
       const dueBy = date ? pacificToUtc(date, END_OF_DAY_MINUTES) : null;
       return { ok: true, value: { date: null, startAt: null, endAt: null, dueBy } };
     }
@@ -79,7 +79,7 @@ export function combineWhen(
 
   // shift
   if (time.kind === "dueBy") {
-    return { ok: false, field: "time", error: "A shift takes a time range. A 'by ...' deadline is for quick tasks." };
+    return { ok: false, field: "time", error: "A shift takes a time range. A 'by ...' deadline is for missions." };
   }
   if (time.kind !== "none" && !date) {
     return { ok: false, field: "date", error: "A timed shift needs a date." };
