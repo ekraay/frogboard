@@ -98,4 +98,9 @@ describe("applyPaste (column-aware: lands at the focused cell)", () => {
     const s = applyPaste([emptyCells()], [["whatever"]], { row: 0, col: ORDER.indexOf("kind") }, ORDER, emptyCells);
     expect(s.cells[0].kind).toBe("shift");
   });
+
+  test("legacy frog value normalizes to quick", () => {
+    const r = applyPaste([emptyCells()], [["frog"]], { row: 0, col: ORDER.indexOf("kind") }, ORDER, emptyCells);
+    expect(r.cells[0].kind).toBe("quick");
+  });
 });
