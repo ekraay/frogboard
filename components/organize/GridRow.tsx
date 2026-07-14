@@ -121,7 +121,7 @@ export function GridRow({
                 className={cellInput}
               >
                 <option value="shift">Shift</option>
-                <option value="frog">🐸 Frog</option>
+                <option value="quick">🐸 Frog</option>
               </select>
             </td>
           ) : (

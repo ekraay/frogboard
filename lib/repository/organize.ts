@@ -9,7 +9,7 @@ export async function createEvent(name: string, startDate: Date, endDate: Date):
   return prisma.event.create({ data: { name, slug, startDate, endDate, orgId: "org_bcsf" } });
 }
 
-/** An evergreen board of frogs: no dates, drafted until the organizer publishes it. */
+/** An evergreen board of quick tasks: no dates, drafted until the organizer publishes it. */
 export async function createStandingBoard(name: string): Promise<Event> {
   const slug = await generateUniqueSlug(name);
   return prisma.event.create({ data: { name, slug, standing: true, orgId: "org_bcsf" } });
@@ -46,7 +46,7 @@ export async function deleteEvent(eventId: string): Promise<boolean> {
 }
 
 export interface GridTask {
-  id: string; kind: "shift" | "frog"; title: string;
+  id: string; kind: "shift" | "quick"; title: string;
   category: string | null; requestedGroup: string | null; neededCount: number;
   date: Date | null; startAt: Date | null; endAt: Date | null; dueBy: Date | null;
   location: string | null; description: string | null;

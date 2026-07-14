@@ -26,7 +26,7 @@ test("shows 'Covered' when full", () => {
 });
 
 test("a solo frog reads 'Grab a frog'", () => {
-  render(<BoardCard task={task({ kind: "frog", neededCount: 1 })} onOpen={vi.fn()} />);
+  render(<BoardCard task={task({ kind: "quick", neededCount: 1 })} onOpen={vi.fn()} />);
   expect(screen.getByText(/grab a frog/i)).toBeInTheDocument();
 });
 
@@ -36,13 +36,13 @@ test("a solo shift reads 'Claim a spot'", () => {
 });
 
 test("a task needing two or more reads 'Grab with a friend'", () => {
-  render(<BoardCard task={task({ kind: "frog", neededCount: 2 })} onOpen={vi.fn()} />);
+  render(<BoardCard task={task({ kind: "quick", neededCount: 2 })} onOpen={vi.fn()} />);
   expect(screen.getByText(/grab with a friend/i)).toBeInTheDocument();
   expect(screen.queryByText(/grab a frog/i)).not.toBeInTheDocument();
 });
 
 test("a full task shows no claim CTA", () => {
-  render(<BoardCard task={task({ kind: "frog", neededCount: 1, signups: [{ id: "s1", name: "Ann", group: null }] })} onOpen={vi.fn()} />);
+  render(<BoardCard task={task({ kind: "quick", neededCount: 1, signups: [{ id: "s1", name: "Ann", group: null }] })} onOpen={vi.fn()} />);
   expect(screen.queryByText(/grab a frog/i)).not.toBeInTheDocument();
   expect(screen.queryByText(/grab with a friend/i)).not.toBeInTheDocument();
   expect(screen.queryByText(/claim a spot/i)).not.toBeInTheDocument();
@@ -73,7 +73,7 @@ test("clicking the card opens the panel with the task id", async () => {
 test("clicking the CTA opens the panel", async () => {
   const onOpen = vi.fn();
   const user = userEvent.setup();
-  render(<BoardCard task={task({ id: "abc", kind: "frog", neededCount: 1 })} onOpen={onOpen} />);
+  render(<BoardCard task={task({ id: "abc", kind: "quick", neededCount: 1 })} onOpen={onOpen} />);
   await user.click(screen.getByText(/grab a frog/i));
   expect(onOpen).toHaveBeenCalledWith("abc");
 });

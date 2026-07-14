@@ -6,7 +6,7 @@ import { Claimant } from "@/components/Claimant";
 
 export function TaskCard({ task, index = 0, isOrganizer = false }: { task: BoardTask; index?: number; isOrganizer?: boolean }) {
   const slot = getSlotInfo(task);
-  const isFrog = task.kind === "frog";
+  const isFrog = task.kind === "quick";
   // Board-wide cascade as the pads surface, capped so the last one isn't slow.
   const delay = `${Math.min(index * 70, 480)}ms`;
 

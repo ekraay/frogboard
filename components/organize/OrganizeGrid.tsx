@@ -35,7 +35,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
         const year = new Date().getUTCFullYear();
         return { year, start: { year, month: 1, day: 1 }, end: { year, month: 12, day: 31 } };
       })();
-  const newCells = () => ({ ...emptyCells(), kind: event.standing ? "frog" : "shift" });
+  const newCells = () => ({ ...emptyCells(), kind: event.standing ? "quick" : "shift" });
   const [rows, setRows] = useState<RowState[]>(() =>
     initialTasks.map((t) => ({
       key: crypto.randomUUID(), taskId: t.id, cells: taskToCells(t),

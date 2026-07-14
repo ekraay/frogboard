@@ -9,7 +9,7 @@ datasource db {
 
 enum TaskKind {
   shift
-  frog
+  quick
 }
 
 enum TaskStatus {

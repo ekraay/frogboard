@@ -11,7 +11,7 @@ import { TaskBoard } from "@/components/board/TaskBoard";
 
 function task(overrides: Partial<BoardTask>): BoardTask {
   return {
-    id: "t1", kind: "frog", title: "Set up", category: null,
+    id: "t1", kind: "quick", title: "Set up", category: null,
     requestedGroup: null, neededCount: 1, date: null,
     startAt: null, endAt: null, dueBy: null, pointOfContact: null,
     location: null, definitionOfDone: null, status: "todo", waiting: false,
