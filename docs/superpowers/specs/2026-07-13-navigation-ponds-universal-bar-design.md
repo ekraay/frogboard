@@ -29,7 +29,7 @@ open spot is a **lily pad** you hop to.
 The IA speaks one vocabulary, adopted from the design handoff:
 
 - **Frog** = the volunteer (the person). When a pad opens, they "hop to it."
-- **Lily pad** = an open spot to sign up for: a scheduled **shift**, or a one-off **mission** (buy 50 cups, hang the banner, trim the hedges).
+- **Lily pad** = a job to be done, of two kinds: a scheduled **shift** (needs staffing), or a one-off **task** (an errand: buy 50 cups, hang the banner, trim the hedges).
 - **Pond** = a group (Scouts, Taiko, BWA, YAO), first-class, with its own private
   roster.
 - **Garden** = the org (BCSF), all ponds together.
@@ -70,8 +70,9 @@ Two calls set this spec's boundaries:
 1. **Bar-first MVP.** This spec ships the navigation IA and the Universal Nav bar,
    buildable now against today's model. The garden and pond home screens are
    deferred, gated on the Groups epic.
-2. **Fold in the rename.** The `TaskKind` "frog" -> "mission" rename ships here as
-   task 1, so the metaphor is clean before the bar names it.
+2. **Fold in the rename.** The `TaskKind` rename (from "frog" to the one-off
+   "task" kind) ships here as task 1, so the metaphor is clean before the bar
+   names it.
 
 ## The Universal Nav bar
 
@@ -168,7 +169,7 @@ The three-switch shape ships now and gains real teeth as the Groups epic lands.
 Group and org organizer roles resolve to the same organizer persona today; the
 distinction becomes meaningful once groups are first-class.
 
-## The frog -> mission rename
+## The frog -> task rename
 
 The metaphor requires that the volunteer is the frog, so a task cannot also be a
 frog. Two independent pieces:
@@ -177,18 +178,22 @@ frog. Two independent pieces:
 
 Every "Grab a frog" and "grab a frog" becomes **"Hop to it."** Touches the board
 copy (`Board.tsx`), `ClaimForm.tsx`, `BoardCard.tsx`, and `TaskPanel.tsx`, plus
-their tests. A one-off mission is just a small lily pad; the CTA is the same
-"Hop to it" everywhere. The kind badge reads **🪷 Mission** beside **🎐 Shift**.
+their tests. A one-off task is just a small lily pad; the CTA is the same
+"Hop to it" everywhere. The kind badge reads **🪷 Task** beside **🎐 Shift**.
 
 ### Model value (needs a migration)
 
-`TaskKind` becomes `"shift" | "mission"`. The one-off kind is a **noun** beside
-`shift`: "frog" now names the volunteer, and "quick" read as an adjective, so the
-value is `mission` (a one-off objective a volunteer pulls off the board). Because
-`Task.kind` is stored as a literal string, this is not only a symbol swap:
+`TaskKind` becomes `"shift" | "errand"`, shown in the UI as **Task**. The one-off
+kind is a noun beside `shift`: "frog" now names the volunteer, and "quick" read as
+an adjective. The display word is **Task** (a one-off errand: buy 50 cups, trim the
+hedges), but the stored enum value is `errand`, not `task`, to avoid colliding with
+the `Task` entity. So `task.kind === "errand"` reads clean, and the badge shows
+"Task"; a value/label split is normal. Because `Task.kind` is stored as a literal,
+this is not only a symbol swap:
 
-- A Prisma migration renames the stored value in place to `mission`, preserving rows.
-- Paste and import map legacy "frog" input to "mission" (`paste.ts`, `import.ts`).
+- A Prisma migration renames the stored value in place to `errand`, preserving rows.
+- Paste and import map legacy "frog" and typed "task" input to `errand`
+  (`paste.ts`, `import.ts`).
 - Domain functions swap the literal (`when.ts`, `time.ts`, `gridRow.ts`), with
   their unit tests updated first.
 

@@ -127,6 +127,12 @@ so design them together.
 - **AI agents for organizers** — explore agents that draft a task list from a
   plain description, suggest where help is needed, or write reminder messages.
   Intent is still loose; define the first concrete job before building.
+- **Customizable labels per org.** The ponds metaphor (frog / lily pad / Shift /
+  Task) needs explaining, which is friction. Let each org pick its own vocabulary:
+  plain "Shift / Task," or full themed language, so the label carries itself
+  without a "what's this?" explainer. A troop that wants frogs keeps frogs; one
+  that wants plain words gets them. Ties to the naming work on the nav-ponds branch
+  (kind stored as `errand`, shown as "Task").
 - **Passwordless accounts (magic links + SMS).** When real accounts arrive, make
   sign-in passwordless and modern: email **magic links** and **SMS** one-time codes/
   links, no passwords to remember. Fits the no-friction ethos that won adoption, and
