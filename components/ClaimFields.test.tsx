@@ -18,10 +18,10 @@ beforeEach(() => {
   window.localStorage.clear();
 });
 
-test("renders the fields open, with no collapsed 'Grab a frog' button", () => {
+test("renders the fields open, with no collapsed 'Hop to it' button", () => {
   render(<ClaimFields taskId="t1" />);
   expect(screen.getByLabelText(/your name/i)).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: /grab a frog/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /hop to it/i })).not.toBeInTheDocument();
 });
 
 test("a successful claim calls the action, stores the token, then refreshes the board", async () => {

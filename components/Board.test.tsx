@@ -26,10 +26,10 @@ test("renders the event name and a dated day-group heading", () => {
   expect(screen.getByRole("heading", { level: 2, name: /Jul 25/ })).toBeInTheDocument();
 });
 
-test("explains what a frog is", () => {
+test("explains what a lily pad is", () => {
   render(<Board eventName="Ginza Bazaar" tasks={[task({})]} />);
-  expect(screen.getByText(/what's a frog/i)).toBeInTheDocument();
-  expect(screen.getByText(/one-off thing that needs doing/i)).toBeInTheDocument();
+  expect(screen.getByText(/what's a lily pad/i)).toBeInTheDocument();
+  expect(screen.getByText(/one-off/i)).toBeInTheDocument();
 });
 
 test("active facet labels show a coverage header", () => {

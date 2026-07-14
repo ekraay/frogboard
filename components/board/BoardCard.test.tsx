@@ -25,27 +25,24 @@ test("shows 'Covered' when full", () => {
   expect(screen.getByText(/covered/i)).toBeInTheDocument();
 });
 
-test("a solo frog reads 'Grab a frog'", () => {
+test("a solo mission reads 'Hop to it'", () => {
   render(<BoardCard task={task({ kind: "mission", neededCount: 1 })} onOpen={vi.fn()} />);
-  expect(screen.getByText(/grab a frog/i)).toBeInTheDocument();
+  expect(screen.getByText(/hop to it/i)).toBeInTheDocument();
 });
 
-test("a solo shift reads 'Claim a spot'", () => {
+test("a solo shift also reads 'Hop to it'", () => {
   render(<BoardCard task={task({ kind: "shift", neededCount: 1 })} onOpen={vi.fn()} />);
-  expect(screen.getByText(/claim a spot/i)).toBeInTheDocument();
+  expect(screen.getByText(/hop to it/i)).toBeInTheDocument();
 });
 
-test("a task needing two or more reads 'Grab with a friend'", () => {
+test("a task needing two or more reads 'Hop to it together'", () => {
   render(<BoardCard task={task({ kind: "mission", neededCount: 2 })} onOpen={vi.fn()} />);
-  expect(screen.getByText(/grab with a friend/i)).toBeInTheDocument();
-  expect(screen.queryByText(/grab a frog/i)).not.toBeInTheDocument();
+  expect(screen.getByText(/hop to it together/i)).toBeInTheDocument();
 });
 
 test("a full task shows no claim CTA", () => {
   render(<BoardCard task={task({ kind: "mission", neededCount: 1, signups: [{ id: "s1", name: "Ann", group: null }] })} onOpen={vi.fn()} />);
-  expect(screen.queryByText(/grab a frog/i)).not.toBeInTheDocument();
-  expect(screen.queryByText(/grab with a friend/i)).not.toBeInTheDocument();
-  expect(screen.queryByText(/claim a spot/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/hop to it/i)).not.toBeInTheDocument();
 });
 
 test("says 'No one yet' when there are no signups, and lists claimants when there are", () => {
@@ -74,6 +71,6 @@ test("clicking the CTA opens the panel", async () => {
   const onOpen = vi.fn();
   const user = userEvent.setup();
   render(<BoardCard task={task({ id: "abc", kind: "mission", neededCount: 1 })} onOpen={onOpen} />);
-  await user.click(screen.getByText(/grab a frog/i));
+  await user.click(screen.getByText(/hop to it/i));
   expect(onOpen).toHaveBeenCalledWith("abc");
 });

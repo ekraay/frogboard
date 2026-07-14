@@ -165,8 +165,8 @@ test("on a standing board, a pasted column defaults new rows to frog", async () 
   await user.click(screen.getByRole("button", { name: /add row/i })); // anchor row (already frog)
   await user.click(screen.getByLabelText("Title, row 1"));
   await user.paste("Trim hedges\nRake leaves"); // two titles: row 1 filled, row 2 appended
-  expect(screen.getByLabelText("Kind, row 1")).toHaveValue("quick");
-  expect(screen.getByLabelText("Kind, row 2")).toHaveValue("quick"); // the appended row, not shift
+  expect(screen.getByLabelText("Kind, row 1")).toHaveValue("mission");
+  expect(screen.getByLabelText("Kind, row 2")).toHaveValue("mission"); // the appended row, not shift
 });
 
 test("on a standing board, the Paste-a-list modal defaults tasks to frog", async () => {
@@ -178,8 +178,8 @@ test("on a standing board, the Paste-a-list modal defaults tasks to frog", async
   await user.click(box);
   await user.paste("Trim hedges\nRake leaves");
   await user.click(screen.getByRole("button", { name: /add 2 tasks/i }));
-  expect(screen.getByLabelText("Kind, row 1")).toHaveValue("quick");
-  expect(screen.getByLabelText("Kind, row 2")).toHaveValue("quick");
+  expect(screen.getByLabelText("Kind, row 1")).toHaveValue("mission");
+  expect(screen.getByLabelText("Kind, row 2")).toHaveValue("mission");
 });
 
 test("delete is deferred; undo cancels it and restores the row intact (signups included)", () => {

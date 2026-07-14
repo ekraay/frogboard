@@ -17,7 +17,7 @@ const zenMaru = Zen_Maru_Gothic({
 
 export const metadata: Metadata = {
   title: "Frog Board",
-  description: "Grab a frog — sign up to help, no account needed.",
+  description: "Hop to it: sign up to help, no account needed.",
 };
 
 export default function RootLayout({

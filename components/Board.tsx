@@ -32,17 +32,18 @@ export function Board({
           {eventName}
         </h1>
         <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-ink-soft">
-          Tap a lily pad to grab a frog. No account needed — just add your name.
+          Tap a lily pad to hop to it. No account needed, just add your name.
         </p>
         <details className="group mx-auto mt-2 max-w-sm text-sm">
-          <summary className="inline-flex cursor-pointer list-none items-center gap-1 font-semibold text-pond underline-offset-4 hover:underline">
-            🐸 What&apos;s a frog?
+          <summary id="whats-a-pad" className="inline-flex cursor-pointer list-none items-center gap-1 font-semibold text-pond underline-offset-4 hover:underline">
+            🪷 What&apos;s a lily pad?
             <span aria-hidden className="text-xs transition group-open:rotate-180">▾</span>
           </summary>
           <p className="mt-2 leading-relaxed text-ink-soft">
-            A <strong className="text-ink">frog</strong> is a one-off thing that needs doing — like
-            “bring 50 paper cups” or “hang the banner by 4&nbsp;PM.” See it, grab it, it’s yours.
-            (A <strong className="text-ink">shift</strong> is a scheduled time slot helping at a booth.)
+            A <strong className="text-ink">lily pad</strong> is a task that needs a volunteer. A{" "}
+            <strong className="text-ink">mission</strong> is a one-off, like “bring 50 paper cups” or
+            “hang the banner by 4&nbsp;PM.” A <strong className="text-ink">shift</strong> is a scheduled
+            time slot helping at a booth.
           </p>
         </details>
       </header>

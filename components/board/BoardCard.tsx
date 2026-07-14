@@ -4,10 +4,10 @@ import { getSlotInfo } from "@/lib/domain/board";
 import { formatWhen } from "@/lib/domain/time";
 import type { BoardTask } from "@/lib/domain/types";
 
-/** The claim CTA wording: pairs read as a team, then per kind. */
+/** The claim CTA wording: pairs read as a team, solo tasks say "Hop to it". */
 function ctaLabel(task: BoardTask): string {
-  if (task.neededCount >= 2) return "👥 Grab with a friend";
-  return task.kind === "mission" ? "🐸 Grab a frog" : "🎐 Claim a spot";
+  if (task.neededCount >= 2) return "👥 Hop to it together";
+  return "🐸 Hop to it";
 }
 
 // A single task as a card. The whole card opens the detail panel; the CTA is a
@@ -16,7 +16,7 @@ function ctaLabel(task: BoardTask): string {
 // while it still needs people.
 export function BoardCard({ task, onOpen }: { task: BoardTask; onOpen: (id: string) => void }) {
   const slot = getSlotInfo(task);
-  const isFrog = task.kind === "mission";
+  const isMission = task.kind === "mission";
   const accentText = slot.isFull ? "text-reed-deep" : "text-lantern-deep";
   const accentBg = slot.isFull ? "bg-reed/15" : "bg-lantern/15";
   const barFill = slot.isFull ? "bg-reed" : "bg-lantern";
@@ -38,8 +38,8 @@ export function BoardCard({ task, onOpen }: { task: BoardTask; onOpen: (id: stri
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="mb-0.5 text-[0.7rem] font-bold uppercase tracking-[0.15em] text-ink-soft">
-            <span aria-hidden className="mr-1">{isFrog ? "🐸" : "🎐"}</span>
-            {isFrog ? "Frog" : "Shift"}
+            <span aria-hidden className="mr-1">{isMission ? "🪷" : "🎐"}</span>
+            {isMission ? "Mission" : "Shift"}
           </p>
           <p className="font-display text-xl font-bold leading-tight text-ink">{task.title}</p>
           <p className="mt-0.5 text-sm font-semibold text-pond">{formatWhen(task)}</p>
