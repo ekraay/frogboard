@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, test } from "vitest"
 import { prisma } from "@/lib/db";
 import { resetDb } from "@/test/db";
 import { importPeople, getGroupRollups } from "@/lib/repository/directory";
-import { createLead, getLeadAuth, getLeadChaseView } from "@/lib/repository/leads";
+import { createLead, getLeadAuth, getLeadRosterView } from "@/lib/repository/leads";
 
 const ORG_A = "org_bcsf";
 const ORG_B = "org_test2";
@@ -47,8 +47,8 @@ describe("multi-tenant isolation", () => {
     await importPeople(ORG_B, "Scouts", [{ name: "Bea Bee", subGroup: "Hawk", position: null, externalId: "b2" }], { minor: true });
     const leadB = await createLead(eventB.id, "Scouts", "Bianca");
     expect(await getLeadAuth(leadB.token)).toEqual({ eventId: eventB.id, orgId: ORG_B, group: "Scouts" });
-    const view = await getLeadChaseView(leadB.token);
-    // Only org B's person is chased; org A has no bearing on this view.
-    expect(view!.chase.flatMap((g) => g.people).map((p) => p.name)).toEqual(["Bea B."]);
+    const view = await getLeadRosterView(leadB.token);
+    // Only org B's person appears; org A has no bearing on this view.
+    expect(view!.roster.flatMap((g) => g.people).map((p) => p.name)).toEqual(["Bea B."]);
   });
 });

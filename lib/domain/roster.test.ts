@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { statusCounts, chaseList, parsePersonRows, type RosterPerson } from "@/lib/domain/roster";
+import { statusCounts, rosterView, patrolSummary, parsePersonRows, type RosterPerson } from "@/lib/domain/roster";
 import type { RsvpRecord } from "@/lib/domain/rsvp";
 
 function person(id: string, subGroup: string | null): RosterPerson {
@@ -20,44 +20,58 @@ describe("statusCounts", () => {
   });
 });
 
-describe("chaseList", () => {
-  test("keeps only blank and maybe, blank first, grouped by sub-group", () => {
-    const people = [person("a", "Hawk"), person("b", "Hawk"), person("c", "Fox")];
+describe("rosterView", () => {
+  test("includes every person, needs-attention first (blank, maybe, yes, no), then by name", () => {
+    const people = [person("y", "Hawk"), person("b", "Hawk"), person("m", "Hawk"), person("n", "Hawk")];
     const byPerson = map([
-      ["a", [{ day: null, status: "yes" }]],   // answered yes, dropped
-      ["b", [{ day: null, status: "maybe" }]],  // maybe, chased
-      // c is blank, chased
+      ["y", [{ day: null, status: "yes" }]],
+      ["m", [{ day: null, status: "maybe" }]],
+      ["n", [{ day: null, status: "no" }]],
+      // b is blank
     ]);
-    const groups = chaseList(people, byPerson);
-    expect(groups.map((g) => g.subGroup)).toEqual(["Fox", "Hawk"]);
-    expect(groups.find((g) => g.subGroup === "Hawk")!.people.map((p) => p.id)).toEqual(["b"]);
-    expect(groups.find((g) => g.subGroup === "Fox")!.people.map((p) => p.status)).toEqual(["blank"]);
+    const rows = rosterView(people, byPerson)[0].people;
+    expect(rows.map((p) => p.status)).toEqual(["blank", "maybe", "yes", "no"]);
   });
-  test("blank sorts before maybe within a sub-group, even against name order", () => {
-    // "Name a" (maybe) sorts before "Name z" (blank), so status rank must win.
+  test("blank sorts before an alphabetically earlier maybe within a sub-group", () => {
     const people = [person("a", "Hawk"), person("z", "Hawk")];
     const byPerson = map([["a", [{ day: null, status: "maybe" }]]]);
-    const groups = chaseList(people, byPerson);
-    expect(groups[0].people.map((p) => p.status)).toEqual(["blank", "maybe"]);
+    const rows = rosterView(people, byPerson)[0].people;
+    expect(rows.map((p) => [p.id, p.status])).toEqual([["z", "blank"], ["a", "maybe"]]);
   });
-  test("null sub-group collects under 'Ungrouped'", () => {
-    const groups = chaseList([person("a", null)], map([]));
-    expect(groups[0].subGroup).toBe("Ungrouped");
+  test("groups by sub-group, groups alphabetical, null under 'Ungrouped'", () => {
+    const groups = rosterView([person("a", "Hawk"), person("b", null)], map([]));
+    expect(groups.map((g) => g.subGroup)).toEqual(["Hawk", "Ungrouped"]);
   });
-  test("carries a maybe person's reason onto the chase row", () => {
-    const people = [person("a", "Hawk")];
-    const byPerson = map([["a", [{ day: null, status: "maybe", reason: "Working that night" }]]]);
-    const row = chaseList(people, byPerson)[0].people[0];
-    expect(row.reason).toBe("Working that night");
-  });
-  test("never exposes the minor flag on a chase row", () => {
-    const row = chaseList([person("a", "Hawk")], map([]))[0].people[0];
+  test("carries status, reason and position, never the minor flag", () => {
+    const people: RosterPerson[] = [{ id: "a", name: "Alex T.", subGroup: "Hawk", minor: true, position: "PL" }];
+    const byPerson = map([["a", [{ day: null, status: "no", reason: "Away" }]]]);
+    const row = rosterView(people, byPerson)[0].people[0];
+    expect(row).toMatchObject({ status: "no", reason: "Away", position: "PL" });
     expect(row).not.toHaveProperty("minor");
   });
-  test("carries position onto the chase row", () => {
-    const people: RosterPerson[] = [{ id: "a", name: "Alex T.", subGroup: "Hawk", minor: true, position: "PL" }];
-    const row = chaseList(people, map([]))[0].people[0];
-    expect(row.position).toBe("PL");
+});
+
+describe("patrolSummary", () => {
+  test("tallies each status per sub-group and names the patrol leader", () => {
+    const people: RosterPerson[] = [
+      { id: "pl", name: "Lead A.", subGroup: "Hawk", minor: true, position: "PL" },
+      { id: "b", name: "Bee B.", subGroup: "Hawk", minor: true, position: null },
+      { id: "c", name: "Cy C.", subGroup: "Fox", minor: true, position: null },
+    ];
+    const byPerson = map([
+      ["pl", [{ day: null, status: "yes" }]],
+      ["b", [{ day: null, status: "no" }]],
+    ]);
+    const summary = patrolSummary(people, byPerson);
+    expect(summary.map((s) => s.subGroup)).toEqual(["Fox", "Hawk"]);
+    const hawk = summary.find((s) => s.subGroup === "Hawk")!;
+    expect(hawk.counts).toEqual({ yes: 1, maybe: 0, no: 1, blank: 0 });
+    expect(hawk.leader).toBe("Lead A.");
+    expect(summary.find((s) => s.subGroup === "Fox")!.leader).toBeNull();
+  });
+  test("null sub-group tallies under 'Ungrouped'", () => {
+    const summary = patrolSummary([person("a", null)], map([]));
+    expect(summary[0].subGroup).toBe("Ungrouped");
   });
 });
 

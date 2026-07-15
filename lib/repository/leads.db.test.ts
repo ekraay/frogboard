@@ -2,7 +2,7 @@
 import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "@/lib/db";
 import { resetDb } from "@/test/db";
-import { createLead, removeLead, regenerateLeadToken, getEventLeads, getLeadAuth, getLeadChaseView } from "@/lib/repository/leads";
+import { createLead, removeLead, regenerateLeadToken, getEventLeads, getLeadAuth, getLeadRosterView } from "@/lib/repository/leads";
 import { importPeople } from "@/lib/repository/directory";
 import { setRsvp } from "@/lib/repository/rsvp";
 
@@ -46,24 +46,39 @@ test("getLeadAuth resolves scope, null on bad token", async () => {
   expect(await getLeadAuth("nope")).toBeNull();
 });
 
-describe("getLeadChaseView", () => {
-  test("shows the group's chase list, abbreviated, with counts", async () => {
+describe("getLeadRosterView", () => {
+  test("shows the whole group, abbreviated, answered people kept with their status", async () => {
     const e = await event();
     await importPeople(ORG, "Scouts", [
       { name: "Alex Tanaka", subGroup: "Hawk", position: null, externalId: "1" },
       { name: "Bo Smith", subGroup: "Hawk", position: null, externalId: "2" },
     ], { minor: true });
     const bo = await prisma.person.findFirst({ where: { name: "Bo Smith" } });
-    await setRsvp(bo!.id, e.id, "yes", null); // answered, drops off the chase list
+    await setRsvp(bo!.id, e.id, "yes", null);
     const lead = await createLead(e.id, "Scouts", "Simon");
-    const view = await getLeadChaseView(lead.token);
+    const view = await getLeadRosterView(lead.token);
     expect(view!.group).toBe("Scouts");
     expect(view!.eventName).toBe("Obon");
     expect(view!.counts).toEqual({ yes: 1, maybe: 0, no: 0, blank: 1 });
-    const hawk = view!.chase.find((g) => g.subGroup === "Hawk")!;
-    expect(hawk.people.map((p) => p.name)).toEqual(["Alex T."]); // minor abbreviation, Bo dropped
+    const hawk = view!.roster.find((g) => g.subGroup === "Hawk")!;
+    expect(hawk.people.map((p) => p.name)).toEqual(["Alex T.", "Bo S."]); // blank first, both kept
+    expect(hawk.people.find((p) => p.name === "Bo S.")!.status).toBe("yes");
   });
-  test("shows a maybe person's reason on the chase row", async () => {
+  test("summarizes each patrol with counts and names the patrol leader", async () => {
+    const e = await event();
+    await importPeople(ORG, "Scouts", [
+      { name: "Alex Tanaka", subGroup: "Hawk", position: "PL", externalId: "1" },
+      { name: "Bo Smith", subGroup: "Hawk", position: null, externalId: "2" },
+    ], { minor: true });
+    const bo = await prisma.person.findFirst({ where: { name: "Bo Smith" } });
+    await setRsvp(bo!.id, e.id, "no", null);
+    const lead = await createLead(e.id, "Scouts", "Simon");
+    const view = await getLeadRosterView(lead.token);
+    const hawk = view!.byPatrol.find((p) => p.subGroup === "Hawk")!;
+    expect(hawk.counts).toEqual({ yes: 0, maybe: 0, no: 1, blank: 1 });
+    expect(hawk.leader).toBe("Alex T.");
+  });
+  test("shows a maybe person's reason on the roster row", async () => {
     const e = await event();
     await importPeople(ORG, "Scouts", [
       { name: "Cara Ito", subGroup: "Hawk", position: null, externalId: "9" },
@@ -71,21 +86,21 @@ describe("getLeadChaseView", () => {
     const cara = await prisma.person.findFirst({ where: { name: "Cara Ito" } });
     await setRsvp(cara!.id, e.id, "maybe", "Might have a game");
     const lead = await createLead(e.id, "Scouts", "Simon");
-    const view = await getLeadChaseView(lead.token);
-    const row = view!.chase.flatMap((g) => g.people).find((p) => p.id === cara!.id)!;
+    const view = await getLeadRosterView(lead.token);
+    const row = view!.roster.flatMap((g) => g.people).find((p) => p.id === cara!.id)!;
     expect(row.reason).toBe("Might have a game");
   });
-  test("shows each person's position on the chase row", async () => {
+  test("shows each person's position on the roster row", async () => {
     const e = await event();
     await importPeople(ORG, "Scouts", [
       { name: "Alex Tanaka", subGroup: "Hawk", position: "PL", externalId: "1" },
     ], { minor: true });
     const lead = await createLead(e.id, "Scouts", "Simon");
-    const view = await getLeadChaseView(lead.token);
-    const row = view!.chase.flatMap((g) => g.people).find((p) => p.name === "Alex T.")!;
+    const view = await getLeadRosterView(lead.token);
+    const row = view!.roster.flatMap((g) => g.people).find((p) => p.name === "Alex T.")!;
     expect(row.position).toBe("PL");
   });
   test("null on an unknown token", async () => {
-    expect(await getLeadChaseView("nope")).toBeNull();
+    expect(await getLeadRosterView("nope")).toBeNull();
   });
 });
