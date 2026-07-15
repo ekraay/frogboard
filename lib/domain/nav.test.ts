@@ -31,10 +31,10 @@ describe("breadcrumbSegments", () => {
 });
 
 describe("navActions", () => {
-  test("volunteer: a help link and one Hop to it CTA", () => {
+  test("volunteer: quiet, with Hop to it as a tagline (no help link, not a button)", () => {
     const a = navActions({ ...base, persona: "volunteer" });
-    expect(a.map((x) => x.key)).toEqual(["help", "hop"]);
-    expect(a.find((x) => x.key === "hop")?.variant).toBe("cta");
+    expect(a.map((x) => x.key)).toEqual(["hop"]);
+    expect(a[0]).toEqual({ key: "hop", label: "Hop to it", href: null, variant: "tagline" });
   });
   test("lead with a board link: one View public board link", () => {
     const a = navActions({ ...base, persona: "lead", boardHref: "/bon-odori" });

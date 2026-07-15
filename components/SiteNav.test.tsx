@@ -21,9 +21,16 @@ test("brand links to org home", () => {
   expect(screen.getByRole("link", { name: /Frog Board/ })).toHaveAttribute("href", "/");
 });
 
-test("volunteer sees the Hop to it CTA", () => {
+test("volunteer sees Hop to it as a tagline, not a clickable button", () => {
   render(<SiteNav ctx={ctx({ persona: "volunteer" })} />);
-  expect(screen.getByRole("link", { name: /hop to it/i })).toHaveAttribute("href", "#board");
+  expect(screen.getByText(/hop to it/i)).toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: /hop to it/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /hop to it/i })).not.toBeInTheDocument();
+});
+
+test("volunteer bar no longer offers a What's a pad link", () => {
+  render(<SiteNav ctx={ctx({ persona: "volunteer" })} />);
+  expect(screen.queryByText(/what's a pad/i)).not.toBeInTheDocument();
 });
 
 test("lead sees the group chip and the board link", () => {

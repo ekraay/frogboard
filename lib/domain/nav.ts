@@ -33,7 +33,7 @@ export interface NavAction {
   key: string;
   label: string;
   href: string | null;
-  variant: "cta" | "link" | "share";
+  variant: "cta" | "link" | "share" | "tagline";
 }
 
 /** A group is a lens: one shows its name, many show a count, org-wide shows all. */
@@ -59,10 +59,9 @@ export function breadcrumbSegments(ctx: NavContext): Segments {
 /** Only in-reach moves: an action appears only when its prerequisite exists. */
 export function navActions(ctx: NavContext): NavAction[] {
   if (ctx.persona === "volunteer") {
-    return [
-      { key: "help", label: "What's a pad?", href: "#whats-a-pad", variant: "link" },
-      { key: "hop", label: "🐸 Hop to it", href: "#board", variant: "cta" },
-    ];
+    // Quiet by design: no moves, just the tagline. "Hop to it" is a slogan,
+    // not a button; the board itself carries the claim action.
+    return [{ key: "hop", label: "Hop to it", href: null, variant: "tagline" }];
   }
   if (ctx.persona === "lead") {
     return ctx.boardHref

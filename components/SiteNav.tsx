@@ -30,7 +30,7 @@ export function SiteNav({ ctx }: { ctx: NavContext }) {
         </span>
       ))}
 
-      <span className="whitespace-nowrap text-sm font-semibold text-ink-soft">· {seg.view}</span>
+      <span className="whitespace-nowrap text-sm font-normal italic text-ink-soft/70">· {seg.view}</span>
 
       <div className="ml-auto flex items-center gap-2">
         {seg.chip && (
@@ -41,6 +41,13 @@ export function SiteNav({ ctx }: { ctx: NavContext }) {
         {actions.map((a) => {
           if (a.variant === "share") {
             return ctx.shareUrl ? <ShareButton key={a.key} url={ctx.shareUrl} /> : null;
+          }
+          if (a.variant === "tagline") {
+            return (
+              <span key={a.key} className="whitespace-nowrap text-sm font-semibold text-pond">
+                🐸 {a.label}
+              </span>
+            );
           }
           const cls =
             a.variant === "cta"
