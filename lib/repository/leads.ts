@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import type { Lead } from "@prisma/client";
 import { newClaimToken } from "@/lib/security/tokens";
-import { chaseList, type ChaseGroup, statusCounts, type StatusCounts, type RosterPerson } from "@/lib/domain/roster";
+import { rosterView, type RosterGroup, patrolSummary, type PatrolSummary, statusCounts, type StatusCounts, type RosterPerson } from "@/lib/domain/roster";
 import { getEventRsvps } from "@/lib/repository/rsvp";
 import { boardDisplayName } from "@/lib/domain/displayName";
 import type { RsvpRecord } from "@/lib/domain/rsvp";
@@ -45,10 +45,10 @@ export async function getLeadAuth(
   return lead;
 }
 
-/** A lead's read view: their group's chase list (abbreviated names, no contact details) and counts. */
-export async function getLeadChaseView(
+/** A lead's read view: their whole group (abbreviated names, no contact details), counts, and per-patrol summary. */
+export async function getLeadRosterView(
   token: string,
-): Promise<{ group: string; eventName: string; counts: StatusCounts; chase: ChaseGroup[] } | null> {
+): Promise<{ group: string; eventName: string; counts: StatusCounts; byPatrol: PatrolSummary[]; roster: RosterGroup[] } | null> {
   const lead = await prisma.lead.findUnique({
     where: { token },
     select: { group: true, orgId: true, eventId: true, event: { select: { name: true } } },
@@ -72,6 +72,7 @@ export async function getLeadChaseView(
     group: lead.group,
     eventName: lead.event.name,
     counts: statusCounts(roster, byPerson),
-    chase: chaseList(roster, byPerson),
+    byPatrol: patrolSummary(roster, byPerson),
+    roster: rosterView(roster, byPerson),
   };
 }
