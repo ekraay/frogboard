@@ -4,7 +4,6 @@ import { getEventBoardByParam } from "@/lib/repository/events";
 import { Board } from "@/components/Board";
 import { filterTasks, facetOptions, coverageFor } from "@/lib/domain/board";
 import { isValidSession, SESSION_COOKIE } from "@/lib/security/session";
-import { flagEnabled } from "@/lib/flags";
 import { SiteNav } from "@/components/SiteNav";
 import type { NavContext } from "@/lib/domain/nav";
 
@@ -37,14 +36,13 @@ export default async function EventBoardPage({
   const { covered, total } = coverageFor(tasks);
   const jar = await cookies();
   const isOrganizer = isValidSession(jar.get(SESSION_COOKIE)?.value);
-  const showNav = flagEnabled("nav", { cookies: jar });
   const navCtx: NavContext = {
     org: "BCSF", orgHref: "/", event: board.name, view: "Sign up",
     persona: "volunteer", groups: [], allGroups: board.standing, boardHref: null, shareUrl: null,
   };
   return (
     <>
-      {showNav && <SiteNav ctx={navCtx} />}
+      <SiteNav ctx={navCtx} />
       <Board eventName={board.name} tasks={tasks} standing={board.standing} isOrganizer={isOrganizer} filter={{ options, activeLabels, covered, total }} />
     </>
   );

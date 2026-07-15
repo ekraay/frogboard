@@ -8,7 +8,6 @@ import { getEventLeads } from "@/lib/repository/leads";
 import { OrganizeGrid } from "@/components/organize/OrganizeGrid";
 import { GroupRollups } from "@/components/organize/GroupRollups";
 import { LeadsPanel } from "@/components/organize/LeadsPanel";
-import { flagEnabled } from "@/lib/flags";
 import { SiteNav } from "@/components/SiteNav";
 import type { NavContext } from "@/lib/domain/nav";
 
@@ -34,7 +33,6 @@ export default async function OrganizeEventPage({
   const boardParam = grid.slug ?? grid.id;
   const host = (await headers()).get("host") ?? "";
   const proto = host.startsWith("localhost") || host.startsWith("127.0.0.1") ? "http" : "https";
-  const showNav = flagEnabled("nav", { cookies: jar });
   const navCtx: NavContext = {
     org: "BCSF", orgHref: "/", event: grid.name, view: "Organize",
     persona: "organizer", groups: [], allGroups: false,
@@ -43,7 +41,7 @@ export default async function OrganizeEventPage({
 
   return (
     <>
-      {showNav && <SiteNav ctx={navCtx} />}
+      <SiteNav ctx={navCtx} />
       <main className="mx-auto max-w-6xl px-4 pb-16 pt-8">
       <div className="mb-4">
         <Link href="/organize"

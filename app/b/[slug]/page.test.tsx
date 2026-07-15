@@ -113,15 +113,7 @@ test("parses filters from the query into initialFilters and passes a clock", asy
   expect(typeof tb.props.nowMs).toBe("number");
 });
 
-test("hides the nav bar when FLAG_NAV is dark", async () => {
-  getEventBoardByParam.mockResolvedValue(sampleBoard);
-  isValidSession.mockReturnValue(false);
-  const el = await render();
-  expect(siteNavElement(el)).toBeFalsy();
-});
-
-test("shows the nav bar when the nav preview cookie is set", async () => {
-  cookieJar = { get: (n) => (n === "ff_nav" ? { value: "1" } : undefined) };
+test("always renders the nav bar (no longer flag-gated)", async () => {
   getEventBoardByParam.mockResolvedValue(sampleBoard);
   isValidSession.mockReturnValue(false);
   const el = await render();
@@ -129,7 +121,6 @@ test("shows the nav bar when the nav preview cookie is set", async () => {
 });
 
 test("marks the standing board as all-groups in the nav chip", async () => {
-  cookieJar = { get: (n) => (n === "ff_nav" ? { value: "1" } : undefined) };
   getEventBoardByParam.mockResolvedValue({ ...sampleBoard, standing: true });
   isValidSession.mockReturnValue(false);
   const el = await render();

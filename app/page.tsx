@@ -1,8 +1,6 @@
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
 import { listPublishedEvents, listPublishedStandingBoards } from "@/lib/repository/events";
 import { GardenHome } from "@/components/GardenHome";
-import { flagEnabled } from "@/lib/flags";
 import { SiteNav } from "@/components/SiteNav";
 import type { NavContext } from "@/lib/domain/nav";
 
@@ -14,7 +12,6 @@ export default async function Home({
   searchParams: Promise<{ group?: string | string[] }>;
 }) {
   const [events, boards] = await Promise.all([listPublishedEvents(), listPublishedStandingBoards()]);
-  const showNav = flagEnabled("nav", { cookies: await cookies() });
   const navCtx: NavContext = {
     org: "BCSF", orgHref: "/", event: null, view: "Choose event",
     persona: "volunteer", groups: [], allGroups: false, boardHref: null, shareUrl: null,
@@ -23,7 +20,7 @@ export default async function Home({
   if (events.length === 0 && boards.length === 0) {
     return (
       <>
-        {showNav && <SiteNav ctx={navCtx} />}
+        <SiteNav ctx={navCtx} />
         <main className="mx-auto max-w-2xl px-4 py-16 text-center text-ink-soft">
           <p className="text-4xl" aria-hidden>🐸</p>
           <h1 className="mt-3 font-display text-2xl font-bold text-ink">No event yet</h1>
@@ -49,7 +46,7 @@ export default async function Home({
 
   return (
     <>
-      {showNav && <SiteNav ctx={navCtx} />}
+      <SiteNav ctx={navCtx} />
       <GardenHome events={events} boards={boards} />
     </>
   );

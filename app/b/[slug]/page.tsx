@@ -36,14 +36,13 @@ export default async function TaskBoardPage({
   const initialFilters = parseBoardFilters(await searchParams);
   const nowMs = currentTimeMs();
   const isOrganizer = isValidSession(cookieStore.get(SESSION_COOKIE)?.value);
-  const showNav = flagEnabled("nav", { cookies: cookieStore });
   const navCtx: NavContext = {
     org: "BCSF", orgHref: "/", event: board.name, view: "Sign up",
     persona: "volunteer", groups: [], allGroups: board.standing, boardHref: null, shareUrl: null,
   };
   return (
     <>
-      {showNav && <SiteNav ctx={navCtx} />}
+      <SiteNav ctx={navCtx} />
       <TaskBoard
         event={{ name: board.name }}
         tasks={board.tasks}

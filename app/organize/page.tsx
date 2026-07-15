@@ -7,7 +7,6 @@ import { NewEventForm } from "@/components/organize/NewEventForm";
 import { NewOngoingBoardForm } from "@/components/organize/NewOngoingBoardForm";
 import { EventList } from "@/components/organize/EventList";
 import { StandingBoardList } from "@/components/organize/StandingBoardList";
-import { flagEnabled } from "@/lib/flags";
 import { SiteNav } from "@/components/SiteNav";
 import type { NavContext } from "@/lib/domain/nav";
 
@@ -19,14 +18,13 @@ export default async function OrganizePage() {
     return <main className="px-4"><SignInForm /></main>;
   }
   const [events, standingBoards] = await Promise.all([listEvents(), listStandingBoards()]);
-  const showNav = flagEnabled("nav", { cookies: jar });
   const navCtx: NavContext = {
     org: "BCSF", orgHref: "/", event: null, view: "Organize",
     persona: "organizer", groups: [], allGroups: false, boardHref: null, shareUrl: null,
   };
   return (
     <>
-      {showNav && <SiteNav ctx={navCtx} />}
+      <SiteNav ctx={navCtx} />
       <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
       <div className="mb-6 flex items-baseline justify-between">
         <h1 className="font-display text-3xl font-extrabold text-ink">🐸 Your events</h1>

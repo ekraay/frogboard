@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import { getLeadChaseView } from "@/lib/repository/leads";
 import { ChaseView } from "@/components/ChaseView";
-import { flagEnabled } from "@/lib/flags";
 import { SiteNav } from "@/components/SiteNav";
 import type { NavContext } from "@/lib/domain/nav";
 
@@ -21,7 +19,6 @@ export default async function LeadPage({ params }: { params: Promise<{ token: st
       </main>
     );
   }
-  const showNav = flagEnabled("nav", { cookies: await cookies() });
   const navCtx: NavContext = {
     org: "BCSF", orgHref: "/", event: view.eventName, view: "Group lead",
     persona: "lead", groups: [view.group], allGroups: false,
@@ -29,7 +26,7 @@ export default async function LeadPage({ params }: { params: Promise<{ token: st
   };
   return (
     <>
-      {showNav && <SiteNav ctx={navCtx} />}
+      <SiteNav ctx={navCtx} />
       <ChaseView token={token} group={view.group} eventName={view.eventName} counts={view.counts} chase={view.chase} />
     </>
   );
