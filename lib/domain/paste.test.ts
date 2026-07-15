@@ -95,6 +95,8 @@ describe("applyPaste (column-aware: lands at the focused cell)", () => {
   test("a pasted Kind value normalizes to shift/errand", () => {
     const r = applyPaste([emptyCells()], [["errand"]], { row: 0, col: ORDER.indexOf("kind") }, ORDER, emptyCells);
     expect(r.cells[0].kind).toBe("errand");
+    const t = applyPaste([emptyCells()], [["task"]], { row: 0, col: ORDER.indexOf("kind") }, ORDER, emptyCells);
+    expect(t.cells[0].kind).toBe("errand");
     const s = applyPaste([emptyCells()], [["whatever"]], { row: 0, col: ORDER.indexOf("kind") }, ORDER, emptyCells);
     expect(s.cells[0].kind).toBe("shift");
   });

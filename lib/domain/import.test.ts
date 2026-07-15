@@ -67,9 +67,10 @@ describe("buildImportRows", () => {
     const grid = [
       ["Setup", "frog"],
       ["Cleanup", "errand"],
+      ["Prep", "task"],
     ];
     const fields: ImportField[] = ["title", "kind"];
     const rows = buildImportRows(grid, fields, false, emptyCells);
-    expect(rows.map((c) => c.kind)).toEqual(["errand", "errand"]);
+    expect(rows.map((c) => c.kind)).toEqual(["errand", "errand", "errand"]);
   });
 });

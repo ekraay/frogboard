@@ -25,7 +25,7 @@ test("shows 'Covered' when full", () => {
   expect(screen.getByText(/covered/i)).toBeInTheDocument();
 });
 
-test("a solo mission reads 'Hop to it'", () => {
+test("a solo task reads 'Hop to it'", () => {
   render(<BoardCard task={task({ kind: "errand", neededCount: 1 })} onOpen={vi.fn()} />);
   expect(screen.getByText(/hop to it/i)).toBeInTheDocument();
 });

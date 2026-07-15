@@ -343,8 +343,8 @@ test("explanations are tucked behind ? popovers, not shown as a wall of text", a
   // Paste-a-list help opens on demand
   await user.click(screen.getByRole("button", { name: /how .*paste a list/i }));
   expect(screen.getByText(/each line becomes a task/i)).toBeInTheDocument();
-  // Kind help explains Shift vs Frog
-  await user.click(screen.getByRole("button", { name: /shift vs frog/i }));
+  // Kind help explains Shift vs Task
+  await user.click(screen.getByRole("button", { name: /shift vs task/i }));
   expect(screen.getByText(/one-off need/i)).toBeInTheDocument();
 });
 
