@@ -25,6 +25,7 @@ let cookieJar: { get: (n: string) => { value: string } | undefined };
 
 import Page from "./page";
 import { TaskBoard } from "@/components/board/TaskBoard";
+import { SiteNav } from "@/components/SiteNav";
 
 const sampleBoard = {
   id: "e1",
@@ -56,6 +57,14 @@ function taskBoardElement(el: Awaited<ReturnType<typeof render>>) {
   const children = el.props.children;
   const kids = Array.isArray(children) ? children : [children];
   return kids.find((c) => c && c.type === TaskBoard);
+}
+
+// When the flag is dark the fragment's first child is `false`, so a find by
+// type returns undefined. That is exactly the "no bar" assertion we want.
+function siteNavElement(el: Awaited<ReturnType<typeof render>>) {
+  const children = el.props.children;
+  const kids = Array.isArray(children) ? children : [children];
+  return kids.find((c) => c && c.type === SiteNav);
 }
 
 test("notFound when the flag is off", async () => {
@@ -102,4 +111,27 @@ test("parses filters from the query into initialFilters and passes a clock", asy
   const tb = taskBoardElement(el);
   expect(tb.props.initialFilters.group).toEqual(["Scouts"]);
   expect(typeof tb.props.nowMs).toBe("number");
+});
+
+test("hides the nav bar when FLAG_NAV is dark", async () => {
+  getEventBoardByParam.mockResolvedValue(sampleBoard);
+  isValidSession.mockReturnValue(false);
+  const el = await render();
+  expect(siteNavElement(el)).toBeFalsy();
+});
+
+test("shows the nav bar when the nav preview cookie is set", async () => {
+  cookieJar = { get: (n) => (n === "ff_nav" ? { value: "1" } : undefined) };
+  getEventBoardByParam.mockResolvedValue(sampleBoard);
+  isValidSession.mockReturnValue(false);
+  const el = await render();
+  expect(siteNavElement(el).type).toBe(SiteNav);
+});
+
+test("marks the standing board as all-groups in the nav chip", async () => {
+  cookieJar = { get: (n) => (n === "ff_nav" ? { value: "1" } : undefined) };
+  getEventBoardByParam.mockResolvedValue({ ...sampleBoard, standing: true });
+  isValidSession.mockReturnValue(false);
+  const el = await render();
+  expect(siteNavElement(el).props.ctx.allGroups).toBe(true);
 });

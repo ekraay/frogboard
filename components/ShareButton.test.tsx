@@ -12,3 +12,12 @@ test("copies the url and confirms", async () => {
   expect(writeText).toHaveBeenCalledWith("https://frogboard.vercel.app/bon-odori");
   expect(await screen.findByText(/copied/i)).toBeInTheDocument();
 });
+
+test("shows a fallback when the clipboard rejects", async () => {
+  const writeText = vi.fn().mockRejectedValue(new Error("denied"));
+  const user = userEvent.setup();
+  Object.assign(navigator.clipboard, { writeText });
+  render(<ShareButton url="https://frogboard.vercel.app/bon-odori" />);
+  await user.click(screen.getByRole("button", { name: /share/i }));
+  expect(await screen.findByText(/copy failed/i)).toBeInTheDocument();
+});

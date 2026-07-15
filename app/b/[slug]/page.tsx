@@ -39,7 +39,7 @@ export default async function TaskBoardPage({
   const showNav = flagEnabled("nav", { cookies: cookieStore });
   const navCtx: NavContext = {
     org: "BCSF", orgHref: "/", event: board.name, view: "Sign up",
-    persona: "volunteer", groups: [], allGroups: false, boardHref: null, shareUrl: null,
+    persona: "volunteer", groups: [], allGroups: board.standing, boardHref: null, shareUrl: null,
   };
   return (
     <>

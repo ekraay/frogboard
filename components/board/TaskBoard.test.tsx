@@ -46,6 +46,12 @@ test("splits tasks into Available and Claimed columns with counts", () => {
   expect(within(claimed).getByText("1")).toBeInTheDocument();
 });
 
+test("renders the volunteer bar's scroll anchors so its links resolve", () => {
+  const { container } = renderBoard();
+  expect(container.querySelector("#board")).not.toBeNull();
+  expect(container.querySelector("#whats-a-pad")).not.toBeNull();
+});
+
 test("shows the copy-public-link control for an organizer only", () => {
   const { rerender } = renderBoard({ isOrganizer: true });
   expect(screen.getByRole("button", { name: /copy public link/i })).toBeInTheDocument();

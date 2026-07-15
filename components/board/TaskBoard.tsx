@@ -120,6 +120,17 @@ export function TaskBoard({
             {event.name}
           </h1>
           <p className="mt-1 text-ink-soft">Grab a task to help out.</p>
+          <details className="group mt-2 max-w-sm text-sm">
+            <summary id="whats-a-pad" className="inline-flex scroll-mt-16 cursor-pointer list-none items-center gap-1 font-semibold text-pond underline-offset-4 hover:underline">
+              🪷 What&apos;s a lily pad?
+              <span aria-hidden className="text-xs transition group-open:rotate-180">▾</span>
+            </summary>
+            <p className="mt-2 leading-relaxed text-ink-soft">
+              A <strong className="text-ink">lily pad</strong> is anything that needs a volunteer. A{" "}
+              <strong className="text-ink">task</strong> is a one-off, like &ldquo;bring 50 paper cups.&rdquo; A{" "}
+              <strong className="text-ink">shift</strong> is a scheduled time slot at a booth.
+            </p>
+          </details>
         </div>
         {isOrganizer ? (
           <div className="flex flex-wrap items-center gap-3">
@@ -150,7 +161,7 @@ export function TaskBoard({
         )}
       </header>
 
-      <div className="mb-4">
+      <div id="board" className="mb-4 scroll-mt-16">
         <button
           type="button"
           onClick={() => setFlyoutOpen(true)}

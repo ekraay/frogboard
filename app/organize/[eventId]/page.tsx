@@ -33,12 +33,12 @@ export default async function OrganizeEventPage({
 
   const boardParam = grid.slug ?? grid.id;
   const host = (await headers()).get("host") ?? "";
-  const proto = host.startsWith("localhost") ? "http" : "https";
+  const proto = host.startsWith("localhost") || host.startsWith("127.0.0.1") ? "http" : "https";
   const showNav = flagEnabled("nav", { cookies: jar });
   const navCtx: NavContext = {
     org: "BCSF", orgHref: "/", event: grid.name, view: "Organize",
     persona: "organizer", groups: [], allGroups: false,
-    boardHref: `/${boardParam}`, shareUrl: `${proto}://${host}/${boardParam}`,
+    boardHref: `/${boardParam}`, shareUrl: host ? `${proto}://${host}/${boardParam}` : null,
   };
 
   return (
@@ -57,11 +57,11 @@ export default async function OrganizeEventPage({
           </Link>
         </div>
       </div>
-      <div id="roster" className="mb-4 space-y-4">
+      <div id="roster" className="mb-4 scroll-mt-16 space-y-4">
         <GroupRollups groups={rollups} />
         <LeadsPanel eventId={grid.id} groups={groups} leads={leads} />
       </div>
-      <div id="settings">
+      <div id="settings" className="scroll-mt-16">
         <OrganizeGrid
           event={{ id: grid.id, name: grid.name, status: grid.status, slug: grid.slug, startDate: grid.startDate, endDate: grid.endDate, standing: grid.standing }}
           initialTasks={grid.tasks}

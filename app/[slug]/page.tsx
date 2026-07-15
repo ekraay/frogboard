@@ -40,7 +40,7 @@ export default async function EventBoardPage({
   const showNav = flagEnabled("nav", { cookies: jar });
   const navCtx: NavContext = {
     org: "BCSF", orgHref: "/", event: board.name, view: "Sign up",
-    persona: "volunteer", groups: [], allGroups: false, boardHref: null, shareUrl: null,
+    persona: "volunteer", groups: [], allGroups: board.standing, boardHref: null, shareUrl: null,
   };
   return (
     <>
