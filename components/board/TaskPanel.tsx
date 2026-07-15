@@ -25,7 +25,7 @@ function Detail({ label, icon, value }: { label: string; icon: string; value: st
 // derive from window.location so they stay correct wherever the board mounts.
 export function TaskPanel({ task, onClose }: { task: BoardTask; onClose: () => void }) {
   const slot = getSlotInfo(task);
-  const isFrog = task.kind === "frog";
+  const isTask = task.kind === "errand";
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
@@ -49,7 +49,7 @@ export function TaskPanel({ task, onClose }: { task: BoardTask; onClose: () => v
   }
 
   const accentBar = slot.isFull ? "bg-reed" : "bg-lantern";
-  const claimVerb = isFrog ? "Grab this frog" : "Claim a spot";
+  const claimVerb = "Hop to it";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -71,8 +71,8 @@ export function TaskPanel({ task, onClose }: { task: BoardTask; onClose: () => v
         <div className="p-6">
           <header className="flex items-start justify-between gap-3">
             <p className="text-[0.7rem] font-bold uppercase tracking-[0.15em] text-ink-soft">
-              <span aria-hidden className="mr-1">{isFrog ? "🐸" : "🎐"}</span>
-              {isFrog ? "Frog" : "Shift"}
+              <span aria-hidden className="mr-1">{isTask ? "🪷" : "🎐"}</span>
+              {isTask ? "Task" : "Shift"}
             </p>
             <div className="flex items-center gap-2">
               <button

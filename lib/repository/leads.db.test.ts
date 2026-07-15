@@ -100,6 +100,12 @@ describe("getLeadRosterView", () => {
     const row = view!.roster.flatMap((g) => g.people).find((p) => p.name === "Alex T.")!;
     expect(row.position).toBe("PL");
   });
+  test("exposes the event's board param (slug, else id)", async () => {
+    const e = await event();
+    const lead = await createLead(e.id, "Scouts", "Simon");
+    const view = await getLeadRosterView(lead.token);
+    expect(view!.boardParam).toBe(e.slug ?? e.id);
+  });
   test("null on an unknown token", async () => {
     expect(await getLeadRosterView("nope")).toBeNull();
   });

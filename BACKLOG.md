@@ -36,6 +36,16 @@ so design them together.
 
 ## Explore / design first
 
+- **Garden home / workspace hub (Trello-style)**: the brand (🐸 Frog Board)
+  eventually opens a hub listing your **gardens** (orgs/workspaces you can
+  reach), **ponds** (groups), **gatherings** (events), and **standing boards**,
+  like Trello's boards-and-workspaces home. Multi-tenant home screen. It grows
+  out of the minimal single-org "BCSF garden home" shipped on the nav branch
+  (public landing at `/`, Gatherings + Ongoing boards). Belongs with
+  multi-tenant / the [[groups-epic]]. Open questions: per-user access scoping,
+  recents/starred, and where a signed-in organizer view diverges from the
+  public volunteer view.
+
 - **Single-card create view**: a focused one-card form to add a task/frog, instead
   of adding rows in the spreadsheet grid. The grid stays the power tool for bulk
   **edit / delete / archive**; the card is the quick "add one thing" path (title,
@@ -127,6 +137,12 @@ so design them together.
 - **AI agents for organizers** — explore agents that draft a task list from a
   plain description, suggest where help is needed, or write reminder messages.
   Intent is still loose; define the first concrete job before building.
+- **Customizable labels per org.** The ponds metaphor (frog / lily pad / Shift /
+  Task) needs explaining, which is friction. Let each org pick its own vocabulary:
+  plain "Shift / Task," or full themed language, so the label carries itself
+  without a "what's this?" explainer. A troop that wants frogs keeps frogs; one
+  that wants plain words gets them. Ties to the naming work on the nav-ponds branch
+  (kind stored as `errand`, shown as "Task").
 - **Passwordless accounts (magic links + SMS).** When real accounts arrive, make
   sign-in passwordless and modern: email **magic links** and **SMS** one-time codes/
   links, no passwords to remember. Fits the no-friction ethos that won adoption, and

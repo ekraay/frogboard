@@ -46,7 +46,7 @@ async function main() {
         position: 3072,
       },
       {
-        eventId: event.id, kind: "frog", title: "Bring 50 paper cups",
+        eventId: event.id, kind: "errand", title: "Bring 50 paper cups",
         category: "Supplies", neededCount: 1,
         dueBy: new Date("2026-07-25T17:00:00Z"),
         definitionOfDone: "Cups delivered to the dining area.",

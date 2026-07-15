@@ -9,7 +9,7 @@ export async function createEvent(name: string, startDate: Date, endDate: Date):
   return prisma.event.create({ data: { name, slug, startDate, endDate, orgId: "org_bcsf" } });
 }
 
-/** An evergreen board of frogs: no dates, drafted until the organizer publishes it. */
+/** An evergreen board of tasks: no dates, drafted until the organizer publishes it. */
 export async function createStandingBoard(name: string): Promise<Event> {
   const slug = await generateUniqueSlug(name);
   return prisma.event.create({ data: { name, slug, standing: true, orgId: "org_bcsf" } });
@@ -18,6 +18,23 @@ export async function createStandingBoard(name: string): Promise<Event> {
 export interface EventListItem {
   id: string; name: string; startDate: Date | null; endDate: Date | null;
   status: EventStatus; taskCount: number;
+}
+
+export interface StandingBoardItem {
+  id: string; name: string; slug: string | null; status: EventStatus; taskCount: number;
+}
+
+/** Evergreen boards, newest first. listEvents excludes standing boards, so the
+ *  organizer index lists these separately to keep them reachable. */
+export async function listStandingBoards(): Promise<StandingBoardItem[]> {
+  const boards = await prisma.event.findMany({
+    where: { standing: true },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    include: { _count: { select: { tasks: true } } },
+  });
+  return boards.map((b) => ({
+    id: b.id, name: b.name, slug: b.slug, status: b.status, taskCount: b._count.tasks,
+  }));
 }
 
 export async function listEvents(): Promise<EventListItem[]> {
@@ -46,7 +63,7 @@ export async function deleteEvent(eventId: string): Promise<boolean> {
 }
 
 export interface GridTask {
-  id: string; kind: "shift" | "frog"; title: string;
+  id: string; kind: "shift" | "errand"; title: string;
   category: string | null; requestedGroup: string | null; neededCount: number;
   date: Date | null; startAt: Date | null; endAt: Date | null; dueBy: Date | null;
   location: string | null; description: string | null;

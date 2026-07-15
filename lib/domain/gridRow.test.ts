@@ -75,7 +75,7 @@ describe("taskToCells round-trip", () => {
   });
   test("a stored frog renders a 'by …' cell", () => {
     const c = taskToCells({
-      title: "Cups", kind: "frog", category: null, requestedGroup: null, neededCount: 1,
+      title: "Cups", kind: "errand", category: null, requestedGroup: null, neededCount: 1,
       date: null, startAt: null, endAt: null, dueBy: new Date("2026-07-25T17:00:00Z"),
       location: null, description: null, definitionOfDone: null, pointOfContact: null,
     });

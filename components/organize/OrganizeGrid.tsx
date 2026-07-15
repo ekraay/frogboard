@@ -35,7 +35,7 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
         const year = new Date().getUTCFullYear();
         return { year, start: { year, month: 1, day: 1 }, end: { year, month: 12, day: 31 } };
       })();
-  const newCells = () => ({ ...emptyCells(), kind: event.standing ? "frog" : "shift" });
+  const newCells = () => ({ ...emptyCells(), kind: event.standing ? "errand" : "shift" });
   const [rows, setRows] = useState<RowState[]>(() =>
     initialTasks.map((t) => ({
       key: crypto.randomUUID(), taskId: t.id, cells: taskToCells(t),
@@ -469,10 +469,10 @@ export function OrganizeGrid({ event, initialTasks }: { event: GridEvent; initia
                     </span>
                   </button>
                   {c.field === "kind" && (
-                    <> <HelpPopover label="Shift vs Frog">
+                    <> <HelpPopover label="Shift vs Task">
                       A <span className="font-semibold">Shift</span> is a scheduled time slot. A{" "}
-                      <span className="font-semibold">🐸 Frog</span> is a one-off need volunteers grab &mdash;
-                      it can take a &ldquo;by&rdquo; deadline instead of a time.
+                      <span className="font-semibold">🪷 Task</span> is a one-off need volunteers grab.
+                      It can take a &ldquo;by&rdquo; deadline instead of a time.
                     </HelpPopover></>
                   )}
                 </th>

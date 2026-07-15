@@ -40,20 +40,20 @@ describe("formatWhen", () => {
   });
   test("frog with a deadline", () => {
     expect(
-      formatWhen(task({ kind: "frog", date: null, dueBy: new Date("2026-07-25T17:00:00Z") })),
+      formatWhen(task({ kind: "errand", date: null, dueBy: new Date("2026-07-25T17:00:00Z") })),
     ).toBe("By Jul 25");
   });
   test("frog with no deadline is anytime", () => {
     expect(
-      formatWhen(task({ kind: "frog", date: null, dueBy: null })),
+      formatWhen(task({ kind: "errand", date: null, dueBy: null })),
     ).toBe("Anytime");
   });
   test("a frog shows its deadline, or 'Anytime' when it has none", () => {
     expect(
-      formatWhen(task({ kind: "frog", date: null, dueBy: new Date("2026-07-25T12:00:00Z") })),
+      formatWhen(task({ kind: "errand", date: null, dueBy: new Date("2026-07-25T12:00:00Z") })),
     ).toMatch(/^By /);
     expect(
-      formatWhen(task({ kind: "frog", date: null, dueBy: null })),
+      formatWhen(task({ kind: "errand", date: null, dueBy: null })),
     ).toBe("Anytime");
   });
 });

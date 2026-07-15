@@ -48,10 +48,10 @@ export async function getLeadAuth(
 /** A lead's read view: their whole group (abbreviated names, no contact details), counts, and per-patrol summary. */
 export async function getLeadRosterView(
   token: string,
-): Promise<{ group: string; eventName: string; counts: StatusCounts; byPatrol: PatrolSummary[]; roster: RosterGroup[] } | null> {
+): Promise<{ group: string; eventName: string; counts: StatusCounts; byPatrol: PatrolSummary[]; roster: RosterGroup[]; boardParam: string } | null> {
   const lead = await prisma.lead.findUnique({
     where: { token },
-    select: { group: true, orgId: true, eventId: true, event: { select: { name: true } } },
+    select: { group: true, orgId: true, eventId: true, event: { select: { name: true, slug: true, id: true } } },
   });
   if (!lead) return null;
   const people = await prisma.person.findMany({
@@ -74,5 +74,6 @@ export async function getLeadRosterView(
     counts: statusCounts(roster, byPerson),
     byPatrol: patrolSummary(roster, byPerson),
     roster: rosterView(roster, byPerson),
+    boardParam: lead.event.slug ?? lead.event.id,
   };
 }

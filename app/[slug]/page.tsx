@@ -4,6 +4,8 @@ import { getEventBoardByParam } from "@/lib/repository/events";
 import { Board } from "@/components/Board";
 import { filterTasks, facetOptions, coverageFor } from "@/lib/domain/board";
 import { isValidSession, SESSION_COOKIE } from "@/lib/security/session";
+import { SiteNav } from "@/components/SiteNav";
+import type { NavContext } from "@/lib/domain/nav";
 
 // The board reflects live signups; always render fresh.
 export const dynamic = "force-dynamic";
@@ -32,6 +34,16 @@ export default async function EventBoardPage({
     facets.group, facets.category, facets.location,
   ].filter((s) => s !== "");
   const { covered, total } = coverageFor(tasks);
-  const isOrganizer = isValidSession((await cookies()).get(SESSION_COOKIE)?.value);
-  return <Board eventName={board.name} tasks={tasks} standing={board.standing} isOrganizer={isOrganizer} filter={{ options, activeLabels, covered, total }} />;
+  const jar = await cookies();
+  const isOrganizer = isValidSession(jar.get(SESSION_COOKIE)?.value);
+  const navCtx: NavContext = {
+    org: "BCSF", orgHref: "/", event: board.name, view: "Sign up",
+    persona: "volunteer", groups: [], allGroups: board.standing, boardHref: null, shareUrl: null,
+  };
+  return (
+    <>
+      <SiteNav ctx={navCtx} />
+      <Board eventName={board.name} tasks={tasks} standing={board.standing} isOrganizer={isOrganizer} filter={{ options, activeLabels, covered, total }} />
+    </>
+  );
 }

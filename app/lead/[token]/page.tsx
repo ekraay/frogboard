@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { getLeadRosterView } from "@/lib/repository/leads";
 import { RosterView } from "@/components/RosterView";
+import { SiteNav } from "@/components/SiteNav";
+import type { NavContext } from "@/lib/domain/nav";
 
 // Live signups; always fresh. Keep the token out of search engines and Referer headers.
 export const dynamic = "force-dynamic";
@@ -17,7 +19,15 @@ export default async function LeadPage({ params }: { params: Promise<{ token: st
       </main>
     );
   }
+  const navCtx: NavContext = {
+    org: "BCSF", orgHref: "/", event: view.eventName, view: "Group lead",
+    persona: "lead", groups: [view.group], allGroups: false,
+    boardHref: `/${view.boardParam}`, shareUrl: null,
+  };
   return (
-    <RosterView token={token} group={view.group} eventName={view.eventName} counts={view.counts} byPatrol={view.byPatrol} roster={view.roster} />
+    <>
+      <SiteNav ctx={navCtx} />
+      <RosterView token={token} group={view.group} eventName={view.eventName} counts={view.counts} byPatrol={view.byPatrol} roster={view.roster} />
+    </>
   );
 }

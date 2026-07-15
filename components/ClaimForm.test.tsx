@@ -21,7 +21,7 @@ test("submits a name, calls the action, and stores the returned token", async ()
   const user = userEvent.setup();
   render(<ClaimForm taskId="t1" />);
 
-  await user.click(screen.getByRole("button", { name: /grab a frog/i }));
+  await user.click(screen.getByRole("button", { name: /hop to it/i }));
   await user.type(screen.getByLabelText(/your name/i), "Kenji");
   await user.click(screen.getByRole("button", { name: /^add me$/i }));
 
@@ -36,7 +36,7 @@ test("prefills name and group from a remembered profile", async () => {
   window.localStorage.setItem("frogboard.profile", JSON.stringify({ name: "Kenji", group: "Scouts" }));
   const user = userEvent.setup();
   render(<ClaimForm taskId="t1" />);
-  await user.click(screen.getByRole("button", { name: /grab a frog/i }));
+  await user.click(screen.getByRole("button", { name: /hop to it/i }));
   expect(screen.getByLabelText(/your name/i)).toHaveValue("Kenji");
   expect(screen.getByLabelText(/group/i)).toHaveValue("Scouts");
 });
@@ -45,7 +45,7 @@ test("remembers name and group after a successful claim", async () => {
   claimSlot.mockResolvedValue({ ok: true, signupId: "s1", claimToken: "tok-1" });
   const user = userEvent.setup();
   render(<ClaimForm taskId="t1" />);
-  await user.click(screen.getByRole("button", { name: /grab a frog/i }));
+  await user.click(screen.getByRole("button", { name: /hop to it/i }));
   await user.type(screen.getByLabelText(/your name/i), "Mika");
   await user.type(screen.getByLabelText(/group/i), "YAO");
   await user.click(screen.getByRole("button", { name: /^add me$/i }));
@@ -55,7 +55,7 @@ test("remembers name and group after a successful claim", async () => {
 test("explains that email and phone are for reminders", async () => {
   const user = userEvent.setup();
   render(<ClaimForm taskId="t1" />);
-  await user.click(screen.getByRole("button", { name: /grab a frog/i }));
+  await user.click(screen.getByRole("button", { name: /hop to it/i }));
   expect(screen.getByText(/remind you about your shift/i)).toBeInTheDocument();
 });
 
@@ -64,7 +64,7 @@ test("shows the error message when the action fails", async () => {
   const user = userEvent.setup();
   render(<ClaimForm taskId="t1" />);
 
-  await user.click(screen.getByRole("button", { name: /grab a frog/i }));
+  await user.click(screen.getByRole("button", { name: /hop to it/i }));
   await user.type(screen.getByLabelText(/your name/i), "Kenji");
   await user.click(screen.getByRole("button", { name: /^add me$/i }));
 
@@ -79,7 +79,7 @@ test("does not double-submit when Add me is tapped twice quickly", async () => {
   const user = userEvent.setup();
   render(<ClaimForm taskId="t1" />);
 
-  await user.click(screen.getByRole("button", { name: /grab a frog/i }));
+  await user.click(screen.getByRole("button", { name: /hop to it/i }));
   await user.type(screen.getByLabelText(/your name/i), "Kenji");
   const addMe = screen.getByRole("button", { name: /^add me$/i });
   await user.click(addMe);
@@ -95,7 +95,7 @@ test("forwards optional email and phone when provided", async () => {
   const user = userEvent.setup();
   render(<ClaimForm taskId="t1" />);
 
-  await user.click(screen.getByRole("button", { name: /grab a frog/i }));
+  await user.click(screen.getByRole("button", { name: /hop to it/i }));
   await user.type(screen.getByLabelText(/your name/i), "Kenji");
   await user.type(screen.getByLabelText(/email/i), "kenji@example.com");
   await user.type(screen.getByLabelText(/phone/i), "555-1234");
@@ -111,7 +111,7 @@ test("email and phone are optional — submitting blank still works", async () =
   const user = userEvent.setup();
   render(<ClaimForm taskId="t1" />);
 
-  await user.click(screen.getByRole("button", { name: /grab a frog/i }));
+  await user.click(screen.getByRole("button", { name: /hop to it/i }));
   await user.type(screen.getByLabelText(/your name/i), "Kenji");
   await user.click(screen.getByRole("button", { name: /^add me$/i }));
 

@@ -9,7 +9,7 @@ import { getProfile, rememberProfile } from "@/lib/client/profile";
 /**
  * The claim form body: the fields, the `claimSlot` call, the device-local
  * remember-and-refresh. Rendered open (no button). `ClaimForm` wraps this behind
- * a "Grab a frog" button for the old board; the task panel renders it directly.
+ * a "Hop to it" button for the old board; the task panel renders it directly.
  * One home for claim semantics so the two surfaces never diverge.
  */
 export function ClaimFields({

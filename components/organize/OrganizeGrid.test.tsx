@@ -165,8 +165,8 @@ test("on a standing board, a pasted column defaults new rows to frog", async () 
   await user.click(screen.getByRole("button", { name: /add row/i })); // anchor row (already frog)
   await user.click(screen.getByLabelText("Title, row 1"));
   await user.paste("Trim hedges\nRake leaves"); // two titles: row 1 filled, row 2 appended
-  expect(screen.getByLabelText("Kind, row 1")).toHaveValue("frog");
-  expect(screen.getByLabelText("Kind, row 2")).toHaveValue("frog"); // the appended row, not shift
+  expect(screen.getByLabelText("Kind, row 1")).toHaveValue("errand");
+  expect(screen.getByLabelText("Kind, row 2")).toHaveValue("errand"); // the appended row, not shift
 });
 
 test("on a standing board, the Paste-a-list modal defaults tasks to frog", async () => {
@@ -178,8 +178,8 @@ test("on a standing board, the Paste-a-list modal defaults tasks to frog", async
   await user.click(box);
   await user.paste("Trim hedges\nRake leaves");
   await user.click(screen.getByRole("button", { name: /add 2 tasks/i }));
-  expect(screen.getByLabelText("Kind, row 1")).toHaveValue("frog");
-  expect(screen.getByLabelText("Kind, row 2")).toHaveValue("frog");
+  expect(screen.getByLabelText("Kind, row 1")).toHaveValue("errand");
+  expect(screen.getByLabelText("Kind, row 2")).toHaveValue("errand");
 });
 
 test("delete is deferred; undo cancels it and restores the row intact (signups included)", () => {
@@ -343,8 +343,8 @@ test("explanations are tucked behind ? popovers, not shown as a wall of text", a
   // Paste-a-list help opens on demand
   await user.click(screen.getByRole("button", { name: /how .*paste a list/i }));
   expect(screen.getByText(/each line becomes a task/i)).toBeInTheDocument();
-  // Kind help explains Shift vs Frog
-  await user.click(screen.getByRole("button", { name: /shift vs frog/i }));
+  // Kind help explains Shift vs Task
+  await user.click(screen.getByRole("button", { name: /shift vs task/i }));
   expect(screen.getByText(/one-off need/i)).toBeInTheDocument();
 });
 
@@ -474,7 +474,7 @@ test("reorder buttons disable while sorted", async () => {
 test("offers existing categories as datalist suggestions", () => {
   render(<OrganizeGrid
     event={{ id: "e1", name: "Temple", status: "draft", slug: null, startDate: null, endDate: null, standing: true }}
-    initialTasks={[{ id: "t1", kind: "frog", title: "Trim hedges", category: "Grounds", requestedGroup: null,
+    initialTasks={[{ id: "t1", kind: "errand", title: "Trim hedges", category: "Grounds", requestedGroup: null,
       neededCount: 1, date: null, startAt: null, endAt: null, dueBy: null, location: null, description: null,
       definitionOfDone: null, pointOfContact: null, position: 1024, signupCount: 0 }]} />);
   const option = document.querySelector('datalist option[value="Grounds"]');

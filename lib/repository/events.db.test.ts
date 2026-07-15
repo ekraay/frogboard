@@ -3,7 +3,7 @@ import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "@/lib/db";
 import { resetDb } from "@/test/db";
 import {
-  getEventBoard, listPublishedEvents,
+  getEventBoard, listPublishedEvents, listPublishedStandingBoards,
   generateUniqueSlug, getEventBoardByParam, getEventParam, updateEventSlug,
 } from "@/lib/repository/events";
 
@@ -64,6 +64,20 @@ describe("listPublishedEvents", () => {
     await prisma.event.create({ data: { name: "Ginza", slug: "ginza-2026", status: "published", ...dates } });
     const list = await listPublishedEvents();
     expect(list[0].slug).toBe("ginza-2026");
+  });
+});
+
+describe("listPublishedStandingBoards", () => {
+  test("lists only published standing boards, newest first, with slug and task counts", async () => {
+    await prisma.event.create({ data: { name: "Ginza", status: "published", ...dates } }); // dated event, excluded
+    const temple = await prisma.event.create({ data: { name: "Temple needs", slug: "temple-needs", standing: true, status: "published", orgId: "org_bcsf" } });
+    await prisma.task.create({ data: { eventId: temple.id, title: "Cups", position: 1024 } });
+    await prisma.event.create({ data: { name: "Draft board", standing: true, status: "draft", orgId: "org_bcsf" } }); // draft, excluded
+    await prisma.event.create({ data: { name: "Garden care", slug: "garden-care", standing: true, status: "published", orgId: "org_bcsf" } }); // newest
+
+    const list = await listPublishedStandingBoards();
+    expect(list.map((b) => b.name)).toEqual(["Garden care", "Temple needs"]);
+    expect(list.find((b) => b.name === "Temple needs")).toMatchObject({ slug: "temple-needs", taskCount: 1 });
   });
 });
 
