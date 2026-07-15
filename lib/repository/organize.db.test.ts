@@ -5,7 +5,7 @@ import { resetDb } from "@/test/db";
 import {
   createEvent, listEvents, setEventStatus, deleteEvent, getEventGrid,
   upsertTaskWithAudit, deleteTaskWithAudit, deleteTasks, renumberTasks,
-  getEventHistory, revertAuditEntry, createStandingBoard,
+  getEventHistory, revertAuditEntry, createStandingBoard, listStandingBoards,
 } from "@/lib/repository/organize";
 import { listPublishedEvents } from "@/lib/repository/events";
 import type { ParsedTaskFields } from "@/lib/domain/gridRow";
@@ -329,5 +329,17 @@ describe("standing boards stay out of the event lists", () => {
     });
     expect((await listEvents()).map((e) => e.name)).toEqual(["Ginza"]);
     expect((await listPublishedEvents()).map((e) => e.name)).toEqual(["Ginza"]);
+  });
+
+  test("listStandingBoards returns standing boards newest first, with slug and counts", async () => {
+    await createEvent("Ginza", new Date(), new Date());
+    const temple = await createStandingBoard("Temple needs");
+    await prisma.task.create({ data: { eventId: temple.id, title: "Cups", position: 1024 } });
+    await createStandingBoard("Garden care");
+    const list = await listStandingBoards();
+    expect(list.map((b) => b.name)).toEqual(["Garden care", "Temple needs"]);
+    const found = list.find((b) => b.name === "Temple needs")!;
+    expect(found.taskCount).toBe(1);
+    expect(found.slug).toBeTruthy();
   });
 });

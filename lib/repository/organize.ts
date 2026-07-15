@@ -20,6 +20,23 @@ export interface EventListItem {
   status: EventStatus; taskCount: number;
 }
 
+export interface StandingBoardItem {
+  id: string; name: string; slug: string | null; status: EventStatus; taskCount: number;
+}
+
+/** Evergreen boards, newest first. listEvents excludes standing boards, so the
+ *  organizer index lists these separately to keep them reachable. */
+export async function listStandingBoards(): Promise<StandingBoardItem[]> {
+  const boards = await prisma.event.findMany({
+    where: { standing: true },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    include: { _count: { select: { tasks: true } } },
+  });
+  return boards.map((b) => ({
+    id: b.id, name: b.name, slug: b.slug, status: b.status, taskCount: b._count.tasks,
+  }));
+}
+
 export async function listEvents(): Promise<EventListItem[]> {
   const events = await prisma.event.findMany({
     where: { standing: false },
