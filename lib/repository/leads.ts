@@ -48,10 +48,10 @@ export async function getLeadAuth(
 /** A lead's read view: their group's chase list (abbreviated names, no contact details) and counts. */
 export async function getLeadChaseView(
   token: string,
-): Promise<{ group: string; eventName: string; counts: StatusCounts; chase: ChaseGroup[] } | null> {
+): Promise<{ group: string; eventName: string; counts: StatusCounts; chase: ChaseGroup[]; boardParam: string } | null> {
   const lead = await prisma.lead.findUnique({
     where: { token },
-    select: { group: true, orgId: true, eventId: true, event: { select: { name: true } } },
+    select: { group: true, orgId: true, eventId: true, event: { select: { name: true, slug: true, id: true } } },
   });
   if (!lead) return null;
   const people = await prisma.person.findMany({
@@ -73,5 +73,6 @@ export async function getLeadChaseView(
     eventName: lead.event.name,
     counts: statusCounts(roster, byPerson),
     chase: chaseList(roster, byPerson),
+    boardParam: lead.event.slug ?? lead.event.id,
   };
 }
