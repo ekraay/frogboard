@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { getLeadChaseView } from "@/lib/repository/leads";
-import { ChaseView } from "@/components/ChaseView";
+import { getLeadRosterView } from "@/lib/repository/leads";
+import { RosterView } from "@/components/RosterView";
 import { SiteNav } from "@/components/SiteNav";
 import type { NavContext } from "@/lib/domain/nav";
 
@@ -10,7 +10,7 @@ export const metadata: Metadata = { robots: { index: false, follow: false }, ref
 
 export default async function LeadPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const view = await getLeadChaseView(token);
+  const view = await getLeadRosterView(token);
   if (!view) {
     return (
       <main className="mx-auto max-w-md px-4 pt-16 text-center">
@@ -27,7 +27,7 @@ export default async function LeadPage({ params }: { params: Promise<{ token: st
   return (
     <>
       <SiteNav ctx={navCtx} />
-      <ChaseView token={token} group={view.group} eventName={view.eventName} counts={view.counts} chase={view.chase} />
+      <RosterView token={token} group={view.group} eventName={view.eventName} counts={view.counts} byPatrol={view.byPatrol} roster={view.roster} />
     </>
   );
 }

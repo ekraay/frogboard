@@ -22,21 +22,25 @@ export function statusCounts(people: { id: string }[], byPerson: Map<string, Rsv
   return counts;
 }
 
-export interface ChaseGroup {
+export interface RosterGroup {
   subGroup: string;
   people: { id: string; name: string; position: string | null; status: EffectiveStatus; reason: string | null }[];
 }
 
-/** The people still to chase (blank, then maybe), grouped by sub-group, groups sorted alphabetically. */
-export function chaseList(people: RosterPerson[], byPerson: Map<string, RsvpRecord[]>): ChaseGroup[] {
-  const rank: Record<string, number> = { blank: 0, maybe: 1 };
-  const bySub = new Map<string, ChaseGroup["people"]>();
+/** The patrol key a person falls under; a blank sub-group collects under 'Ungrouped'. */
+function patrolKey(subGroup: string | null): string {
+  return subGroup?.trim() ? subGroup.trim() : "Ungrouped";
+}
+
+/** Everyone in the group, by sub-group (alphabetical), needs-attention first within each. */
+export function rosterView(people: RosterPerson[], byPerson: Map<string, RsvpRecord[]>): RosterGroup[] {
+  const rank: Record<EffectiveStatus, number> = { blank: 0, maybe: 1, yes: 2, no: 3 };
+  const bySub = new Map<string, RosterGroup["people"]>();
   for (const p of people) {
     const records = byPerson.get(p.id) ?? [];
     const status = eventStatus(records);
-    if (status !== "blank" && status !== "maybe") continue;
     const reason = records.find((r) => r.day === null)?.reason ?? null;
-    const key = p.subGroup?.trim() ? p.subGroup.trim() : "Ungrouped";
+    const key = patrolKey(p.subGroup);
     if (!bySub.has(key)) bySub.set(key, []);
     bySub.get(key)!.push({ id: p.id, name: p.name, position: p.position, status, reason });
   }
@@ -45,6 +49,29 @@ export function chaseList(people: RosterPerson[], byPerson: Map<string, RsvpReco
     .map(([subGroup, ppl]) => ({
       subGroup,
       people: ppl.sort((x, y) => rank[x.status] - rank[y.status] || x.name.localeCompare(y.name)),
+    }));
+}
+
+export interface PatrolSummary {
+  subGroup: string;
+  counts: StatusCounts;
+  leader: string | null;
+}
+
+/** Per-sub-group tallies (alphabetical) and the patrol leader's name, for the summary. */
+export function patrolSummary(people: RosterPerson[], byPerson: Map<string, RsvpRecord[]>): PatrolSummary[] {
+  const bySub = new Map<string, RosterPerson[]>();
+  for (const p of people) {
+    const key = patrolKey(p.subGroup);
+    if (!bySub.has(key)) bySub.set(key, []);
+    bySub.get(key)!.push(p);
+  }
+  return [...bySub.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([subGroup, ppl]) => ({
+      subGroup,
+      counts: statusCounts(ppl, byPerson),
+      leader: ppl.find((p) => p.position === "PL")?.name ?? null,
     }));
 }
 
