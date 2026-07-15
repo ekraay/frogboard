@@ -125,3 +125,18 @@ export async function listPublishedEvents(): Promise<PublishedEventSummary[]> {
     covered: e.tasks.filter((t) => t._count.signups >= t.neededCount).length,
   }));
 }
+
+export interface PublishedBoardSummary {
+  id: string; name: string; slug: string | null; taskCount: number;
+}
+
+/** Published standing boards, newest first, for the public org landing.
+ *  Drafts stay private; only published boards surface to volunteers. */
+export async function listPublishedStandingBoards(): Promise<PublishedBoardSummary[]> {
+  const boards = await prisma.event.findMany({
+    where: { status: "published", standing: true },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    include: { _count: { select: { tasks: true } } },
+  });
+  return boards.map((b) => ({ id: b.id, name: b.name, slug: b.slug, taskCount: b._count.tasks }));
+}

@@ -8,16 +8,22 @@ import { ShareButton } from "@/components/ShareButton";
 export function SiteNav({ ctx }: { ctx: NavContext }) {
   const seg = breadcrumbSegments(ctx);
   const actions = navActions(ctx);
+  // The tagline rides under the brand title, not in the action cluster.
+  const tagline = actions.find((a) => a.variant === "tagline");
+  const clusterActions = actions.filter((a) => a.variant !== "tagline");
 
   return (
     <nav
       aria-label="Site"
       className="sticky top-0 z-30 flex items-center gap-3 border-b border-washi-deep bg-washi/90 px-4 py-2.5 backdrop-blur"
     >
-      <Link href={seg.brandHref} className="flex items-center gap-2 font-display text-lg font-extrabold text-ink">
-        <span aria-hidden className="text-xl">🐸</span>
-        <span className="hidden sm:inline">{seg.brand}</span>
-      </Link>
+      <div className="flex flex-col">
+        <Link href={seg.brandHref} className="flex items-center gap-2 font-display text-lg font-extrabold leading-tight text-ink">
+          <span aria-hidden className="text-xl">🐸</span>
+          <span className="hidden sm:inline">{seg.brand}</span>
+        </Link>
+        {tagline && <span className="text-xs font-normal italic text-ink-soft">{tagline.label}</span>}
+      </div>
 
       {seg.crumbs.map((c) => (
         <span key={c.label} className="flex items-center gap-3 min-w-0">
@@ -38,16 +44,9 @@ export function SiteNav({ ctx }: { ctx: NavContext }) {
             {seg.chip}
           </span>
         )}
-        {actions.map((a) => {
+        {clusterActions.map((a) => {
           if (a.variant === "share") {
             return ctx.shareUrl ? <ShareButton key={a.key} url={ctx.shareUrl} /> : null;
-          }
-          if (a.variant === "tagline") {
-            return (
-              <span key={a.key} className="whitespace-nowrap text-sm font-semibold text-pond">
-                🐸 {a.label}
-              </span>
-            );
           }
           const cls =
             a.variant === "cta"
