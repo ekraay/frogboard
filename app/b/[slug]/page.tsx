@@ -5,6 +5,8 @@ import { isValidSession, SESSION_COOKIE } from "@/lib/security/session";
 import { flagEnabled } from "@/lib/flags";
 import { parseBoardFilters } from "@/lib/domain/boardFilters";
 import { TaskBoard } from "@/components/board/TaskBoard";
+import { SiteNav } from "@/components/SiteNav";
+import type { NavContext } from "@/lib/domain/nav";
 
 // Per-request: the session decides organizer, and the flag/cookie decides
 // whether the board is visible at all.
@@ -34,13 +36,21 @@ export default async function TaskBoardPage({
   const initialFilters = parseBoardFilters(await searchParams);
   const nowMs = currentTimeMs();
   const isOrganizer = isValidSession(cookieStore.get(SESSION_COOKIE)?.value);
+  const showNav = flagEnabled("nav", { cookies: cookieStore });
+  const navCtx: NavContext = {
+    org: "BCSF", orgHref: "/", event: board.name, view: "Sign up",
+    persona: "volunteer", groups: [], allGroups: false, boardHref: null, shareUrl: null,
+  };
   return (
-    <TaskBoard
-      event={{ name: board.name }}
-      tasks={board.tasks}
-      isOrganizer={isOrganizer}
-      initialFilters={initialFilters}
-      nowMs={nowMs}
-    />
+    <>
+      {showNav && <SiteNav ctx={navCtx} />}
+      <TaskBoard
+        event={{ name: board.name }}
+        tasks={board.tasks}
+        isOrganizer={isOrganizer}
+        initialFilters={initialFilters}
+        nowMs={nowMs}
+      />
+    </>
   );
 }

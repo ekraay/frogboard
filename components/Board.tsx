@@ -64,24 +64,26 @@ export function Board({
         </p>
       )}
 
-      {groups.map((g) => (
-        <section key={g.key} className="mb-10">
-          {!standing && (
-            <h2 className="mb-4 flex items-center justify-center gap-3 text-xs font-bold uppercase tracking-[0.2em] text-lantern-deep">
-              <span aria-hidden className="h-px w-10 bg-gradient-to-r from-transparent to-lantern/50" />
-              <span aria-hidden className="text-[0.7rem]">🏮</span>
-              {g.label}
-              <span aria-hidden className="text-[0.7rem]">🏮</span>
-              <span aria-hidden className="h-px w-10 bg-gradient-to-l from-transparent to-lantern/50" />
-            </h2>
-          )}
-          <div className="space-y-4">
-            {g.tasks.map((t) => (
-              <TaskCard key={t.id} task={t} index={cardIndex++} isOrganizer={isOrganizer} />
-            ))}
-          </div>
-        </section>
-      ))}
+      <div id="board">
+        {groups.map((g) => (
+          <section key={g.key} className="mb-10">
+            {!standing && (
+              <h2 className="mb-4 flex items-center justify-center gap-3 text-xs font-bold uppercase tracking-[0.2em] text-lantern-deep">
+                <span aria-hidden className="h-px w-10 bg-gradient-to-r from-transparent to-lantern/50" />
+                <span aria-hidden className="text-[0.7rem]">🏮</span>
+                {g.label}
+                <span aria-hidden className="text-[0.7rem]">🏮</span>
+                <span aria-hidden className="h-px w-10 bg-gradient-to-l from-transparent to-lantern/50" />
+              </h2>
+            )}
+            <div className="space-y-4">
+              {g.tasks.map((t) => (
+                <TaskCard key={t.id} task={t} index={cardIndex++} isOrganizer={isOrganizer} />
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
 
       <footer className="mt-14 border-t border-lily-line/60 pt-6 text-center">
         <Link
