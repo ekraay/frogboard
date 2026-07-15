@@ -31,10 +31,13 @@ describe("breadcrumbSegments", () => {
 });
 
 describe("navActions", () => {
-  test("volunteer: quiet, with Hop to it as a tagline (no help link, not a button)", () => {
-    const a = navActions({ ...base, persona: "volunteer" });
+  test("volunteer on a board: Hop to it as a tagline (no help link, not a button)", () => {
+    const a = navActions({ ...base, persona: "volunteer", event: "Bon Odori 2026" });
     expect(a.map((x) => x.key)).toEqual(["hop"]);
     expect(a[0]).toEqual({ key: "hop", label: "Hop to it", href: null, variant: "tagline" });
+  });
+  test("volunteer at the root (no event chosen): a quiet bar, no actions", () => {
+    expect(navActions({ ...base, persona: "volunteer" })).toEqual([]);
   });
   test("lead with a board link: one View public board link", () => {
     const a = navActions({ ...base, persona: "lead", boardHref: "/bon-odori" });

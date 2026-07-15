@@ -59,9 +59,10 @@ export function breadcrumbSegments(ctx: NavContext): Segments {
 /** Only in-reach moves: an action appears only when its prerequisite exists. */
 export function navActions(ctx: NavContext): NavAction[] {
   if (ctx.persona === "volunteer") {
-    // Quiet by design: no moves, just the tagline. "Hop to it" is a slogan,
-    // not a button; the board itself carries the claim action.
-    return [{ key: "hop", label: "Hop to it", href: null, variant: "tagline" }];
+    // Quiet by design: no moves, just a tagline. "Hop to it" is a slogan, not a
+    // button; the board carries the claim action. At the root (no event chosen
+    // yet) there is no board, so the bar stays silent.
+    return ctx.event ? [{ key: "hop", label: "Hop to it", href: null, variant: "tagline" }] : [];
   }
   if (ctx.persona === "lead") {
     return ctx.boardHref
