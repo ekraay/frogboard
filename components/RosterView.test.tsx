@@ -39,11 +39,31 @@ test("summarizes each patrol and names the leader accountable", () => {
   expect(summary.getByText(/PL Alex T\./)).toBeInTheDocument(); // leader shown in the summary
 });
 
-test("keeps answered people with their status and reason", () => {
+test("keeps answered people, showing their reason", () => {
   render(view());
   expect(screen.getByText("Bo S.")).toBeInTheDocument();
-  expect(screen.getByText(/away that weekend/i)).toBeInTheDocument();
-  expect(screen.getByText(/no answer/i)).toBeInTheDocument(); // the blank person still shows
+  expect(screen.getByDisplayValue(/away that weekend/i)).toBeInTheDocument(); // reason kept, editable
+});
+
+test("marks the recorded answer as the selected choice", () => {
+  render(view());
+  const bo = screen.getByText("Bo S.").closest("li")!;
+  expect(within(bo).getByRole("button", { name: /no/i })).toHaveAttribute("aria-pressed", "true");
+  expect(within(bo).getByRole("button", { name: /^yes$/i })).toHaveAttribute("aria-pressed", "false");
+});
+
+test("prefills a maybe reason so it is never lost on the next tap", () => {
+  render(view());
+  const cara = screen.getByText("Cara I.").closest("li")!;
+  expect(within(cara).getByDisplayValue("Might have a game")).toBeInTheDocument();
+});
+
+test("flags people who have not replied", () => {
+  render(view());
+  const dee = screen.getByText("Dee K.").closest("li")!;
+  expect(within(dee).getByText(/awaiting reply/i)).toBeInTheDocument();
+  // nothing is selected yet
+  expect(within(dee).getByRole("button", { name: /^yes$/i })).toHaveAttribute("aria-pressed", "false");
 });
 
 test("bolds the patrol leader in the roster", () => {
