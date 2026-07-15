@@ -6,6 +6,9 @@ import { SignInForm } from "@/components/organize/SignInForm";
 import { NewEventForm } from "@/components/organize/NewEventForm";
 import { NewOngoingBoardForm } from "@/components/organize/NewOngoingBoardForm";
 import { EventList } from "@/components/organize/EventList";
+import { flagEnabled } from "@/lib/flags";
+import { SiteNav } from "@/components/SiteNav";
+import type { NavContext } from "@/lib/domain/nav";
 
 export const dynamic = "force-dynamic";
 
@@ -15,8 +18,15 @@ export default async function OrganizePage() {
     return <main className="px-4"><SignInForm /></main>;
   }
   const events = await listEvents();
+  const showNav = flagEnabled("nav", { cookies: jar });
+  const navCtx: NavContext = {
+    org: "BCSF", orgHref: "/", event: null, view: "Organize",
+    persona: "organizer", groups: [], allGroups: false, boardHref: null, shareUrl: null,
+  };
   return (
-    <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
+    <>
+      {showNav && <SiteNav ctx={navCtx} />}
+      <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
       <div className="mb-6 flex items-baseline justify-between">
         <h1 className="font-display text-3xl font-extrabold text-ink">🐸 Your events</h1>
         <form action={signOutAction}>
@@ -28,6 +38,7 @@ export default async function OrganizePage() {
       <EventList events={events} />
       <NewEventForm />
       <NewOngoingBoardForm />
-    </main>
+      </main>
+    </>
   );
 }

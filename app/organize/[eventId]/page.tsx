@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { isValidSession, SESSION_COOKIE } from "@/lib/security/session";
@@ -8,6 +8,9 @@ import { getEventLeads } from "@/lib/repository/leads";
 import { OrganizeGrid } from "@/components/organize/OrganizeGrid";
 import { GroupRollups } from "@/components/organize/GroupRollups";
 import { LeadsPanel } from "@/components/organize/LeadsPanel";
+import { flagEnabled } from "@/lib/flags";
+import { SiteNav } from "@/components/SiteNav";
+import type { NavContext } from "@/lib/domain/nav";
 
 export const dynamic = "force-dynamic";
 
@@ -28,8 +31,20 @@ export default async function OrganizeEventPage({
   ]);
   const groups = rollups.map((r) => r.group);
 
+  const boardParam = grid.slug ?? grid.id;
+  const host = (await headers()).get("host") ?? "";
+  const proto = host.startsWith("localhost") ? "http" : "https";
+  const showNav = flagEnabled("nav", { cookies: jar });
+  const navCtx: NavContext = {
+    org: "BCSF", orgHref: "/", event: grid.name, view: "Organize",
+    persona: "organizer", groups: [], allGroups: false,
+    boardHref: `/${boardParam}`, shareUrl: `${proto}://${host}/${boardParam}`,
+  };
+
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-16 pt-8">
+    <>
+      {showNav && <SiteNav ctx={navCtx} />}
+      <main className="mx-auto max-w-6xl px-4 pb-16 pt-8">
       <div className="mb-4">
         <Link href="/organize"
           className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-pond underline-offset-2 hover:underline">
@@ -42,14 +57,17 @@ export default async function OrganizeEventPage({
           </Link>
         </div>
       </div>
-      <div className="mb-4 space-y-4">
+      <div id="roster" className="mb-4 space-y-4">
         <GroupRollups groups={rollups} />
         <LeadsPanel eventId={grid.id} groups={groups} leads={leads} />
       </div>
-      <OrganizeGrid
-        event={{ id: grid.id, name: grid.name, status: grid.status, slug: grid.slug, startDate: grid.startDate, endDate: grid.endDate, standing: grid.standing }}
-        initialTasks={grid.tasks}
-      />
-    </main>
+      <div id="settings">
+        <OrganizeGrid
+          event={{ id: grid.id, name: grid.name, status: grid.status, slug: grid.slug, startDate: grid.startDate, endDate: grid.endDate, standing: grid.standing }}
+          initialTasks={grid.tasks}
+        />
+      </div>
+      </main>
+    </>
   );
 }
