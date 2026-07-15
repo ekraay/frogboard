@@ -36,6 +36,16 @@ so design them together.
 
 ## Explore / design first
 
+- **Garden home / workspace hub (Trello-style)**: the brand (🐸 Frog Board)
+  eventually opens a hub listing your **gardens** (orgs/workspaces you can
+  reach), **ponds** (groups), **gatherings** (events), and **standing boards**,
+  like Trello's boards-and-workspaces home. Multi-tenant home screen. It grows
+  out of the minimal single-org "BCSF garden home" shipped on the nav branch
+  (public landing at `/`, Gatherings + Ongoing boards). Belongs with
+  multi-tenant / the [[groups-epic]]. Open questions: per-user access scoping,
+  recents/starred, and where a signed-in organizer view diverges from the
+  public volunteer view.
+
 - **Single-card create view**: a focused one-card form to add a task/frog, instead
   of adding rows in the spreadsheet grid. The grid stays the power tool for bulk
   **edit / delete / archive**; the card is the quick "add one thing" path (title,
