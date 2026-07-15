@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { breadcrumbSegments, navActions, type NavContext } from "@/lib/domain/nav";
+import { ShareButton } from "@/components/ShareButton";
 
 // The one bar that answers "where am I". Left cluster is identical everywhere;
 // the right cluster carries only the moves in reach for this persona. A server
@@ -39,15 +40,7 @@ export function SiteNav({ ctx }: { ctx: NavContext }) {
         )}
         {actions.map((a) => {
           if (a.variant === "share") {
-            return (
-              <button
-                key={a.key}
-                type="button"
-                className="whitespace-nowrap rounded-lg bg-reed px-3 py-2 text-sm font-bold text-white"
-              >
-                {a.label}
-              </button>
-            );
+            return ctx.shareUrl ? <ShareButton key={a.key} url={ctx.shareUrl} /> : null;
           }
           const cls =
             a.variant === "cta"
