@@ -36,6 +36,18 @@ so design them together.
 
 ## Explore / design first
 
+- **Accounts / identity & roles**: today the app has no real accounts. Volunteers
+  sign up with no account (the sacred adoption win), group leads use a per-event
+  magic-link token (`/lead/[token]`), and organizers share one password. A durable
+  per-user identity becomes foundational when **group leads self-serve**: manage
+  their own group's membership and own a persistent "home group" across events
+  instead of a throwaway token. Sequence this with Groups epic sub-project 2
+  ("a group is a home base"), not before the groups foundation. Its own brainstorm:
+  it is cross-cutting (leads and organizers), touches security, and must not erode
+  the no-account volunteer flow. The `Membership` join (from Groups sub-project 1a)
+  reserves the seam: a lead role attaches there as an additive field. See the
+  `delegate-per-group` spec for the conceptual seed. See [[groups-epic]].
+
 - **Garden home / workspace hub (Trello-style)**: the brand (🐸 Frog Board)
   eventually opens a hub listing your **gardens** (orgs/workspaces you can
   reach), **ponds** (groups), **gatherings** (events), and **standing boards**,
