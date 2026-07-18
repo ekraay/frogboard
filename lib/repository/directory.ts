@@ -68,7 +68,7 @@ export async function importPeople(
 export async function getGroupRollups(eventId: string): Promise<{ group: string; counts: StatusCounts }[]> {
   const event = await prisma.event.findUniqueOrThrow({ where: { id: eventId }, select: { orgId: true } });
   const memberships = await prisma.membership.findMany({
-    where: { group: { orgId: event.orgId }, person: { active: true } },
+    where: { group: { orgId: event.orgId }, person: { orgId: event.orgId, active: true } },
     select: { personId: true, group: { select: { name: true } } },
   });
   const rsvps = await getEventRsvps(eventId);

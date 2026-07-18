@@ -1,14 +1,21 @@
 // @vitest-environment node
-import { afterAll, beforeEach, describe, expect, test } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "@/lib/db";
 import { resetDb } from "@/test/db";
 import { hashExternalId } from "@/lib/security/hash";
 import { importPeople, getGroupRollups } from "@/lib/repository/directory";
+import { resolveGroupId } from "@/lib/repository/groups";
 import { setRsvp } from "@/lib/repository/rsvp";
 
 const ORG = "org_bcsf";
+const ORG_OTHER = "org_other";
 
 beforeEach(async () => { await resetDb(); });
+afterEach(async () => {
+  // resetDb() doesn't touch Organization, so drop the second org here to keep
+  // the test database clean for other test files that assume only org_bcsf.
+  await prisma.organization.deleteMany({ where: { NOT: { id: ORG } } });
+});
 afterAll(async () => { await prisma.$disconnect(); });
 
 describe("importPeople", () => {
@@ -61,5 +68,21 @@ describe("getGroupRollups", () => {
     await importPeople(ORG, "Ghosts", [{ name: "Gone Person", subGroup: null, position: null, externalId: "g1" }], { minor: false });
     await prisma.person.updateMany({ where: { orgId: ORG, name: "Gone Person" }, data: { active: false } });
     expect(await getGroupRollups(e.id)).toEqual([]);
+  });
+  test("a membership linking another org's person to this org's group does not leak them in", async () => {
+    const e = await prisma.event.create({ data: { name: "Obon", orgId: ORG, startDate: new Date(), endDate: new Date() } });
+    await importPeople(ORG, "Scouts", [
+      { name: "Home Person", subGroup: null, position: null, externalId: "h1" },
+    ], { minor: true });
+
+    await prisma.organization.create({ data: { id: ORG_OTHER, name: "Other", slug: "other" } });
+    const outsider = await prisma.person.create({ data: { orgId: ORG_OTHER, name: "Outsider", group: "Scouts" } });
+    const scoutsGroupId = await resolveGroupId(ORG, "Scouts");
+    await prisma.membership.create({ data: { personId: outsider.id, groupId: scoutsGroupId! } });
+
+    // Only Home Person (org_bcsf) counts; Outsider (org_other) must not inflate the bucket.
+    expect(await getGroupRollups(e.id)).toEqual([
+      { group: "Scouts", counts: { yes: 0, maybe: 0, no: 0, blank: 1 } },
+    ]);
   });
 });
