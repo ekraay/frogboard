@@ -68,7 +68,7 @@ function ArchivedRow({ id, name }: { id: string; name: string }) {
           disabled={pending}
           aria-label={`Delete ${name}`}
           onClick={() => {
-            if (window.confirm(`Permanently delete "${name}" and all its tasks and signups? This can't be undone.`)) {
+            if (window.confirm(`Permanently delete “${name}” and all its tasks and signups? This can't be undone.`)) {
               run(() => deleteEventAction(id));
             }
           }}
