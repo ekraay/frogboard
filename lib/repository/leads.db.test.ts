@@ -1,17 +1,27 @@
 // @vitest-environment node
-import { afterAll, beforeEach, describe, expect, test } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "@/lib/db";
 import { resetDb } from "@/test/db";
 import { createLead, removeLead, regenerateLeadToken, getEventLeads, getLeadAuth, getLeadRosterView } from "@/lib/repository/leads";
 import { importPeople } from "@/lib/repository/directory";
 import { setRsvp } from "@/lib/repository/rsvp";
+import { upsertGroup, moveMembership } from "@/lib/repository/groups";
 
 const ORG = "org_bcsf";
+const ORG_B = "org_test2";
 async function event() {
   return prisma.event.create({ data: { name: "Obon", orgId: ORG, startDate: new Date(), endDate: new Date() } });
 }
+async function seedOrgB() {
+  await prisma.organization.upsert({
+    where: { id: ORG_B },
+    update: {},
+    create: { id: ORG_B, name: "Second Church", slug: "second-church" },
+  });
+}
 
 beforeEach(async () => { await resetDb(); });
+afterEach(async () => { await prisma.organization.deleteMany({ where: { NOT: { id: ORG } } }); });
 afterAll(async () => { await prisma.$disconnect(); });
 
 test("createLead mints a token and carries the org", async () => {
@@ -108,5 +118,27 @@ describe("getLeadRosterView", () => {
   });
   test("null on an unknown token", async () => {
     expect(await getLeadRosterView("nope")).toBeNull();
+  });
+  test("returns an empty roster when the lead's group has no Group row", async () => {
+    const e = await prisma.event.create({ data: { name: "Obon", orgId: ORG, startDate: new Date(), endDate: new Date() } });
+    const lead = await createLead(e.id, "Nonexistent", "Simon");
+    const view = await getLeadRosterView(lead.token);
+    expect(view).not.toBeNull();
+    expect(view!.roster).toEqual([]);
+    expect(view!.counts).toEqual({ yes: 0, maybe: 0, no: 0, blank: 0 });
+  });
+  test("a person from another org linked to this org's group does not appear in the roster", async () => {
+    await seedOrgB();
+    const e = await event();
+    await importPeople(ORG, "Scouts", [
+      { name: "Alex Tanaka", subGroup: "Hawk", position: null, externalId: "1" },
+    ], { minor: true });
+    // A person in ORG_B, but with a membership pointing at ORG's "Scouts" group.
+    const outsider = await prisma.person.create({ data: { orgId: ORG_B, name: "Ola Outsider", group: "Scouts", active: true } });
+    const scoutsGroupId = await upsertGroup(ORG, "Scouts");
+    await moveMembership(outsider.id, scoutsGroupId, null);
+    const lead = await createLead(e.id, "Scouts", "Simon");
+    const view = await getLeadRosterView(lead.token);
+    expect(view!.roster.flatMap((g) => g.people).map((p) => p.name)).toEqual(["Alex T."]);
   });
 });
