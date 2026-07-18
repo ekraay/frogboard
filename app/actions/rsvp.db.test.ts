@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { resetDb } from "@/test/db";
 import { setRsvpAction } from "@/app/actions/rsvp";
 import { createLead } from "@/lib/repository/leads";
+import { personInGroup } from "@/test/factories";
 import type { RsvpStatus } from "@/lib/domain/rsvp";
 
 const ORG = "org_bcsf";
@@ -15,8 +16,8 @@ afterAll(async () => { await prisma.$disconnect(); });
 
 async function fixture() {
   const event = await prisma.event.create({ data: { name: "Obon", orgId: ORG, startDate: new Date(), endDate: new Date() } });
-  const scout = await prisma.person.create({ data: { orgId: ORG, name: "Simon Kraay", group: "Scouts" } });
-  const baller = await prisma.person.create({ data: { orgId: ORG, name: "Ava Lin", group: "YAO" } });
+  const scout = await personInGroup(ORG, "Scouts", { name: "Simon Kraay" });
+  const baller = await personInGroup(ORG, "YAO", { name: "Ava Lin" });
   const lead = await createLead(event.id, "Scouts", "Simon");
   return { event, scout, baller, lead };
 }
@@ -52,4 +53,16 @@ test("coerces a non-string reason to no reason", async () => {
   expect(await setRsvpAction(lead.token, scout.id, "no", 42 as unknown as string)).toEqual({ ok: true });
   const row = await prisma.rsvp.findFirst({ where: { personId: scout.id, eventId: event.id } });
   expect(row!.reason).toBeNull();
+});
+
+test("allows an active and an inactive member of the lead's group, refuses others", async () => {
+  const event = await prisma.event.create({ data: { name: "Obon", orgId: ORG, startDate: new Date(), endDate: new Date() } });
+  const active = await personInGroup(ORG, "Scouts", { name: "Simon Kraay" });
+  const inactive = await personInGroup(ORG, "Scouts", { name: "Old Scout", active: false });
+  const other = await personInGroup(ORG, "YAO", { name: "Ava Lin" });
+  const lead = await createLead(event.id, "Scouts", "Simon");
+
+  expect((await setRsvpAction(lead.token, active.id, "yes", null)).ok).toBe(true);
+  expect((await setRsvpAction(lead.token, inactive.id, "no", null)).ok).toBe(true);
+  expect((await setRsvpAction(lead.token, other.id, "yes", null)).ok).toBe(false);
 });
