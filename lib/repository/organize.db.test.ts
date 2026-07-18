@@ -6,6 +6,7 @@ import {
   createEvent, listEvents, setEventStatus, deleteEvent, getEventGrid,
   upsertTaskWithAudit, deleteTaskWithAudit, deleteTasks, renumberTasks,
   getEventHistory, revertAuditEntry, createStandingBoard, listStandingBoards,
+  getEventSignups,
 } from "@/lib/repository/organize";
 import { listPublishedEvents } from "@/lib/repository/events";
 import type { ParsedTaskFields } from "@/lib/domain/gridRow";
@@ -341,5 +342,42 @@ describe("standing boards stay out of the event lists", () => {
     const found = list.find((b) => b.name === "Temple needs")!;
     expect(found.taskCount).toBe(1);
     expect(found.slug).toBeTruthy();
+  });
+});
+
+describe("getEventSignups", () => {
+  test("getEventSignups returns null for an unknown event", async () => {
+    expect(await getEventSignups("nope")).toBeNull();
+  });
+
+  test("getEventSignups flattens signups with their task fields, this event only", async () => {
+    const event = await prisma.event.create({
+      data: { name: "Obon", slug: "obon-2026", orgId: "org_bcsf", startDate: new Date(), endDate: new Date() },
+    });
+    const other = await prisma.event.create({
+      data: { name: "Other", orgId: "org_bcsf", startDate: new Date(), endDate: new Date() },
+    });
+    const task = await prisma.task.create({
+      data: {
+        eventId: event.id, title: "Games booth", kind: "shift", category: "Games",
+        date: new Date("2026-07-25T00:00:00Z"), startAt: new Date("2026-07-25T20:00:00Z"),
+        endAt: new Date("2026-07-25T23:00:00Z"), neededCount: 2, position: 3,
+      },
+    });
+    const otherTask = await prisma.task.create({ data: { eventId: other.id, title: "Elsewhere" } });
+    await prisma.signup.create({
+      data: { taskId: task.id, name: "Kenji", email: "k@x.com", group: "Scouts", minor: true, claimToken: "t1" },
+    });
+    await prisma.signup.create({ data: { taskId: otherTask.id, name: "Stranger", claimToken: "t2" } });
+
+    const result = await getEventSignups(event.id);
+    expect(result).not.toBeNull();
+    expect(result!.event).toEqual({ name: "Obon", slug: "obon-2026" });
+    expect(result!.signups).toHaveLength(1);
+    expect(result!.signups[0]).toMatchObject({
+      taskTitle: "Games booth", taskKind: "shift", category: "Games", position: 3,
+      name: "Kenji", email: "k@x.com", phone: null, group: "Scouts", minor: true,
+    });
+    expect(result!.signups[0].createdAt).toBeInstanceOf(Date);
   });
 });
