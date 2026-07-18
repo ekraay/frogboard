@@ -122,6 +122,7 @@ model Organization {
   people    Person[]
   events    Event[]
   leads     Lead[]
+  groups    Group[]
 }
 
 model Person {
@@ -139,6 +140,7 @@ model Person {
   active         Boolean      @default(true)
   createdAt      DateTime     @default(now())
   rsvps          Rsvp[]
+  memberships    Membership[]
 
   @@unique([orgId, externalIdHash])
   @@index([orgId, group, subGroup])
@@ -176,4 +178,28 @@ model Lead {
   createdAt DateTime     @default(now())
 
   @@index([eventId, group])
+}
+
+model Group {
+  id          String       @id @default(cuid())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name        String
+  createdAt   DateTime     @default(now())
+  memberships Membership[]
+
+  @@unique([orgId, name])
+}
+
+model Membership {
+  id        String   @id @default(cuid())
+  personId  String
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  groupId   String
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  subGroup  String?
+  createdAt DateTime @default(now())
+
+  @@unique([personId, groupId])
+  @@index([groupId])
 }
