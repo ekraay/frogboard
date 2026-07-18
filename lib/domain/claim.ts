@@ -51,6 +51,10 @@ export function validateClaim(input: ClaimInput, slot: SlotInfo): Result<ClaimVa
   const group = nullIfBlank(input.group);
   if (group && group.length > LIMITS.group) return { ok: false, error: "Group is too long." };
 
+  if (!input.minor && !email && !phone) {
+    return { ok: false, error: "Add an email or phone so we can reach you." };
+  }
+
   return {
     ok: true,
     value: { name, email, phone, group, minor: input.minor ?? null },

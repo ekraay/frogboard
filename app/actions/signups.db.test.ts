@@ -26,6 +26,7 @@ test("claimSlot persists a signup and returns its token", async () => {
   fd.set("taskId", taskId);
   fd.set("name", "Kenji");
   fd.set("group", "Scouts");
+  fd.set("phone", "555-0100");
 
   const result = await claimSlot(fd);
   expect(result.ok).toBe(true);
@@ -59,6 +60,7 @@ test("releaseSignup removes a signup when the token matches", async () => {
   const fd = new FormData();
   fd.set("taskId", taskId);
   fd.set("name", "Kenji");
+  fd.set("phone", "555-0100");
   const claim = await claimSlot(fd);
   expect(claim.ok).toBe(true);
   if (!claim.ok) return;

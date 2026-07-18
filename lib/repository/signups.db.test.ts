@@ -20,7 +20,7 @@ afterAll(async () => { await prisma.$disconnect(); });
 describe("createSignupWithAudit", () => {
   test("creates a signup + claim audit (with eventId) and returns a token", async () => {
     const taskId = await makeTaskNeeding(2);
-    const result = await createSignupWithAudit(taskId, { name: "Kenji", group: "Scouts" });
+    const result = await createSignupWithAudit(taskId, { name: "Kenji", group: "Scouts", phone: "555-0100" });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -37,8 +37,8 @@ describe("createSignupWithAudit", () => {
 
   test("refuses to overfill a task", async () => {
     const taskId = await makeTaskNeeding(1);
-    await createSignupWithAudit(taskId, { name: "Ann" });
-    const result = await createSignupWithAudit(taskId, { name: "Bob" });
+    await createSignupWithAudit(taskId, { name: "Ann", phone: "555-0100" });
+    const result = await createSignupWithAudit(taskId, { name: "Bob", phone: "555-0100" });
     expect(result).toEqual({ ok: false, error: "This task is already full." });
     expect(await prisma.signup.count({ where: { taskId } })).toBe(1);
   });
@@ -46,8 +46,8 @@ describe("createSignupWithAudit", () => {
   test("two simultaneous claims for the last slot do not overfill", async () => {
     const taskId = await makeTaskNeeding(1);
     const [a, b] = await Promise.allSettled([
-      createSignupWithAudit(taskId, { name: "Ann" }),
-      createSignupWithAudit(taskId, { name: "Bob" }),
+      createSignupWithAudit(taskId, { name: "Ann", phone: "555-0100" }),
+      createSignupWithAudit(taskId, { name: "Bob", phone: "555-0100" }),
     ]);
     const oks = [a, b].filter(
       (r) => r.status === "fulfilled" && r.value.ok,
@@ -75,7 +75,7 @@ describe("deleteSignupWithAudit", () => {
 
   test("refuses to remove a signup when the token is wrong", async () => {
     const taskId = await makeTaskNeeding(2);
-    const created = await createSignupWithAudit(taskId, { name: "Kenji" });
+    const created = await createSignupWithAudit(taskId, { name: "Kenji", phone: "555-0100" });
     expect(created.ok).toBe(true);
     if (!created.ok) return;
 
@@ -88,7 +88,7 @@ describe("deleteSignupWithAudit", () => {
 describe("audit actor (volunteer's own name)", () => {
   test("claim and release stamp the volunteer's name as the actor", async () => {
     const taskId = await makeTaskNeeding(2);
-    const created = await createSignupWithAudit(taskId, { name: "Kenji", group: "Scouts" });
+    const created = await createSignupWithAudit(taskId, { name: "Kenji", group: "Scouts", phone: "555-0100" });
     if (!created.ok) throw new Error("setup");
     const claim = await prisma.auditLog.findFirst({ where: { taskId, action: "claim" } });
     expect(claim!.actorName).toBe("Kenji");

@@ -7,11 +7,11 @@ const full: SlotInfo = { filled: 1, needed: 1, isFull: true };
 
 describe("validateClaim", () => {
   test("accepts a trimmed name and normalizes optional fields", () => {
-    const result = validateClaim({ name: "  Kenji  ", group: "Scouts" }, open);
+    const result = validateClaim({ name: "  Kenji  ", group: "Scouts", phone: "555-0100" }, open);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value).toEqual({
-        name: "Kenji", email: null, phone: null, group: "Scouts", minor: null,
+        name: "Kenji", email: null, phone: "555-0100", group: "Scouts", minor: null,
       });
     }
   });
@@ -38,7 +38,7 @@ describe("validateClaim", () => {
   });
   test("preserves a Unicode name (emoji + CJK) intact", () => {
     // Exploratory charter: youth/family names may include emoji and kanji.
-    const result = validateClaim({ name: "🐸 Kenji 山田" }, open);
+    const result = validateClaim({ name: "🐸 Kenji 山田", email: "k@x.com" }, open);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.name).toBe("🐸 Kenji 山田");
   });
@@ -48,12 +48,34 @@ describe("validateClaim", () => {
     });
   });
   test("coerces empty optional strings to null", () => {
-    const result = validateClaim({ name: "Kenji", email: "", phone: "" }, open);
+    const result = validateClaim({ name: "Kenji", email: "", phone: "", minor: true }, open);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.email).toBeNull();
       expect(result.value.phone).toBeNull();
+      expect(result.value.minor).toBe(true);
     }
+  });
+  test("rejects an adult with neither email nor phone", () => {
+    expect(validateClaim({ name: "Kenji" }, open)).toEqual({
+      ok: false, error: "Add an email or phone so we can reach you.",
+    });
+  });
+  test("whitespace-only contact counts as none", () => {
+    expect(validateClaim({ name: "Kenji", email: "  ", phone: " " }, open)).toEqual({
+      ok: false, error: "Add an email or phone so we can reach you.",
+    });
+  });
+  test("accepts an adult with only a phone", () => {
+    const result = validateClaim({ name: "Kenji", phone: "555-0100" }, open);
+    expect(result.ok).toBe(true);
+  });
+  test("accepts a minor with no contact info", () => {
+    const result = validateClaim({ name: "Alex", minor: true }, open);
+    expect(result).toEqual({
+      ok: true,
+      value: { name: "Alex", email: null, phone: null, group: null, minor: true },
+    });
   });
 });
 
