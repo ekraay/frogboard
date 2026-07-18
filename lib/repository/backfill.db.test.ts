@@ -1,11 +1,12 @@
 // @vitest-environment node
-import { afterAll, beforeEach, expect, test } from "vitest";
+import { afterAll, afterEach, beforeEach, expect, test } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { prisma } from "@/lib/db";
 import { resetDb } from "@/test/db";
 
 const ORG = "org_bcsf";
+const ORG_OTHER = "org_other";
 const SQL = readFileSync(join(process.cwd(), "prisma/sql/backfill-groups.sql"), "utf8");
 
 // $executeRawUnsafe runs exactly one statement per call, but the canonical
@@ -26,6 +27,11 @@ const runBackfill = async () => {
 
 beforeEach(async () => {
   await resetDb();
+});
+afterEach(async () => {
+  // resetDb() doesn't touch Organization, so drop the second org here to keep
+  // the test database clean for other test files that assume only org_bcsf.
+  await prisma.organization.deleteMany({ where: { NOT: { id: ORG } } });
 });
 afterAll(async () => {
   await prisma.$disconnect();
@@ -50,4 +56,33 @@ test("backfills groups and memberships from the legacy strings, idempotently", a
   await runBackfill(); // second run changes nothing
   expect(await prisma.group.count({ where: { orgId: ORG } })).toBe(2);
   expect(await prisma.membership.count()).toBe(3);
+});
+
+test("scopes the membership join by orgId, not by name alone", async () => {
+  await prisma.organization.upsert({
+    where: { id: ORG_OTHER },
+    update: {},
+    create: { id: ORG_OTHER, name: "Other", slug: "other" },
+  });
+  await prisma.person.create({ data: { orgId: ORG, name: "BCSF Scout", group: "Scouts" } });
+  await prisma.person.create({ data: { orgId: ORG_OTHER, name: "Other Scout", group: "Scouts" } });
+
+  await runBackfill();
+
+  // Same group name, two orgs: this must produce two Group rows, not one shared row.
+  const scoutsGroups = await prisma.group.findMany({ where: { name: "Scouts" } });
+  expect(scoutsGroups).toHaveLength(2);
+  expect(new Set(scoutsGroups.map((g) => g.orgId))).toEqual(new Set([ORG, ORG_OTHER]));
+
+  // Each person's membership must link to the Group in their OWN org.
+  const bcsfMembership = await prisma.membership.findFirstOrThrow({
+    where: { person: { name: "BCSF Scout" } },
+    include: { group: true },
+  });
+  const otherMembership = await prisma.membership.findFirstOrThrow({
+    where: { person: { name: "Other Scout" } },
+    include: { group: true },
+  });
+  expect(bcsfMembership.group.orgId).toBe(ORG);
+  expect(otherMembership.group.orgId).toBe(ORG_OTHER);
 });
