@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
 /** Find-or-create a group by name, race-safe against a concurrent create. */
@@ -7,9 +8,10 @@ export async function upsertGroup(orgId: string, name: string): Promise<string> 
   try {
     const created = await prisma.group.create({ data: { orgId, name }, select: { id: true } });
     return created.id;
-  } catch (e: unknown) {
+  } catch (e) {
     // P2002: another writer created it between our read and write.
-    if (e && typeof e === "object" && "code" in e && (e as { code: string }).code === "P2002") {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      // Assumes the concurrent creator's row is committed by now; fails loudly if not, never corrupts data.
       const now = await prisma.group.findUniqueOrThrow({ where: { orgId_name: { orgId, name } }, select: { id: true } });
       return now.id;
     }
