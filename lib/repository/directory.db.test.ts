@@ -32,6 +32,15 @@ describe("importPeople", () => {
     expect(p!.name).toBe("New Name");
     expect(p!.subGroup).toBe("Hawk");
   });
+  test("re-importing a person into a new group moves them (one membership)", async () => {
+    await importPeople(ORG, "Scouts", [{ name: "Simon", subGroup: "Fox", position: null, externalId: "1" }], { minor: false });
+    await importPeople(ORG, "Taiko", [{ name: "Simon", subGroup: null, position: null, externalId: "1" }], { minor: false });
+    const person = await prisma.person.findFirstOrThrow({ where: { orgId: ORG } });
+    const memberships = await prisma.membership.findMany({ where: { personId: person.id }, include: { group: true } });
+    expect(memberships).toHaveLength(1);
+    expect(memberships[0].group.name).toBe("Taiko");
+    expect(person.group).toBe("Taiko"); // dual-write kept in sync
+  });
 });
 
 describe("getGroupRollups", () => {

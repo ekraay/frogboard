@@ -4,11 +4,14 @@ import type { ImportedPerson } from "@/lib/domain/roster";
 import { statusCounts, type StatusCounts } from "@/lib/domain/roster";
 import { getEventRsvps } from "@/lib/repository/rsvp";
 import type { RsvpRecord } from "@/lib/domain/rsvp";
+import { upsertGroup, moveMembership } from "@/lib/repository/groups";
 
 /**
- * Idempotent roster import in one transaction. People with a source id dedup by
- * its hash (existing rows update, new rows insert); people without one always
- * insert. A duplicate source id inside one paste keeps the last row.
+ * Idempotent roster import. People with a source id dedup by its hash (existing
+ * rows update, new rows insert); people without one always insert. A duplicate
+ * source id inside one paste keeps the last row. Each person's membership is
+ * moved (not added) to the imported group, while `Person.group`/`subGroup`
+ * stay dual-written for now.
  */
 export async function importPeople(
   orgId: string,
@@ -16,6 +19,8 @@ export async function importPeople(
   rows: ImportedPerson[],
   opts: { minor: boolean },
 ): Promise<{ created: number; updated: number }> {
+  const groupId = await upsertGroup(orgId, group);
+
   const byHash = new Map<string, ImportedPerson>();
   const withoutHash: ImportedPerson[] = [];
   for (const row of rows) {
@@ -23,7 +28,6 @@ export async function importPeople(
     if (hash) byHash.set(hash, row);
     else withoutHash.push(row);
   }
-
   const existing = byHash.size
     ? await prisma.person.findMany({
         where: { orgId, externalIdHash: { in: [...byHash.keys()] } },
@@ -32,25 +36,32 @@ export async function importPeople(
     : [];
   const idByHash = new Map(existing.map((p) => [p.externalIdHash!, p.id]));
 
-  const rowData = (row: ImportedPerson, hash: string | null) => ({
+  const personData = (row: ImportedPerson, hash: string | null) => ({
     name: row.name, group, subGroup: row.subGroup, position: row.position,
     minor: opts.minor, externalIdHash: hash,
   });
-  const toCreate: ReturnType<typeof rowData>[] = withoutHash.map((row) => rowData(row, null));
-  const toUpdate: { id: string; data: ReturnType<typeof rowData> }[] = [];
+
+  let created = 0;
+  let updated = 0;
+  // Sequential so each person's id is known for its membership move.
+  for (const row of withoutHash) {
+    const p = await prisma.person.create({ data: { orgId, ...personData(row, null) }, select: { id: true } });
+    await moveMembership(p.id, groupId, row.subGroup);
+    created++;
+  }
   for (const [hash, row] of byHash) {
     const id = idByHash.get(hash);
-    if (id) toUpdate.push({ id, data: rowData(row, hash) });
-    else toCreate.push(rowData(row, hash));
+    if (id) {
+      await prisma.person.update({ where: { id }, data: { ...personData(row, hash), active: true } });
+      await moveMembership(id, groupId, row.subGroup);
+      updated++;
+    } else {
+      const p = await prisma.person.create({ data: { orgId, ...personData(row, hash) }, select: { id: true } });
+      await moveMembership(p.id, groupId, row.subGroup);
+      created++;
+    }
   }
-
-  await prisma.$transaction([
-    prisma.person.createMany({ data: toCreate.map((d) => ({ orgId, ...d })) }),
-    ...toUpdate.map((u) =>
-      prisma.person.update({ where: { id: u.id }, data: { ...u.data, active: true } }),
-    ),
-  ]);
-  return { created: toCreate.length, updated: toUpdate.length };
+  return { created, updated };
 }
 
 /** Attendance counts per group for an event: what the org coordinator sees (no names). */
