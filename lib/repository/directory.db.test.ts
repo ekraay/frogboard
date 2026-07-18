@@ -56,4 +56,10 @@ describe("getGroupRollups", () => {
       { group: "Scouts", counts: { yes: 1, maybe: 0, no: 0, blank: 1 } },
     ]);
   });
+  test("a group whose members are all inactive does not appear", async () => {
+    const e = await prisma.event.create({ data: { name: "Obon", orgId: ORG, startDate: new Date(), endDate: new Date() } });
+    await importPeople(ORG, "Ghosts", [{ name: "Gone Person", subGroup: null, position: null, externalId: "g1" }], { minor: false });
+    await prisma.person.updateMany({ where: { orgId: ORG, name: "Gone Person" }, data: { active: false } });
+    expect(await getGroupRollups(e.id)).toEqual([]);
+  });
 });

@@ -67,9 +67,9 @@ export async function importPeople(
 /** Attendance counts per group for an event: what the org coordinator sees (no names). */
 export async function getGroupRollups(eventId: string): Promise<{ group: string; counts: StatusCounts }[]> {
   const event = await prisma.event.findUniqueOrThrow({ where: { id: eventId }, select: { orgId: true } });
-  const people = await prisma.person.findMany({
-    where: { orgId: event.orgId, active: true, NOT: { group: null } },
-    select: { id: true, group: true },
+  const memberships = await prisma.membership.findMany({
+    where: { group: { orgId: event.orgId }, person: { active: true } },
+    select: { personId: true, group: { select: { name: true } } },
   });
   const rsvps = await getEventRsvps(eventId);
   const byPerson = new Map<string, RsvpRecord[]>();
@@ -78,10 +78,10 @@ export async function getGroupRollups(eventId: string): Promise<{ group: string;
     byPerson.get(r.personId)!.push({ day: r.day, status: r.status });
   }
   const groups = new Map<string, { id: string }[]>();
-  for (const p of people) {
-    const g = p.group!;
+  for (const m of memberships) {
+    const g = m.group.name;
     if (!groups.has(g)) groups.set(g, []);
-    groups.get(g)!.push({ id: p.id });
+    groups.get(g)!.push({ id: m.personId });
   }
   return [...groups.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
