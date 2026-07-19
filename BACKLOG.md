@@ -44,7 +44,9 @@ so design them together.
   early), but a future destructive migration on a review branch would hit prod
   pre-merge. Fix: give previews their own Neon branch (per-environment
   `DATABASE_URL`), or gate `migrate deploy` to production builds only. Surfaced
-  by the Groups sub-project 1a final review (2026-07-19).
+  by the Groups sub-project 1a final review (2026-07-19). Related: the
+  "Non-prod database wiring" card below, and local dev currently shares the prod
+  `frogboard` database (give dev its own DB too).
 
 - **Accounts / identity & roles**: today the app has no real accounts. Volunteers
   sign up with no account (the sacred adoption win), group leads use a per-event
@@ -57,6 +59,16 @@ so design them together.
   the no-account volunteer flow. The `Membership` join (from Groups sub-project 1a)
   reserves the seam: a lead role attaches there as an additive field. See the
   `delegate-per-group` spec for the conceptual seed. See [[groups-epic]].
+
+- **Archive follow-up batch** (from the archive-ongoing-boards final review,
+  PR #13): (a) surface `ok: false` results from archive/restore/delete actions
+  in both /organize lists — today a stale session makes the click a silent
+  no-op; (b) copy parity: dated events say "No events yet." even when all are
+  archived; give them "All events are archived." like ongoing boards; (c) close
+  signup writes on archived boards — `createSignupWithAudit` /
+  `deleteSignupWithAudit` never check event status, so a board loaded before
+  archiving still accepts claims (pre-existing, shared with archived dated
+  events).
 
 - **Garden home / workspace hub (Trello-style)**: the brand (🐸 Frog Board)
   eventually opens a hub listing your **gardens** (orgs/workspaces you can
