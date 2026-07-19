@@ -36,6 +36,16 @@ so design them together.
 
 ## Explore / design first
 
+- **Archive follow-up batch** (from the archive-ongoing-boards final review,
+  PR #13): (a) surface `ok: false` results from archive/restore/delete actions
+  in both /organize lists — today a stale session makes the click a silent
+  no-op; (b) copy parity: dated events say "No events yet." even when all are
+  archived; give them "All events are archived." like ongoing boards; (c) close
+  signup writes on archived boards — `createSignupWithAudit` /
+  `deleteSignupWithAudit` never check event status, so a board loaded before
+  archiving still accepts claims (pre-existing, shared with archived dated
+  events).
+
 - **Garden home / workspace hub (Trello-style)**: the brand (🐸 Frog Board)
   eventually opens a hub listing your **gardens** (orgs/workspaces you can
   reach), **ponds** (groups), **gatherings** (events), and **standing boards**,

@@ -1,15 +1,18 @@
 import Link from "next/link";
+import { ArchiveButton, ArchivedSection } from "@/components/organize/ArchiveControls";
 import type { StandingBoardItem } from "@/lib/repository/organize";
 
 // Ongoing (evergreen) boards live outside the dated-event list, so the
 // organizer index surfaces them here with a link back to each workspace.
 export function StandingBoardList({ boards }: { boards: StandingBoardItem[] }) {
   if (boards.length === 0) return null;
+  const active = boards.filter((b) => b.status !== "archived");
+  const archived = boards.filter((b) => b.status === "archived");
   return (
     <div className="mb-8">
       <h2 className="mb-3 font-display text-lg font-bold text-ink">Ongoing boards</h2>
       <ul className="space-y-3">
-        {boards.map((b) => (
+        {active.map((b) => (
           <li
             key={b.id}
             className="flex items-center gap-1 rounded-2xl border border-lily-line bg-white pr-2 shadow-sm transition hover:border-reed"
@@ -31,9 +34,14 @@ export function StandingBoardList({ boards }: { boards: StandingBoardItem[] }) {
                 View board
               </Link>
             )}
+            <ArchiveButton id={b.id} name={b.name} />
           </li>
         ))}
+        {active.length === 0 && (
+          <li className="text-ink-soft">All ongoing boards are archived.</li>
+        )}
       </ul>
+      <ArchivedSection items={archived} />
     </div>
   );
 }
