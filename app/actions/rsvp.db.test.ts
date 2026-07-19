@@ -66,3 +66,12 @@ test("allows an active and an inactive member of the lead's group, refuses other
   expect((await setRsvpAction(lead.token, inactive.id, "no", null)).ok).toBe(true);
   expect((await setRsvpAction(lead.token, other.id, "yes", null)).ok).toBe(false);
 });
+
+test("refuses when the lead's group name resolves to no Group row (fail closed)", async () => {
+  const event = await prisma.event.create({ data: { name: "Obon", orgId: ORG, startDate: new Date(), endDate: new Date() } });
+  const person = await personInGroup(ORG, "Scouts", { name: "Simon Kraay" });
+  const lead = await createLead(event.id, "Nonexistent", "Simon");
+
+  expect((await setRsvpAction(lead.token, person.id, "yes", null)).ok).toBe(false);
+  expect(await prisma.rsvp.count()).toBe(0);
+});
