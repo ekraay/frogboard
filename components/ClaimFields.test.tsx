@@ -76,3 +76,11 @@ test("surfaces the action error and does not refresh", async () => {
   expect(await screen.findByText("This task is already full.")).toBeInTheDocument();
   expect(refresh).not.toHaveBeenCalled();
 });
+
+test("asks adults for one way to be reached", () => {
+  render(<ClaimFields taskId="t1" />);
+  expect(screen.getByText(/add an email or a phone so we can reach you/i)).toBeInTheDocument();
+  // Email and Phone labels drop "(optional)"; Group keeps its own.
+  expect(screen.getByLabelText("Email")).toBeInTheDocument();
+  expect(screen.getByLabelText("Phone")).toBeInTheDocument();
+});

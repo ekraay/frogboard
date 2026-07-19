@@ -3,6 +3,7 @@ import type { Event, EventStatus, AuditAction, TaskKind, Prisma } from "@prisma/
 import type { ParsedTaskFields } from "@/lib/domain/gridRow";
 import { newClaimToken } from "@/lib/security/tokens";
 import { generateUniqueSlug } from "@/lib/repository/events";
+import type { SignupExportRecord } from "@/lib/domain/signupCsv";
 
 export async function createEvent(name: string, startDate: Date, endDate: Date): Promise<Event> {
   const slug = await generateUniqueSlug(name);
@@ -348,4 +349,25 @@ export async function renumberTasks(
     }
     return { ok: true as const };
   });
+}
+
+/** Every signup for an event with its task fields, flat, for the CSV export. */
+export async function getEventSignups(eventId: string): Promise<
+  { event: { name: string; slug: string | null }; signups: SignupExportRecord[] } | null
+> {
+  const event = await prisma.event.findUnique({ where: { id: eventId }, select: { name: true, slug: true } });
+  if (!event) return null;
+  const rows = await prisma.signup.findMany({
+    where: { task: { eventId } },
+    select: {
+      name: true, email: true, phone: true, group: true, minor: true, createdAt: true,
+      task: { select: { title: true, kind: true, date: true, startAt: true, endAt: true, category: true, position: true } },
+    },
+  });
+  const signups = rows.map((s) => ({
+    taskTitle: s.task.title, taskKind: s.task.kind, taskDate: s.task.date,
+    startAt: s.task.startAt, endAt: s.task.endAt, category: s.task.category, position: s.task.position,
+    name: s.name, email: s.email, phone: s.phone, group: s.group, minor: s.minor, createdAt: s.createdAt,
+  }));
+  return { event, signups };
 }

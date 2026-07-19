@@ -9,6 +9,7 @@ test("claim and release a slot end-to-end", async ({ page }) => {
 
   await firstCard.getByRole("button", { name: /hop to it/i }).click();
   await firstCard.getByLabel(/your name/i).fill("E2E Tester");
+  await firstCard.getByLabel(/email/i).fill("e2e@example.com");
   await firstCard.getByRole("button", { name: /^add me$/i }).click();
 
   await expect(firstCard).toContainText("E2E Tester");

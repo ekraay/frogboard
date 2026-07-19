@@ -27,6 +27,7 @@ test("preview opt-in, claim through the panel, then clean up", async ({ page }) 
 
   // Claim through the reused ClaimFields.
   await dialog.getByLabel(/your name/i).fill("E2E Board Tester");
+  await dialog.getByLabel(/email/i).fill("e2e@example.com");
   await dialog.getByRole("button", { name: /^add me$/i }).click();
 
   // The board refreshes and the claimant shows on the board.
