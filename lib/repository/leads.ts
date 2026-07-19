@@ -5,6 +5,7 @@ import { rosterView, type RosterGroup, patrolSummary, type PatrolSummary, status
 import { getEventRsvps } from "@/lib/repository/rsvp";
 import { boardDisplayName } from "@/lib/domain/displayName";
 import type { RsvpRecord } from "@/lib/domain/rsvp";
+import { resolveGroupId } from "@/lib/repository/groups";
 
 export async function createLead(eventId: string, group: string, name: string): Promise<Lead> {
   const event = await prisma.event.findUniqueOrThrow({ where: { id: eventId }, select: { orgId: true } });
@@ -54,10 +55,16 @@ export async function getLeadRosterView(
     select: { group: true, orgId: true, eventId: true, event: { select: { name: true, slug: true, id: true } } },
   });
   if (!lead) return null;
-  const people = await prisma.person.findMany({
-    where: { orgId: lead.orgId, active: true, group: lead.group },
-    select: { id: true, name: true, subGroup: true, minor: true, position: true },
-  });
+  const groupId = await resolveGroupId(lead.orgId, lead.group);
+  const memberships = groupId
+    ? await prisma.membership.findMany({
+        where: { groupId, person: { orgId: lead.orgId, active: true } },
+        select: { subGroup: true, person: { select: { id: true, name: true, minor: true, position: true } } },
+      })
+    : [];
+  const people = memberships.map((m) => ({
+    id: m.person.id, name: m.person.name, subGroup: m.subGroup, minor: m.person.minor, position: m.person.position,
+  }));
   const rsvps = await getEventRsvps(lead.eventId);
   const byPerson = new Map<string, RsvpRecord[]>();
   for (const r of rsvps) {

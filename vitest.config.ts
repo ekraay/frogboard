@@ -11,7 +11,9 @@ export default defineConfig({
     include: ["**/*.test.ts", "**/*.test.tsx"],
     // DB integration tests (*.db.test.ts) run separately via vitest.db.config.ts
     // against the test database; excluded here so `npm test` stays pure + fast.
-    exclude: ["e2e/**", "node_modules/**", ".next/**", "**/*.db.test.ts"],
+    // `.claude/**` keeps sibling git worktrees under .claude/worktrees/ from
+    // being cross-collected into this project's run.
+    exclude: ["e2e/**", "node_modules/**", ".next/**", ".claude/**", "**/*.db.test.ts"],
   },
   resolve: {
     alias: { "@": path.resolve(__dirname, ".") },

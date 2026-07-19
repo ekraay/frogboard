@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { getLeadAuth } from "@/lib/repository/leads";
 import { setRsvp } from "@/lib/repository/rsvp";
+import { resolveGroupId } from "@/lib/repository/groups";
 import type { RsvpStatus } from "@/lib/domain/rsvp";
 
 type Err = { ok: false; error: string };
@@ -18,8 +19,13 @@ export async function setRsvpAction(
   if (!STATUSES.includes(status)) return { ok: false, error: "Pick yes, no, or maybe." };
   const auth = await getLeadAuth(token);
   if (!auth) return { ok: false, error: "This link isn't valid." };
-  const person = await prisma.person.findUnique({ where: { id: personId }, select: { orgId: true, group: true } });
-  if (!person || person.orgId !== auth.orgId || person.group !== auth.group) {
+  const person = await prisma.person.findUnique({ where: { id: personId }, select: { orgId: true } });
+  if (!person || person.orgId !== auth.orgId) {
+    return { ok: false, error: "That person isn't in your group." };
+  }
+  const groupId = await resolveGroupId(auth.orgId, auth.group);
+  const inGroup = groupId ? (await prisma.membership.count({ where: { personId, groupId } })) > 0 : false;
+  if (!inGroup) {
     return { ok: false, error: "That person isn't in your group." };
   }
   const cleanReason = typeof reason === "string" && reason.trim() ? reason.trim() : null;

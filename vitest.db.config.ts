@@ -9,7 +9,9 @@ export default defineConfig({
     environment: "node",
     globals: true,
     include: ["**/*.db.test.ts"],
-    exclude: ["node_modules/**", ".next/**"],
+    // `.claude/**` keeps sibling git worktrees under .claude/worktrees/ from
+    // being cross-collected into this project's run.
+    exclude: ["node_modules/**", ".next/**", ".claude/**"],
     // One DB, no cross-test isolation between files sharing tables: run serially.
     fileParallelism: false,
   },

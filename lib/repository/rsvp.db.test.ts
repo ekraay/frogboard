@@ -3,12 +3,13 @@ import { afterAll, beforeEach, expect, test } from "vitest";
 import { prisma } from "@/lib/db";
 import { resetDb } from "@/test/db";
 import { setRsvp, getEventRsvps } from "@/lib/repository/rsvp";
+import { personInGroup } from "@/test/factories";
 
 const ORG = "org_bcsf";
 
 async function fixture() {
   const event = await prisma.event.create({ data: { name: "Obon", orgId: ORG, startDate: new Date(), endDate: new Date() } });
-  const person = await prisma.person.create({ data: { orgId: ORG, name: "Simon Kraay", group: "Scouts" } });
+  const person = await personInGroup(ORG, "Scouts", { name: "Simon Kraay" });
   return { event, person };
 }
 
