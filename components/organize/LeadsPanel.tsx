@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   createLeadAction, removeLeadAction, regenerateLeadTokenAction, importRosterAction,
 } from "@/app/actions/leads";
@@ -50,6 +51,10 @@ export function LeadsPanel({ eventId, groups, leads }: { eventId: string; groups
         {leads.map((l) => (
           <li key={l.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-lily-line px-3 py-2">
             <span className="text-sm text-ink"><span className="font-semibold">{l.name}</span> · {l.group}</span>
+            <Link href={`/lead/${l.token}`} aria-label={`Open ${l.group} RSVP list`}
+              className="rounded-lg px-3 py-1 text-sm font-bold text-pond underline underline-offset-2">
+              Open
+            </Link>
             <button type="button" disabled={pending} onClick={() => void navigator.clipboard?.writeText(leadUrl(l.token))}
               className="rounded-lg bg-reed px-3 py-1 text-sm font-bold text-white hover:bg-reed-deep disabled:opacity-60">Copy link</button>
             <button type="button" disabled={pending} onClick={() => run(() => regenerateLeadTokenAction(l.id, eventId))}
