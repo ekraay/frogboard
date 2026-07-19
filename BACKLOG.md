@@ -36,6 +36,16 @@ so design them together.
 
 ## Explore / design first
 
+- **Preview deploys migrate production (infra hazard)**: `package.json` runs
+  `prisma generate && prisma migrate deploy && next build`, and Vercel preview
+  deployments share the production `DATABASE_URL`. So an un-merged branch's
+  migration runs against prod at preview-build time, before review. Harmless for
+  additive/idempotent migrations (that is how the Groups backfill reached prod
+  early), but a future destructive migration on a review branch would hit prod
+  pre-merge. Fix: give previews their own Neon branch (per-environment
+  `DATABASE_URL`), or gate `migrate deploy` to production builds only. Surfaced
+  by the Groups sub-project 1a final review (2026-07-19).
+
 - **Accounts / identity & roles**: today the app has no real accounts. Volunteers
   sign up with no account (the sacred adoption win), group leads use a per-event
   magic-link token (`/lead/[token]`), and organizers share one password. A durable
