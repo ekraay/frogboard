@@ -8,6 +8,7 @@ import { getEventLeads } from "@/lib/repository/leads";
 import { OrganizeGrid } from "@/components/organize/OrganizeGrid";
 import { GroupRollups } from "@/components/organize/GroupRollups";
 import { LeadsPanel } from "@/components/organize/LeadsPanel";
+import { DownloadSignupsButton } from "@/components/organize/DownloadSignupsButton";
 import { SiteNav } from "@/components/SiteNav";
 import type { NavContext } from "@/lib/domain/nav";
 
@@ -50,9 +51,12 @@ export default async function OrganizeEventPage({
         </Link>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
           <h1 className="font-display text-2xl font-extrabold text-ink">🐸 {grid.name}</h1>
-          <Link href={`/organize/${grid.id}/history`} className="text-sm font-medium text-pond underline-offset-2 hover:underline">
-            History
-          </Link>
+          <div className="flex items-center gap-4">
+            <DownloadSignupsButton eventId={grid.id} />
+            <Link href={`/organize/${grid.id}/history`} className="text-sm font-medium text-pond underline-offset-2 hover:underline">
+              History
+            </Link>
+          </div>
         </div>
       </div>
       <div id="roster" className="mb-4 scroll-mt-16 space-y-4">
