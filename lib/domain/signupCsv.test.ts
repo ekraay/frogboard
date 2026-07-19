@@ -52,10 +52,20 @@ describe("signupCsvRows", () => {
   });
 
   test("guards volunteer-typed cells against formula injection", () => {
-    const [, row] = signupCsvRows([{ ...base, name: "=HYPERLINK(1)", group: "+Scouts" }]);
+    const [, row] = signupCsvRows([
+      { ...base, name: "=HYPERLINK(1)", group: "+Scouts", email: "=cmd()", phone: "@1234" },
+    ]);
     expect(row[5]).toBe("'=HYPERLINK(1)");
     expect(row[8]).toBe("'+Scouts");
+    expect(row[6]).toBe("'=cmd()");
+    expect(row[7]).toBe("'@1234");
     expect(row[0]).toBe("Games booth"); // organizer-typed title untouched
+  });
+
+  test("empty input yields just the header row", () => {
+    expect(signupCsvRows([])).toEqual([
+      ["Task", "Kind", "Date", "Time", "Category", "Name", "Email", "Phone", "Group", "Minor", "Signed up"],
+    ]);
   });
 });
 
@@ -66,5 +76,11 @@ describe("toCsv", () => {
 
   test("adds no BOM", () => {
     expect(toCsv([["a"]]).charCodeAt(0)).toBe(97);
+  });
+
+  test("header-only rows produce a single line with no trailing CRLF", () => {
+    const csv = toCsv(signupCsvRows([]));
+    expect(csv).toBe("Task,Kind,Date,Time,Category,Name,Email,Phone,Group,Minor,Signed up");
+    expect(csv.endsWith("\r\n")).toBe(false);
   });
 });

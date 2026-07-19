@@ -1,8 +1,9 @@
 import { EVENT_TZ, formatTime } from "@/lib/domain/time";
+import type { TaskKind } from "@/lib/domain/types";
 
 export interface SignupExportRecord {
   taskTitle: string;
-  taskKind: "shift" | "errand";
+  taskKind: TaskKind;
   taskDate: Date | null;
   startAt: Date | null;
   endAt: Date | null;
@@ -35,6 +36,9 @@ function timeRange(startAt: Date | null, endAt: Date | null): string {
 }
 
 function byTaskThenSignup(a: SignupExportRecord, b: SignupExportRecord): number {
+  // When both sides are null the subtraction yields NaN, which is falsy, so the
+  // comparison falls through to the next tier. That is the intended null-vs-null
+  // behavior, not an accident.
   const date = (a.taskDate?.getTime() ?? Infinity) - (b.taskDate?.getTime() ?? Infinity);
   if (date) return date;
   const start = (a.startAt?.getTime() ?? Infinity) - (b.startAt?.getTime() ?? Infinity);
